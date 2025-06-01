@@ -347,14 +347,12 @@ deduplication. This is a major problem in practice and currently severely limits
 e-graphs are suitable for. In particular, e-graphs are not used in current general-purpose compilers
 despite their ability to solve the phase ordering problem.
 
-#TODO[eggcc is capable of taking in Rust code, so it's kinda extreme to imply that it is a "toy" compiler]
-
 E-graphs have, however, been used in more specialized domains such as synthesis of low-error
-floating point expressions @herbie and optimization of linear algebra expressions @spores. They
-are also used in eggcc @eggcc, an experimental optimizing compiler for the toy language Bril, and
-the webassembly-oriented production compiler backend Cranelift @cranelift. Cranelift uses a weaker
-construct called acyclic e-graphs (aegraphs) due to performance problems of full e-graphs. A
-proliferation of e-graphs within compilers would require them to become faster.
+floating point expressions @herbie and optimization of linear algebra expressions @spores. They are
+also used in eggcc @eggcc, an experimental optimizing compiler, and the webassembly-oriented
+production compiler backend Cranelift @cranelift. Cranelift uses a weaker construct called acyclic
+e-graphs (aegraphs) due to performance problems of full e-graphs. A proliferation of e-graphs within
+compilers would require them to become faster.
 
 // #TODO[Explain limitations of aegraphs. Or not? Seems excessive]
 // it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
@@ -388,20 +386,22 @@ implementation for our master's thesis.
 
 == Oatlog
 
-This thesis introduces Oatlog, a rewrite engine compatible with the egglog language. Like egglog, it
-can be seen as a Datalog engine with support for unification. Unlike egglog, it compiles rules
-ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index selection to be
-optimized globally.
+This thesis' contribution lies in introducing Oatlog, an independently developed e-graph engine,
+which implements with the egglog language and achieves a significant speedup compared to egglog.
+
+Like egglog, it can be seen as a Datalog engine with support for unification. Unlike egglog, it
+compiles rules ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index
+selection to be optimized globally.
 
 Oatlog has limited functionality compared to egglog, implementing only a subset of the language and
 its long tail of features. While a few features are impractical in an ahead-of-time setting, most
 egglog features could be implemented within the existing Oatlog architecture.
 
 For the language subset that Oatlog supports, it exceeeds egglog in performance. The speedups range
-from over 10x for tiny e-graphs of only hundreds of nodes, to more moderate 2x speedups for small
-e-graphs of about $10^5$ nodes. These results stem not from one large but rather many small
-improvements compared to egglog, around rule preprocessing, query planning, index implementation and
-general performance engineering.
+from over 100x for tiny e-graphs of less than a hundred e-nodes, gradually shrinking to a 2x speedup
+for e-graphs of about $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes. These
+results stem not from one large but rather many small improvements compared to egglog, around rule
+preprocessing, query planning, index implementation and general performance engineering.
 
 == This thesis
 
@@ -420,12 +420,6 @@ the implementation decisions we have made, in addition to showing how Oatlog is 
 capabilities.
 @chapter_evaluation follows by evaluating Oatlog through its test suite and benchmarks.
 @chapter_conclusion discusses future work, both algorithmic and constant factor performance improvements.
-
-== Contributions
-
-#TODO[is this needed?]
-
-Our main contribution is a independently implemented egglog compatible e-graph engine that outperforms egglog.
 
 = Background <chapter_background>
 
