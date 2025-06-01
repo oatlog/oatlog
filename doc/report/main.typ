@@ -8,22 +8,22 @@
   [#text(fill: blue, weight: "bold", size: 12pt)[NOTE: #msg]]
 }
 
-#let raw_line_offset = state("raw_line_offset", -1)
-#show raw.line: it => context {
-  if raw_line_offset.get() == -1 {
-    return it
+#let raw_line_offset = state("raw_line_offset", 0)
+#show raw.where(block: true): it => {
+  show raw.line: it => context {
+    let num = it.number + raw_line_offset.get()
+    if num < 10 {
+      text(fill: gray)[~~#num]
+    } else if num < 100 {
+      text(fill: gray)[~#num]
+    } else {
+      text(fill: gray)[#num]
+    }
+    h(1em)
+    it.body
   }
-  let num = it.number + raw_line_offset.get()
-  if num < 10 {
-    text(fill: gray)[~~#num]
-  } else if num < 100 {
-    text(fill: gray)[~#num]
-  } else {
-    text(fill: gray)[#num]
-  }
-  h(1em)
-  it.body
-};
+  it
+}
 
 #show "naive": "naïve"
 #show "e-graph": box[e-graph]
@@ -801,9 +801,9 @@ in @fig_background_practice_uf merges in arbitrary order.
     let start = 79
     let end = 99
     let setup = raw_line_offset.update(_ => start - 1)
-    let reset = raw_line_offset.update(_ => -1)
+    let reset = raw_line_offset.update(_ => 0)
 
-    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    let b = raw(read("egraph.rs").split("\n").slice(start - 1, end).join("\n"), lang: "rust", block: true)
     text(size: 8pt, setup + b + reset)
   },
   caption: [A minimal union-find implementation lacking path compression and smaller-to-larger
@@ -847,12 +847,12 @@ due to functional dependencies possibly triggering a `union()` cascade.
 
 #figure(
   {
-    let start = 3
+    let start = 4
     let end = 30
     let setup = raw_line_offset.update(_ => start - 1)
-    let reset = raw_line_offset.update(_ => -1)
+    let reset = raw_line_offset.update(_ => 0)
 
-    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    let b = raw(read("egraph.rs").split("\n").slice(start - 1, end).join("\n"), lang: "rust", block: true)
     text(size: 8pt, setup + b + reset)
   },
   caption: [An e-graph represented as a data structure.],
@@ -884,12 +884,12 @@ uses its e-class if present, only otherwise falling back to `make()`.
 
 #figure(
   {
-    let start = 30
+    let start = 31
     let end = 68
     let setup = raw_line_offset.update(_ => start - 1)
-    let reset = raw_line_offset.update(_ => -1)
+    let reset = raw_line_offset.update(_ => 0)
 
-    let b = raw(read("egraph.rs").split("\n").slice(start, end).join("\n"), lang: "rust", block: true)
+    let b = raw(read("egraph.rs").split("\n").slice(start - 1, end).join("\n"), lang: "rust", block: true)
     text(size: 8pt, setup + b + reset)
   },
   caption: [Hard-coded implementation of rewrite rules for commutativity and distributivity on an
@@ -940,12 +940,10 @@ Note that existing extraction libraries could be used by serializing the e-graph
     let lines = read("egraph.rs").split("\n")
     let mid = 69
 
-    let primary = raw_line_offset.update(_ => 0)
-    let secondary = raw_line_offset.update(_ => mid - 1)
-    let reset = raw_line_offset.update(_ => -1)
+    let secondary = raw_line_offset.update(_ => mid)
+    let reset = raw_line_offset.update(_ => 0)
 
-    let a = raw(lines.slice(1, mid).join("\n"), lang: "rust", block: true)
-    let a = primary + a
+    let a = raw(lines.slice(0, mid).join("\n"), lang: "rust", block: true)
 
     let b = raw(lines.slice(mid).join("\n"), lang: "rust", block: true)
     let b = secondary + b + reset
@@ -1574,338 +1572,51 @@ depending on the situation.
 
 = Implementation <chapter_implementation>
 
-// #TODO[Suggested chapter structure
-//
-//   - API interface
-//   - Architecture
-//     - Roughly describe structure of each IR
-//   - HIR optimizations
-//     - Pre-seminaive opts
-//     - Semi-naive, why precise old vs only all/new
-//     - Domination among semi-naive variants
-//     - Equality modulo permutation (is mostly HIR level, so place here)
-//   - TIR, Query planning
-//   - LIR and runtime considerations
-//     - Size of e-class ids
-//     - Index implementation
-//       - why hash over btree index
-//       - why full over trie index
-//     - Union find
-//     - Canonicalization in detail
-// ]
+This section describes Oatlog -- focusing first on its external interface, then on its overall
+architecture, before finally going into detail on the compilation stages and their respective
+intermediate representations: HIR, TIR and LIR.
 
-/*
+== Oatlog from a user's perspective <section_implementation_api_interface>
 
-This section discusses Oatlog in detail, including how it is used, what it can do and how it is
-implemented.
+Oatlog is a, or technically a pair of, Rust procedural macros. The macros
+`oatlog::compile_egraph_strict!()` and `oatlog::compile_egraph_relaxed!()` both take as input an
+egglog theory and emits a struct `Theory` as well as opaque types representing e-classes within each
+of the egglog code datatypes. A generated theory containing
+`(datatype Math (Mul Math Math) (Add Math Math))` will generate the types `Theory` and `Math` and
+can be interacted with using the functions
+- `Theory::new() -> Theory`, creating a new theory instance,
+- `Theory::make(&mut self) -> Math`, creating a new entirely unknown e-class,
+- `Theory::find(&mut self, Math) -> Math`, getting the representative of an e-class,
+- `Theory::insert_add(&mut self, (Math, Math, Math))`, inserting an addition tuple,
+- `Theory::insert_mul(&mut self, (Math, Math, Math))`, inserting a multiplication tuple,
+- `Theory::canonicalize(&mut self)`, applying all pending insertions, and
+- `Theory::step(&mut self)` which matches and applies all rewrite rules once.
 
-== Egglog-compatible external interface
+The marcros `compile_egraph_strict` and `compile_egraph_relaxed` differ in how closely they follow
+egglog's semantics. Neither is exactly equivalent to deterministic egglog, which uses `IndexMap`s
+over `HashMap`s to make sure all rules are matched and hence e-classes created in a deterministic
+order. Oatlog, like egglog's nondeterministic mode, iterates hashmaps and is from run to run only
+guaranteed to produce equivalent e-graphs, which are indistinguishable only if e-classes are treated
+as opaque identifiers rather than as integers. Oatlog's strict mode matches egglog's
+nondeterministic mode, including matching every rewrite rule exactly once per step, which means that
+the produced e-graphs will be equivalent for any fixed number of steps.
 
-Oatlog is invoked as a Rust proc macro `oatlog::compile_egraph!`, to which the user can provide
-either a string literal or an S-expression in the form of Rust tokens directly, as seen in
-@compile_egraph_invokation. The input is parsed as a theory in the egglog language as specified in
-@language-egglog.
+Oatlog's relaxed mode replaces the step-by-step equivalence, with every rule matched once per step,
+with an eventual equivalence where the e-graphs must be equivalent once the theory has been
+saturated. This allows Oatlog to detect commutative relations and store them more efficiently, which
+has the side effect of effectively running the commutativity rewrite $(a,b,c)->(b,a,c)$ as part of
+the canonicalization fixed point. By effectively running this specific rewrite rule eagerly, facts
+determined through its use will be discovered earlier by Oatlog, and Oatlog's e-graph will in every
+iteration be a superset of egglog's e-graph in the same step. When comparing Oatlog and egglog we
+will use the relaxed mode for saturating benchmarks and the strict mode for non-saturating
+benchmarks.
 
-#figure(
-  ```rust
-    // Egglog as a string literal
-    oatlog::compile_egraph!("
-      (datatype Math
-        (Mul Math Math)
-        (Add Math Math)
-      )
-      (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-    ");
-    // Egglog as an S-expression of Rust tokens
-    oatlog::compile_egraph!((
-      (datatype Math
-        (Mul Math Math)
-        (Add Math Math)
-      )
-      (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-    ));
-  ```,
-  caption: [Usage examples of `oatlog::compile_egraph!`.],
-) <compile_egraph_invokation>
+Oatlog's practical use is limited due to not supporting extraction, without which it aside from
+being a e-graph implementation case study is limited to verifying identifies.
+@appendix_example_quadratic_formula shows a full example of using Oatlog to verify an identity
+similar to the quadratic formula, including the egglog theory and the Rust usage code.
 
-We are planning to implement user-specified primitive functions by allowing Rust code to be written
-inline with the S-expressions.
-
-Oatlog does not currently support all Egglog language constructs. @oatlog_egglog_compatibility shows
-an overview of language keywords that Oatlog supports. Aside from this, Oatlog currently lacks
-support for
-
-+ #[Primitive functions, i.e. non-partial functions with exclusively primitive arguments and return
-    values, implemented as Rust functions directly such as `i64::add` or `i64::mul`.]
-+ #[Lattice functions, i.e. partial functions returning primitives updated through `:merge`.]
-+ #[Containers, such as sets and multisets containing non-primitives.]
-+ #[Running arbitrary schedules.]
-
-#figure(
-  {
-    let yes = table.cell()[yes]
-    let no = table.cell(fill: red.lighten(20%))[no]
-    let ignored = table.cell(fill: gray.lighten(30%))[ignored]
-    let wont = table.cell(fill: blue.lighten(40%))[won't]
-    grid(
-      columns: (1fr, 1fr),
-      table(
-        columns: (45%, 45%),
-        table.cell(colspan: 2)[Features desirable in Oatlog],
-        [Egglog feature], [Oatlog support],
-
-        table.cell(colspan: 2)[Core],
-        [include], yes,
-        [sort], yes,
-        [datatype], yes,
-        [datatype\*], yes,
-        [constructor], yes,
-        [function], yes,
-        [relation], yes,
-        [let], yes,
-        [rule], yes,
-        [rewrite], yes,
-        [birewrite], yes,
-
-        table.cell(colspan: 2)[Actions],
-        [union], yes,
-        [set], no, // function set output, for lattices
-        [delete], no,
-        [subsume], no,
-        [panic], no,
-
-        table.cell(colspan: 2)[Asserting],
-        [fail], ignored,
-        [check], ignored,
-      ),
-      table(
-        columns: (45%, 45%),
-        table.cell(colspan: 2)[Features more suitable to Oatlog's run-time API],
-        [Egglog feature], [Oatlog support],
-
-        table.cell(colspan: 2)[Scheduling],
-        [set-option], wont,
-        [run], yes,
-        [run-schedule], no,
-        [ruleset], no,
-        [combined-ruleset], no,
-
-        table.cell(colspan: 2)[Push/Pop],
-        [push], wont,
-        [pop], wont,
-
-        table.cell(colspan: 2)[Statistics],
-        [print-stats], wont,
-        [print-function], wont,
-        [print-size], wont,
-
-        table.cell(colspan: 2)[Serialization],
-        [input], wont,
-        [output], wont,
-
-        table.cell(colspan: 2)[Extraction],
-        [extract], wont,
-        [query-extract], wont,
-        [simplify], wont,
-      ),
-    )
-  },
-  caption: {
-    let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
-    let ignored = box(outset: 2pt, radius: 2pt, fill: gray.lighten(30%))[ignored]
-    let wont = box(outset: 2pt, radius: 2pt, fill: blue.lighten(40%))[won't]
-    flex-caption(
-      [Egglog support in Oatlog, by language keyword.],
-      [
-        Rows marked #no could make sense to implement, at the very
-        least for unit tests. Rows marked #ignored are currently no-ops but should be implemented while
-        rows marked #wont are not sensible to implement outside a REPL.
-      ],
-    )
-  },
-) <oatlog_egglog_compatibility>
-
-Finally, Oatlog has a run-time API that allows insertion and querying of rows and e-classes,
-realized through functions implemented on the `Theory` type in the code generated by the
-`oatlog::compile_egraph!` macro. This API is currently overly cumbersome, as can be seen from its
-use in @appendix_examples. @oatlog_runtime_api_features summarizes the currently
-implemented and unimplemented features of the Oatlog run-time API.
-
-#figure(
-  {
-    let yes = table.cell()[yes]
-    let no = table.cell(fill: red.lighten(20%))[no]
-    table(
-      columns: (auto, auto),
-      [Run-time API feature], [Oatlog support],
-      [Creating e-classes], yes,
-      [Inserting e-nodes], yes,
-      [Unifying e-classes], yes,
-      [Applying all rules once], yes,
-      [Running rules to saturation], no,
-      [Checking equality], yes,
-      [Extraction], no,
-      [Row count per table], yes,
-    )
-  },
-  caption: {
-    let no = box(outset: 2pt, radius: 2pt, fill: red.lighten(20%))[no]
-    flex-caption(
-      [Oatlog run-time API feature implementation status.],
-      [
-        Rows marked #no are not yet implemented.
-      ],
-    )
-  },
-) <oatlog_runtime_api_features>
-
-== Architecture and intermediate representations
-
-Oatlog is a Rust proc-macro that takes in egglog code and generates Rust code. See
-@codegen_example_theory and @codegen_example_relation for an example of what the generated code
-looks like. @oatlog-architecture shows an overview of Oatlog's internal architecture.
-
-#figure(
-  image("../figures/architecture.svg"),
-  caption: [A coarse overview of the current Oatlog architecture.],
-) <oatlog-architecture>
-
-=== Egglog AST
-
-Either Rust tokens or strings are parsed into S-expressions and then parsed into an egglog AST. The
-AST represents the source-level language without simplifications and does not remove syntax sugar.
-
-=== HIR, High-level Intermediate Representation
-
-The main purpose of HIR is for normalization and optimization. Here, a rule consist of a set of
-premises and a set of actions, where premises are conjunctive queries (joins) and actions are
-inserts and unifications. HIR is lowered into LIR and that process also performs query planning.
-
-=== QIR, Query-plan IR
-
-#NOTE[The current implementation is a very ad-hoc generic join and will be replaced by something
-  similar to free-join, except entirely static (only a single cover)]
-
-Represents all the choices made to transform a conjunctive query to LIR, specifically the order of
-joins and how the joins are performed. Note that this IR only contains queries and other
-information, such as relation properties are lowered directly from HIR.
-
-=== LIR, Low-level Intermediate Representation
-
-LIR is a low-level description of the actual code that is to be generated.
-
-// string or Rust tokens -> Sexp -> egglog ast -> hir -> query plan -> lir -> Rust code.
-
-=== Rustc spans across files
-
-Rust proc-macros work on Rust tokens which are annotated with spans that essentially are byte ranges
-of the original source code. However, if the proc-macro tokenizes additional strings through
-`proc_macro::TokenStream::from_str`, for example to implement the egglog `(include ..)`
-functionality, when tokenizing arbitrary strings, no such spans are provided.
-
-We solve this by both supporting parsing Rust tokens as well as tokenizing and parsing strings as
-sexp directly, inserting our own byte ranges. This has another problem, in that since our spans are
-not from rustc our error locations are no longer correct. This is solved by implementing displaying
-error contexts ourselves, so that context information is part of the compile error but with a bogus
-rustc span.
-
-=== Testing infrastructure
-
-Since Oatlog is implemented using a proc-macro, errors result in Rust compilation errors rather than
-single test failures. This means we require some mechanism to compile test cases separately.
-Luckily, Rust doctests do exactly this and so we use those for test cases expected to not compile.
-Overall, our comparative testing infrastructure (against egglog) can handle the 6 cases laid out in
-@oatlog_comparative_testing_conditions.
-
-#figure(
-  table(
-    columns: (auto, auto),
-    [Code], [Condition],
-    [`nogenerate`], [Oatlog is unable to generate code.],
-    [`no_compile`], [The generated code does not compile.],
-    [`does_panic`], [Runtime panic when running Oatlog and egglog.],
-    [`mismatched`], [Oatlog and egglog produce different numbers of e-nodes],
-    [`zrocorrect`], [Oatlog and egglog produce zero e-nodes],
-    [`allcorrect`], [Oatlog and egglog produce the same non-zero number of e-nodes],
-  ),
-  caption: flex-caption(
-    [Possible outcomes for comparative testing of Oatlog and egglog.],
-    [
-      The `zrocorrect` verdict is broken out from `allcorrect` since Oatlog ignores the `check`
-      command, which usually is used in those tests.
-    ],
-  ),
-) <oatlog_comparative_testing_conditions>
-
-// === Relation taxonomy.
-//
-// #TODO[@function-taxonomy]
-//
-// #figure(
-//   table(
-//     columns: (auto, auto, auto, auto),
-//     [], [signature], [inserts], [get-or-default],
-//     [function], [`[*] -> *`], [yes], [no],
-//     [constructor], [`[*] -> E`], [yes], [yes, make eclass],
-//     [relation], [`[*] -> ()`], [yes], [yes, performs insert],
-//     [], [], [], [],
-//     [function], [`[] -> *`], [yes], [yes if statically initialized.],
-//     [global], [`[] -> *`], [yes], [yes if statically initialized.],
-//     [], [], [], [],
-//     [primitive], [`[*] -> *`], [not supported], [yes, allows side effects (eg insert)],
-//   ),
-//   caption: flex-caption(
-//     [
-//       Different types of functions.
-//     ],
-//     [
-//       () means unit, \* means any, E means eclass, P means primitive.
-//     ],
-//   ),
-// ) <function-taxonomy>
-
-= Oatlog evaluation <oatlog_evaluation>
-
-*/
-
-// - egglog compatible API interface
-//
-// - architecture and IRs
-//     - should contain bulk of text
-//     - explanations and optimizations interleaved
-//     - query planning
-//     - index selection + algorithms
-//
-// - exactly how is canonicalization implemented (cool optimizations)
-//     - essentially everything from the runtime library
-//
-// - misc implementation details
-//     - proc macro stuff
-//     - spans
-//     - testing infrastructure
-
-This section describes the implementation of Oatlog.
-@section_implementation_api_interface describes the interface to use Oatlog as a library.
-@section_implementation_architecture describes the overall architecture of Oatlog and the IRs (Intermediate Representations) used in it.
-@section_implementation_hir_details presents details on the HIR and how it is optimized.
-@section_implementation_tir_details describes how the query planning is done to create the TIR.
-@section_implementation_lir_details presents the LIR and many of the runtime considerations such as index implementation.
-
-== Main API interface <section_implementation_api_interface>
-
-An example of how Oatlog can be used is shown in @section_implementation_api_demo, it checks if the quadratic formula is correct.
-The macro `oatlog::compile_egraph_relaxed!()` takes in egglog code and emits a struct `Theory` which implements the e-graph engine.
-
-`Theory::make()` creates a new empty e-class.
-`Theory::insert_*()` inserts an e-node into a relation.
-`Theory::step()` canonicalizes the e-graph and applies all rewrite rules once.
-`Theory::are_equal()` checks if two e-classes have been unified.
-
-=== Example <section_implementation_api_demo>
-
-#raw(read("../../examples/api-demo/src/main.rs"), lang: "rust")
-
-== Architecture Overview <section_implementation_architecture>
+== Architecture overview <section_implementation_architecture>
 
 #figure(
   image("../figures/architecture.svg"),
@@ -1944,7 +1655,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
 // SEMI-JOIN
 
 #figure(
-  grid(
+  text(size: 9pt, grid(
     columns: (auto, auto, auto, auto),
     ```python
     # rule 1
@@ -1969,7 +1680,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
             X()
     ```,
     ```python
-    # rule 1 + rule 2 + rule 3
+    # rule 1, 2 and 3
     for _ in A:
         for _ in B:
             X()
@@ -1978,7 +1689,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
             for _ in D:
                 Z()
     ```,
-  ),
+  )),
   caption: [
     Merging similar rules to avoid repeated joins and actions where A,B,C,D are premises and X,Y,Z are actions (inserts and unifications).
   ],
@@ -1988,7 +1699,7 @@ To generate the TIR, we perform query planning and when multiple equally good ch
 
 The LIR describes all relations and what indices they use, and contains a low-level description of how all joins and actions will be performed in the form of a trie.
 
-== HIR transformations <section_implementation_hir_details>
+== HIR transforms <section_implementation_hir_details>
 
 The HIR is a high-level representation of a rewrite rules, for example, consider this rule:
 ```egglog
@@ -2087,7 +1798,7 @@ For example the index $"a" -> "b","res"$ is identical to the index $"b" -> "a","
 Additionally, the optimizations @implementation_intra_rule_opt are extended to consider equality modulo column permutation.
 In practice, this is mostly important for checking if a rule dominates another rule, since it opens more symmetries.
 
-== Query planning when constructing TIR <section_implementation_tir_details>
+== TIR and query planning <section_implementation_tir_details>
 
 Generally for optimal query planning one would need to consider runtime information such as the sizes of the relations and the sizes of joins.
 We are performing static query planning at compile-time since that is less engineering effort and query planning is very well established research.
@@ -2120,7 +1831,7 @@ Globals, relations with all variables bound always produce a single element and 
 We select old before all, since old is smaller.
 To make sure we still perform WCOJ, we need to ensure that we perform semi-joins before joins that may increase the number of elements, however we perform semi-joins with all first to make sure that the last semi-join can become a primary join on old, if possible.
 
-== LIR and runtime <section_implementation_lir_details>
+== LIR, code generation and the runtime <section_implementation_lir_details>
 
 This section describes the LIR and runtime implementation, such as indexes.
 
@@ -3014,6 +2725,10 @@ of expensive random access by doing one of
 
 = Conclusion <chapter_conclusion>
 
+#TODO[discuss AOT/interpreter fundamental trade-offs (AOT best for small instances, interpreter
+  flexible and interactive, asymptotic constant factor could be similar with JIT etc. AOT may be
+  easier to implement]
+
 We introduce Oatlog, a relational e-graph engine implementing the egglog language. By combining a
 few novel techniques -- such as trie query planning and invariant permutations -- with solid
 performance-aware programming, Oatlog achives large speedups over egglog, particularly for small and
@@ -3047,6 +2762,8 @@ large e-graphs. This is possibly the most interesting implementation detail, fro
 perspective, to study further.
 
 == Future work
+
+#TODO[Compare performance with Datalog engines, borrow more tricks from there]
 
 Aside from studying how implementation details drive performance differences in Oatlog and egglog,
 possible future work on Oatlog includes adding features to improve egglog compatibility, smaller
@@ -3138,10 +2855,13 @@ beneficial performance-wise.
 #bibliography("refs.bib")
 #show: appendices
 
+#raw_line_offset.update(_ => 0)
+
 = Distributive law example in many languages <appendix_rosettaexample>
 
 This appendix shows code implementing a rule for the distributive law, $(a + b) dot c = a dot c + b
-dot c$, in Egglog, Eqlog, Rust pseudocode and SQL pseudocode.
+dot c$, in egglog, Eqlog, Rust pseudocode and SQL pseudocode. Note that Oatlog implements the egglog
+language.
 
 == Egglog
 
@@ -3190,13 +2910,13 @@ rule distributive_law {
 The above could be transformed into something like this Rust pseudocode,
 ```rust
 for (t0, c, e) in tables.mul.iter() {
-    for (a, b, _t0) in tables.add.index_2(t0) { // <- index on t0 to join Mul and Add tables
-
-        // actions
-        let t1 = tables.mul.insert_new(a, c);
-        let t2 = tables.mul.insert_new(b, c);
-        tables.add.insert_existing(t1, t2, e);
-    }
+  // index on t0 to join Mul and Add tables
+  for (a, b, _t0) in tables.add.index_2(t0) {
+    // actions
+    let t1 = tables.mul.insert_new(a, c);
+    let t2 = tables.mul.insert_new(b, c);
+    tables.add.insert_existing(t1, t2, e);
+  }
 }
 ```
 
@@ -3207,8 +2927,9 @@ become quite complicated because SQL is not a great language to express both rea
 same query.
 
 ```sql
--- Relevant here is that we can represent the Egraph as a table.
--- There is no explicit "Eclass" table, the Eclass is just the relationship between rows in the database.
+-- The relevant detail here is that we can represent the Egraph
+-- as a table. There is no explicit "Eclass" table, the Eclass
+-- is just the relationship between rows in the database.
 CREATE TABLE Add   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Mul   ( lhs Eclass, rhs Eclass, result Eclass);
 CREATE TABLE Const ( num i64,                result Eclass);
@@ -3246,6 +2967,8 @@ The two most important part of the generated theory code are the functions `appl
 
 Note that less important parts of the generated code have been elided to make the example easier to
 read.
+
+#TODO[Outdated]
 
 ```rust
 pub struct Delta {
@@ -3300,6 +3023,8 @@ impl Theory {
 ```
 
 = Example of generated relation code <appendix_codegen_example_relation>
+
+#TODO[Outdated]
 
 This is part of the generated Rust code for a binary operator `Add`. The querying functions are
 elided, but the included functions `update` and `update_finalize` are used within the theory's
@@ -3476,58 +3201,34 @@ impl AddRelation {
 
 == Math
 
-#raw(read("../../oatlog-bench/input/math.egg"), lang: "egglog")
+#text(size: 9pt, raw(read("../../oatlog-bench/input/math.egg").trim(), lang: "egglog", block: true))
 
 == Boolean adder
 
-#raw(read("../../oatlog-bench/input/boolean_adder.egg"), lang: "egglog")
+#columns(
+  2,
+  text(
+    size: 8pt,
+    raw(
+      read("../../oatlog-bench/input/boolean_adder.egg").trim(),
+      lang: "egglog",
+      block: true,
+    ),
+  ),
+)
 
-= Examples <appendix_examples>
+= Oatlog example -- the quadratic formula <appendix_example_quadratic_formula>
 
-This appendix contains self-contained examples that use Oatlog.
-
-== Quadratic formula
+#TODO[Bring any changes in `examples/api-demo` into `examples/quadratic-formula` if we care about
+  them]
 
 This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As can be seen from
-explicitly passing `&mut theory.uf` around, and having separate e-class creation and e-node
-insertion, the current run-time API is very unergonomic.
+having separate e-class creation and e-node insertion, the current run-time API is very unergonomic.
 
-#raw(read("../../examples/quadratic-formula/src/main.rs"), lang: "rust")
-
-= Passing egglog tests <appendix_passingtests>
-
-#NOTE[`(check <fact>)` is not yet implemented (since it is not vital for most use-cases and would require running rules out-of-order, which we also do not support yet.), we only compare the number of e-nodes for all the relations.]
-
-These are the currently passing tests from the egglog testsuite
-
-== `birewrite`
-
-#raw(read("../../comparative-test/egglog-testsuite/birewrite.egg"), lang: "egglog")
-
-== `include`
-
-#raw(read("../../comparative-test/egglog-testsuite/include.egg"), lang: "egglog")
-
-== `path`
-
-#raw(read("../../comparative-test/egglog-testsuite/path.egg"), lang: "egglog")
-
-== `pathproof`
-
-#raw(read("../../comparative-test/egglog-testsuite/pathproof.egg"), lang: "egglog")
-
-== `repro_querybug2`
-
-#raw(read("../../comparative-test/egglog-testsuite/repro-querybug2.egg"), lang: "egglog")
-
-== `repro_querybug4`
-
-#raw(read("../../comparative-test/egglog-testsuite/repro-querybug4.egg"), lang: "egglog")
-
-== `repro_querybug`
-
-#raw(read("../../comparative-test/egglog-testsuite/repro-querybug.egg"), lang: "egglog")
-
-== `repro_unsound_htutorial`
-
-#raw(read("../../comparative-test/egglog-testsuite/repro-unsound-htutorial.egg"), lang: "egglog")
+#columns(
+  2,
+  text(
+    size: 8pt,
+    raw(read("../../examples/quadratic-formula/src/main.rs").trim(), lang: "rust", block: true),
+  ),
+)
