@@ -347,6 +347,8 @@ deduplication. This is a major problem in practice and currently severely limits
 e-graphs are suitable for. In particular, e-graphs are not used in current general-purpose compilers
 despite their ability to solve the phase ordering problem.
 
+#TODO[eggcc is capable of taking in Rust code, so it's kinda extreme to imply that it is a "toy" compiler]
+
 E-graphs have, however, been used in more specialized domains such as synthesis of low-error
 floating point expressions @herbie and optimization of linear algebra expressions @spores. They
 are also used in eggcc @eggcc, an experimental optimizing compiler for the toy language Bril, and
@@ -358,14 +360,12 @@ proliferation of e-graphs within compilers would require them to become faster.
 // it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
 // explain.
 
+/*
 == Relational databases and Datalog
-
-#TODO[e-graphs as relational databases is discovered "recently" provide year/citation]
 
 #TODO[is this suitable for people who don't know databases or Datalog?]
 
-#TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are
-  useful]
+#TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are useful]
 
 Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm @egglog have
 shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
@@ -384,6 +384,7 @@ providing many techniques that could be transferred to e-graphs beyond those alr
 into egglog. At the same time, e-graphs have unique requirements and have been understood as
 databases only recently. This background is what motivated us to look at Datalog-like e-graph
 implementation for our master's thesis.
+*/
 
 == Oatlog
 
@@ -404,25 +405,27 @@ general performance engineering.
 
 == This thesis
 
-#TODO[Elaborate further with short section summaries once the respective sections have been
-  written.]
+// #TODO[Elaborate further with short section summaries once the respective sections have been
+// written.]
 
 @chapter_background extends this introduction with a step-by-step explanation of the topics relevant to
-implementing a state of the art e-graph engine. It does so by first motivating e-graphs starting
-from expression trees, then by incrementally showcasing a full self-contained implementation of
-equality saturation in about 100 lines of code, before finally explaining the similarity between
-e-graphs and relational databases and how this can be leveraged for a significantly more efficient
-implementation.
-
+implementing a state of the art e-graph engine.
+// It does so by first motivating e-graphs starting
+// from expression trees, then by incrementally showcasing a full self-contained implementation of
+// equality saturation in about 100 lines of code, before finally explaining the similarity between
+// e-graphs and relational databases and how this can be leveraged for a significantly more efficient
+//implementation.
 @chapter_implementation then concretely describes the application of these techniques in Oatlog and
 the implementation decisions we have made, in addition to showing how Oatlog is used and its
 capabilities.
-
 @chapter_evaluation follows by evaluating Oatlog through its test suite and benchmarks.
+@chapter_conclusion discusses future work, both algorithmic and constant factor performance improvements.
 
-#TODO[@chapter_conclusion]
+== Contributions
 
-#TODO[we need to clarify what our actual contributions are]
+#TODO[is this needed?]
+
+Our main contribution is a independently implemented egglog compatible e-graph engine that outperforms egglog.
 
 = Background <chapter_background>
 
@@ -434,7 +437,7 @@ This background introduces relevant concepts to understand Oatlog and its implem
 
 == E-graphs <section_group_egraphs>
 
-#TODO[I think it is fine for this space to be empty]
+This section discusses the background needed to understand e-graphs.
 
 === Expression trees and DAGs <section_background_dags>
 
@@ -861,8 +864,6 @@ Let us now implement rewrite rules that add new e-nodes based on existing e-grap
 particular, we consider commutativity of addition, $a+b=c => b+a=c$, commutativity of multiplication,
 $a dot b=c => b dot a=c$, and distributivity, $(a+b) dot c = d => a dot c + b dot c = d$.
 
-#TODO[grammar: hand-written]
-
 @fig_background_practice_apply_rules implements this, for simplicity in a hard-coded manner. This is
 unlike a generic e-graph engine which must be able to handle arbitrary rules by interpreting or
 compiling them rather than relying on them being hand-written.
@@ -917,16 +918,15 @@ All extraction roughly involves mapping each e-class to its least-cost e-node, b
 this task varies greatly depending on the cost model and on whether approximate solutions are
 acceptable.
 
-#TODO[isn't "dag size" a more clear term?]
-#TODO[bounded treewidth should be clarified that it is fixed parameter tractable]
 - If the cost is a per-node-sum over the expression tree, i.e. with duplicated contributions from
   shared DAG ancestors, optimal extraction can be done in linear time using a topological sort and
   dynamic programming since the cost of an e-node is a constant plus the sum of costs for its input
-  e-classes. This is essentially the only cost model in which extraction is not NP-hard
+  e-classes.
+  This is essentially the only cost model in which extraction is not NP-hard
   @extractnphard.
 - For costs that are per-node-sums in an expression DAG, optimal extraction can be done in
   exponential time using integer linear programming. Extraction in this cost model is also possible
-  in linear time for e-graphs of fixed treewidth @fastextract.
+  in linear time for e-graphs of bounded treewidth @fastextract.
 - Finally, for arbitrary cost functions approximate solutions can be found using various heuristics.
 
 However, Oatlog does not in its current form implement any extraction, so it is not a major topic in
@@ -1020,7 +1020,7 @@ Later on, we will see that relational e-matching addresses these issues.
 
 == Relational Databases <section_background_relational_databases>
 
-#TODO[I think it is fine for this space to be empty]
+This section connects relational databases with e-graphs.
 
 === Database joins <section_background_db_join>
 
@@ -2230,18 +2230,15 @@ A typical implementation of union-find includes both path-compression (@fast-fin
 While path-compression improves the computational complexity, it has worse constant factors.
 Specifically the implementation in @fast-find-impl uses (non-tail) recursion, writes to the same memory it is reading from.
 Additionally, these prohibit compiler optimizations.
-#TODO[argue why we think path length is small in practice]
-Without path-compression, `find` is simply the equivalent of a do-while loop.
+// #TODO[argue why we think path length is small in practice]
+Without path-compression, `find` is simply the equivalent of a do-while loop that may run $O(log n)$ iterations.
 
 Smaller-to-larger has two constant factor issues, maintaining the sizes and reading the sizes.
+Maintaining sizes is hard because we ideally would want to track exactly how many times an e-class is referenced over all the relations and indexes, which hurts performance and makes relation code harder to optimize#footnote[We initially used smaller-to-larger merging.].
+Reading sizes more obviously hurts performance because it uses more of the limited cache and memory bandwidth resources.
 
-// In any reasonable implementation of union-find, one would use both path compression and smaller-to-larger merging, however we do not do that.
-// Since we call `find()` extremely often during canonicalization, it represents a non-insignificant part of the runtime.
-// We found that typically,
-
-// path compression (see @fast-find-impl) actually starts having a significant cost.
-
-#TODO[]
+Newer-to-older merges smaller e-class ids into larger e-class ids#footnote[Newer-to-older merging is also done in egglog @egglog.].
+The reasoning is that this is a good heuristic for what e-class is referenced more often, this is because e-classes start with containing exactly one e-node and if e-classes tend to grow then we would expect older e-classes to increase how often they are referenced.
 
 === Relations and theory codegen
 
@@ -3113,6 +3110,8 @@ Smaller changes that could further improve Oatlog's performance include
 
 Finally, we would like to suggest three larger ideas with the potential to more fundamentally affect
 e-graph engine performance -- magic sets, accelerating associativity and sort-merge joins.
+
+#TODO[isn't adding both the lhs and rhs of an expression basically equivalent to doing magic sets?]
 
 Magic sets, also called demand-driven evaluation, is a technique that allows bottom-up Datalog
 engines to achieve a similar performance profile to top-down evaluation common in Prolog engines.
