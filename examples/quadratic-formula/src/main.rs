@@ -3,35 +3,37 @@ oatlog::compile_egraph_relaxed!((
         (Mul Math Math)
         (Add Math Math)
         (Sub Math Math)
-        (Neg Math)
-        (Zero)
+        (Const i64)
         (Sqrt Math)
     )
 
-    // a-b = a+(-b)
-    (rewrite (Sub a b) (Add a (Neg b)))
+    // constant propagation
+    (rewrite (Add (Const a) (Const b))
+        (Const (+ a b)))
+    (rewrite (Mul (Const a) (Const b))
+        (Const (* a b)))
+    (rewrite (Sub (Const a) (Const b))
+        (Const (- a b)))
 
-    // --x = x
-    (rewrite (Neg (Neg x)) x)
-    // x*(-y) = -(xy)
-    (rewrite (Mul x (Neg y)) (Neg (Mul x y)))
+    // x+0=x, x*0=0, x*1=x, x-x=0
+    (rewrite (Add x (Const 0)) x)
+    (rewrite (Mul x (Const 0)) (Const 0))
+    (rewrite (Mul x (Const 1)) x)
+    (rewrite (Sub x x) (Const 0))
 
-    // x+(-x)=0 and x+0=0
-    (rewrite (Add x (Neg x)) (Zero))
-    (rewrite (Add x (Zero)) x)
+    // a - b = a + (-b)
+    (birewrite (Sub a b)
+        (Add a (Mul b (Const -1))))
 
-    // x*0=0, -0=0
-    (rewrite (Mul x (Zero)) (Zero))
-    (rewrite (Neg (Zero)) (Zero))
-
-    // Mul and Add commutative and associative
+    // Mul and Add, commutativity and associativity
     (rewrite (Mul a b) (Mul b a))
     (rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
     (rewrite (Add a b) (Add b a))
     (rewrite (Add (Add a b) c) (Add a (Add b c)))
 
-    // Distributivity
-    (rewrite (Mul x (Add a b)) (Add (Mul x a) (Mul x b)))
+    // distributivity
+    (rewrite (Mul x (Add a b))
+        (Add (Mul x a) (Mul x b)))
 
     // sqrt(x)*sqrt(x) = x, unsound, but ok for us here
     (rewrite (Mul (Sqrt x) (Sqrt x)) x)
@@ -48,56 +50,52 @@ Let's verify that this is a solution!
 
 fn run(sink: &mut impl std::io::Write) {
     let mut theory = Theory::new();
-    let x = theory.make();
+
+    macro_rules! make_helper {
+        ($op:ident, $insert:ident, 1) => {
+            macro_rules! $op {
+                ($a:expr) => {{
+                    let ret = theory.make();
+                    let row = ($a, ret);
+                    theory.$insert(row);
+                    ret
+                }};
+            }
+        };
+        ($op:ident, $insert:ident, 2) => {
+            macro_rules! $op {
+                ($a:expr, $b:expr) => {{
+                    let ret = theory.make();
+                    let row = ($a, $b, ret);
+                    theory.$insert(row);
+                    ret
+                }};
+            }
+        };
+    }
+    make_helper!(mul, insert_mul, 2);
+    make_helper!(add, insert_add, 2);
+    make_helper!(sub, insert_sub, 2);
+    make_helper!(sqrt, insert_sqrt, 1);
+    make_helper!(constant, insert_const, 1);
+
     let b = theory.make();
     let c = theory.make();
-    writeln!(sink, "{HEADER}").unwrap();
 
-    // b^2
-    let b2 = theory.make();
-    theory.insert_mul((b, b, b2));
-    // b^2 - c
-    let b2_minus_c = theory.make();
-    theory.insert_sub((b2, c, b2_minus_c));
-    // sqrt(b^2 - c)
-    let sqrt_b2_minus_c = theory.make();
-    theory.insert_sqrt((b2_minus_c, sqrt_b2_minus_c));
     // x = sqrt(b^2 - c) - b
-    theory.insert_sub((sqrt_b2_minus_c, b, x));
+    let x = sub!(sqrt!(sub!(mul!(b, b), c)), b);
 
-    // x^2
-    let x2 = theory.make();
-    theory.insert_mul((x, x, x2));
-    // bx
-    let bx = theory.make();
-    theory.insert_mul((b, x, bx));
-    // 2bx
-    let two_bx = theory.make();
-    theory.insert_add((bx, bx, two_bx));
-    // x^2 + 2bx
-    let x2_2bx = theory.make();
-    theory.insert_add((x2, two_bx, x2_2bx));
-    // t = x^2 + 2bx + c
-    let t = theory.make();
-    theory.insert_add((x2_2bx, c, t));
+    // t = x^2 + c + 2bx
+    let t = add!(add!(mul!(x, x), c), add!(mul!(b, x), mul!(b, x)));
 
-    let zero = theory.make();
-    theory.insert_zero((zero,));
+    let zero = constant!(0);
+
+    writeln!(sink, "{HEADER}").unwrap();
 
     const ITERS: usize = 10;
     let mut last = 0;
     for i in 0..ITERS {
         theory.step();
-
-        if false {
-            let relation_entry_count = theory
-                .get_relation_entry_count()
-                .into_iter()
-                .map(|(name, count)| format!("\t{name}: {count}"))
-                .collect::<Vec<String>>()
-                .join("\n");
-            writeln!(sink, "\n{relation_entry_count}").unwrap();
-        }
 
         let size = theory.get_total_relation_entry_count();
         writeln!(sink, "i={i} size={size}").unwrap();
@@ -134,12 +132,13 @@ fn test() {
         Let's verify that this is a solution!
 
         i=0 size=10
-        i=1 size=23
-        i=2 size=41
-        i=3 size=96
-        i=4 size=292
-        i=5 size=762
-        i=6 size=2543
+        i=1 size=26
+        i=2 size=44
+        i=3 size=92
+        i=4 size=275
+        i=5 size=859
+        i=6 size=2303
+        i=7 size=1423
 
         Verified!
     "#])

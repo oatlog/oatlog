@@ -3213,11 +3213,8 @@ impl AddRelation {
 
 = Oatlog example -- the quadratic formula <appendix_example_quadratic_formula>
 
-#TODO[Bring any changes in `examples/api-demo` into `examples/quadratic-formula` if we care about
-  them]
-
-This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As can be seen from
-having separate e-class creation and e-node insertion, the current run-time API is very unergonomic.
+This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As evidenced by the
+need to define e-node insertion helpers, Oatlog's current run-time API is quite unergonomic.
 
 #columns(
   2,
