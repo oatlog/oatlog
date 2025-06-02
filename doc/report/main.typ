@@ -57,7 +57,7 @@
     #TODO[revisit]
 
     Modern software development depends on efficient and reliable optimizing compilers. Traditional
-    compilers apply transformations on a single instance of a program until reaching a fixpoint, but
+    compilers apply transformations on a single instance of a program until reaching a fixed point, but
     since each transformation has to be strictly beneficial, compiler authors need to be
     conservative. This motivates equality saturation which efficiently keeps multiple versions of a
     program using e-graphs and later extracting the optimal program.
@@ -334,9 +334,9 @@ implemented.
 
 In contrast, the equality saturation (EqSat) @equalitysaturation workflow involves an e-graph
 initialized with a set of expressions representing facts or computations, and rewrite rules
-corresponding to logical deductions or optimizations respectively are applied until reaching a
-fixpoint or until some other criterion is met. Rewrite rules pattern match on the existing e-graph
-and perform actions such as inserting new e-nodes and equating existing e-nodes (and hence their
+corresponding to logical deductions or optimizations respectively are applied until reaching a fixed
+point or until some other criterion is met. Rewrite rules pattern match on the existing e-graph and
+perform actions such as inserting new e-nodes and equating existing e-nodes (and hence their
 e-classes). When equality saturation is used for program synthesis or optimization, there is a final
 extraction phase in which one globally near-optimal expression is selected from the many
 possibilities implied by the e-graph.
@@ -1614,170 +1614,256 @@ similar to the quadratic formula, including the egglog theory and the Rust usage
 
 #figure(
   image("../figures/architecture.svg"),
-  caption: [A coarse overview of the current Oatlog architecture.],
-) <oatlog-architecture>
+  caption: [An overview of Oatlog's architecture.],
+) <fig_impl_architecture>
 
-This section provides an overview of the Oatlog architecture, a diagram of it is in @oatlog-architecture.
-At a high-level it takes the egglog language as input and emits Rust code for the relations and rewrite rules.
+Oatlog is implemented as a compiler from the egglog language to generated Rust code. As shown in
+@fig_impl_architecture, this involves a series of compilation steps that gradually lower the
+program through a few different IRs, before embedding it in an arbitrary Rust program.
 
 === Egglog AST
 
-We parse egglog into S-expressions and then into a egglog AST.
-This AST can be converted back into a string, and therefore makes it possible for us to implement shrinking of egglog code into minimal misbehaving examples.
-The shrinking works essentially the same way as it does for QuickCheck @quickcheck, except that we implemented it manually#footnote[As in, we did not use external libraries for this. Also, the actual testing of a egglog program is a bit complicated since we invoke rustc for each test because Oatlog emits Rust code.].
-We include span information in the egglog AST to be able to provide reasonable errors to the user.
-This is parsed into the HIR.
+Egglog code is parsed first as S-expressions and then into an AST. The AST includes span information
+so that it can provide reasonable errors, and also supports shrinking of egglog code into minimal
+misbehaving examples when debugging.
 
 === HIR, high-level IR
 
-The HIR is mainly used to normalize and optimize rules.
-A rule is represented as a set of premises, actions and unifications.
-The main intra-rule optimizations are to merge identical variables, deduplicate premises and remove actions that are part of the premise.
+The AST is transformed into HIR -- high-level intermediate representation -- while desugaring and
+performing type inference. HIR represents rewrite rules as shown in @fig_impl_hir, as a set of
+premises, actions and unifications.
+
+#figure(
+  placement: auto,
+  ```rust
+  struct SymbolicRule {
+    meta: RuleMeta,
+    /// Unstructured list of atoms, with some
+    /// being premises and some actions.
+    atoms: BTreeSet<Atom>,
+    /// Unifications to apply in actions.
+    unify: UF<VariableId>,
+    variables: TVec<VariableId, VariableMeta>,
+  }
+  struct Atom {
+    is_premise: IsPremise,
+    relation: RelationId,
+    columns: TVec<ColumnId, VariableId>,
+    ..
+  }
+  ```,
+  caption: [Rewrite rules in HIR, slightly simplified.],
+) <fig_impl_hir>
+
+The HIR allows rewrite rules to be simplified, both individually and as a group. Rules first
+experience individual optimization, merging identical variables, deduplicating premises, etc. The
+rewrite rules are then expanded for semi-naive evaluation, in which every rewrite rule is replaced
+with multiple other rules with differently tagged premise atoms. Semi-naive expansion can cause
+redundant rules, which are detected and removed.
 
 === TIR, trie IR
 
-The TIR is motivated by the fact that many rules have overlapping premises as seen in @trie-ir.
-To generate the TIR, we perform query planning and when multiple equally good choices are possible for a given rule, we select the choice that maximizes premise sharing.
-
-// While optimal query planning needs to consider the runtime sizes of relations, since we are performing query planning without runtime information we use a simple heuristic:
-// + Iterate new part of relation
-// + Global variable lookup
-// + All variables are bound
-// + The relation result is guaranteed to produce 0 or 1 elements due to functional dependency
-// + The relation contains some bound variable
-// + The relation contains no bound variables.
-// SEMI-JOIN
+After HIR optimization and semi-naive expansion, the rewrite rules of the theory are jointly query
+planned while converting to TIR -- trie intermediate representation. The query planning follows a
+greedy heuristic within the confines of a worst-case optimal generic join. TIR is motivated by the
+insight that many rules have overlapping premises, as illustrated by @fig_trie_ir, which can be
+exploited by matching rewrite rules jointly in a trie. This is one of Oatlog's novel contributions.
+The trie is a tree where the root matches everything, edges add additional premise constraints and
+nodes contain actions. @fig_impl_tir shows TIR's trie structure.
 
 #figure(
-  text(size: 9pt, grid(
-    columns: (auto, auto, auto, auto),
-    ```python
-    # rule 1
-    for _ in A:
-        for _ in B:
-            for _ in C:
-                X()
-                Y()
-    ```,
-    ```python
-    # rule 2
-    for _ in A:
-        for _ in B:
-            for _ in D:
-                X()
-                Z()
-    ```,
-    ```python
-    # rule 3
-    for _ in A:
-        for _ in B:
-            X()
-    ```,
-    ```python
-    # rule 1, 2 and 3
-    for _ in A:
-        for _ in B:
-            X()
-            for _ in C:
-                Y()
-            for _ in D:
-                Z()
-    ```,
-  )),
+  text(
+    size: 9pt,
+    grid(
+      columns: (auto, auto, auto, auto),
+      ```python
+      # rule 1
+      for _ in A:
+          for _ in B:
+              for _ in C:
+                  X()
+                  Y()
+      ```,
+      ```python
+      # rule 2
+      for _ in A:
+          for _ in B:
+              for _ in D:
+                  X()
+                  Z()
+      ```,
+      ```python
+      # rule 3
+      for _ in A:
+          for _ in B:
+              X()
+      ```,
+      ```python
+      # rule 1, 2 and 3
+      for _ in A:
+          for _ in B:
+              X()
+              for _ in C:
+                  Y()
+              for _ in D:
+                  Z()
+      ```,
+    ),
+  ),
   caption: [
     Merging similar rules to avoid repeated joins and actions where A,B,C,D are premises and X,Y,Z are actions (inserts and unifications).
   ],
-) <trie-ir>
+) <fig_trie_ir>
+
+#figure(
+  placement: auto,
+  ```rust
+  // SEMANTICS: actions then unify then perform queries for each TrieLink.
+  pub(crate) struct Trie {
+    meta: Vec<hir::RuleMeta>,
+
+    /// Variables bound in the premise as of traversing the parent
+    /// `TrieLink`. I.e. these variables are bound from the moment
+    /// `self.actions`/`self.unify` starts executing.
+    bound_premise: BTreeSet<VariableId>,
+
+    actions: Vec<Atom>,
+    unify: Vec<(VariableId, VariableId)>,
+    map: BTreeMap<TrieLink, Trie>,
+  }
+  enum TrieLink {
+    /// Loop join
+    /// `for ... in ... { ... }`
+    Primary(Atom),
+    /// Semi-join
+    /// `if ... { ... }`
+    Semi(Atom),
+  }
+  ```,
+  caption: [Rewrite rules in TIR.],
+) <fig_impl_tir>
 
 === LIR, low-level IR
 
-The LIR describes all relations and what indices they use, and contains a low-level description of how all joins and actions will be performed in the form of a trie.
+The LIR -- low-level intermediate representation -- also represent rules as a trie but with
+additional annotations in order to allow for straightforward code generation. This particularly
+includes a description what indexes are required on every relation and precisely how joins and
+actions should be performed. The structure of the LIR's `RuleTrie` is shown in @fig_impl_lir.
+
+#figure(
+  placement: auto,
+  {
+    let a = [```rust
+      enum Inclusion {
+          All,
+          Old,
+      }
+      struct RuleTrie {
+          premise: Premise,
+          meta: Option<&'static str>,
+          actions: Vec<Action>,
+          then: Vec<RuleTrie>,
+      }
+      enum PremiseKind {
+          /// Iterate all new tuples in a relation
+          /// (requires all unbound variables).
+          IterNew,
+          /// Indexed join with relation, binding any
+          /// previously unbound variables.
+          /// `for (c) in relation.iter(a, b) { .. }`
+          ///
+          /// Codegen tracks bound variables, which combined
+          /// with `args` determine how to use `index`.
+          Join {
+              index: IndexId,
+              inclusion: Inclusion,
+          },
+          /// Proceed only if at least one row matching the
+          /// `args` pattern exists in `relation`.
+          /// `if relation.check(a, b) { .. }`
+          SemiJoin {
+              index: IndexId,
+          },
+      }
+      ```]
+    let b = [```rust
+      enum Premise {
+          Relation {
+              relation: RelationId,
+              /// Codegen tracks what variables are bound,
+              /// determining the keys and values for this join.
+              args: TVec<ColumnId, VariableId>,
+              kind: PremiseKind,
+          },
+          /// `if a == b { .. }`
+          /// Motivation is this transformation:
+          /// `for (x, x) in .. { .. }`
+          /// to
+          /// `for (x, y) in .. { if x == y { .. } }`
+          IfEq(VariableId, VariableId),
+      }
+      enum Action {
+          /// Insert tuple with bound variables
+          Insert {
+              relation: RelationId,
+              args: TVec<ColumnId, VariableId>,
+          },
+          /// Equate two bound variables.
+          Equate(VariableId, VariableId),
+          /// Get-or-insert e-class using functional dependency.
+          Entry {
+              relation: RelationId,
+              args: TVec<ColumnId, VariableId>,
+              index: IndexId,
+          },
+      }
+      ```]
+
+    text(
+      7pt,
+      grid(
+        columns: (1fr, 1fr),
+        a, b,
+      ),
+    )
+  },
+  caption: [Rewrite rules in LIR.],
+) <fig_impl_lir>
 
 == HIR transforms <section_implementation_hir_details>
 
-The HIR is a high-level representation of a rewrite rules, for example, consider this rule:
+HIR represents rewrite rules as conjunctive queries. For example, the rule
 ```egglog
 (rewrite (Mul (Const 0) x) (Const 0))
 ```
-
-It would be represented as:
+would be represented as
 ```
 premise = [Mul(a, x, b), Const(0, a)]
 inserts = [Const(0, c)]
 unify = [{b, c}]
 ```
-Where `premise` is the atoms in the join we want to perform, `inserts` is the set of atoms we want to insert and `unify` is the e-classes we want to unify.
 
-=== Intra-rule optimization <implementation_intra_rule_opt>
+=== Single-rule optimization <implementation_intra_rule_opt>
 
-In general, we can think of a rule as $"Premise" => "Action"$, and the overall goal of optimizing the HIR is to remove everything from the actions that is already present in the premise and to simplify the premise and action.
-
-We perform the following set of optimizations until we reach a fixpoint#footnote[$"optimize"(x) = x$]
+Oatlog performs the following optimizations until reaching a fixed point
 - Merging variables due to functional dependency.
-//     - from `(rule ((= c (Add a b)) (= d (Add a b))) (...))`
-//     - to   `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
-- Deduplicating premise, action atoms.
-//     - from `(rule ((= c (Add a b)) (= c (Add a b))) (...))`
-//     - to   `(rule ((= c (Add a b))) (...))`
+- Deduplicating identical premise atoms and identical action atoms.
 - Removing all action atoms that are also present in premise.
-- Attempt to merge variables in unify, so the unify can be avoided.
-  - If both variables in unify are mentioned in premise, this is not done since it would modify the premise.
-- Make all action atoms use canonical variables according to unify.
+- Attempt to merge variables that are later unified, so the unify can be avoided.
+  - This is not possible if and only if both variables in the unify are already defined in the
+    premise, in which case merging them would restrict the matches.
+- Make all action atoms use canonical variables according to the unify union-find.
 
-The effect of these optimizations is to reduce atoms, variables and unifications.
-Reducing premise and action atoms results in a smaller query and fewer unnecessary inserts.
-Reducing variables is beneficial for queries because the join result is smaller and because it may cause further deduplication.
+These optimizations eliminate atoms, variables and unifications. Eliminating premise atoms results
+in fewer semi-naive variants, eliminating action atoms results in fewer unnecessary inserts and
+using canonical variables is beneficial because it triggers the these two kinds of eliminations.
 
-Since this set of optimizations commute and are beneficial, we reach a global optima without needing e-graphs.
+Since these optimizations commute and are strictly beneficial, we reach a global optimum without
+having to use e-graphs.
 
-// #TODO[can we "prove" that these commute and that we therefore reach a global optima?]
-// While one could use e-graphs for this, these optimizations already commute, so they will still reach the global optima.
-// Semi-formal fixpoint algorithm:
-// ```
-// P(r, x -> y), P(r, x -> z) => union(premise_unify, y, z)
-// P(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
-// A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
-//
-// union(premise_unify, x, y) => union(action_unify, x, y)
-//
-// P(r, x) => replace(P(r, x), P(r, find(premise_unify, x)))
-// A(r, x) => replace(A(r, x), A(r, find(action_unify, x)))
-//
-// P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
-//
-// union(action_unify, x, y), !premise_var(x), !premise_var(y) =>
-// ```
+=== Discovering and exploiting invariant column permutations of single relations <eqmodperm>
 
-=== Semi-naive transformation
-
-Additionally, after optimizations, we apply a semi-naive transform where a rule is split into multiple variants, for example this join
-
-$
-  "Add" join "Mul" join "Sub"
-$
-
-Will be split into the following:
-
-$ "Add"_"new" join "Mul"_"old" join "Sub"_"old" $
-$ "Add"_"all" join "Mul"_"new" join "Sub"_"old" $
-$ "Add"_"all" join "Mul"_"all" join "Sub"_"new" $
-
-As mentioned in @section_background_seminaive, the point of this is to avoid re-discovering join results that are guaranteed to always be part of the database.
-
-Note that while this transformation guarantees that we will never get the exact same join result, we might still get duplicate actions, since actions typically only use a small subset of the variables in the query.
-Another way to think about it is that a project operation $pi_("<attributes>")("Relation")$ is performed on the join result before actions are triggered, causing potential duplicates.
-
-=== Domination
-
-Because of symmetries in premises, the semi-naive transformation can generate rules that are
-actually equivalent, and therefore duplicates are removed, similarly to what is done in Eqlog
-@eqlog_algorithm. This is implemented using recursive backtracking, but is feasible since the
-queries are small. We call this domination because some semi-naive variants of a rule may contain
-the entire join result of another rule.
-
-=== Equality modulo permutation <eqmodperm>
-
-Consider a rule for commutativity:
+Oatlog, in its relaxed mode, detects rules such as commutativity:
 ```egglog
 (rule (
     (= res (Add a b))
@@ -1786,48 +1872,147 @@ Consider a rule for commutativity:
 ))
 ```
 
-This implies that swapping columns `a` and `b` in `Add(a, b, res)` is the same relation.
-By maintaining the invariant that $("a", "b", "res") in "Add" <=> ("b", "a", "res") in "Add"$, we can reduce the number of indexes required.
-For example the index $"a" -> "b","res"$ is identical to the index $"b" -> "a","res"$.
-Additionally, the optimizations @implementation_intra_rule_opt are extended to consider equality modulo column permutation.
-In practice, this is mostly important for checking if a rule dominates another rule, since it opens more symmetries.
+Specifically, Oatlog detects rules which simply permute the columns of a single relation. For
+commutative addition, where the relations `Add(a, b, res)` and `Add(b, a, res)` are identical, an
+e-graph engine can use fewer indexes than would otherwise be necessary if it upholds the invariant
+that $("a", "b", "res") in "Add" <=> ("b", "a", "res") in "Add"$. If this holds, the index $"a" ->
+"b","res"$ is identical to the index $"b" -> "a","res"$ and only one of them must be stored.
+Additionally, the optimizations presented in @implementation_intra_rule_opt can by extended to
+canonicalize atoms using these invariant permutations, further simplifying the rewrite rules.
+
+=== Semi-naive transformation
+
+After single-rule optimization, HIR rewrite rules are split into multiple variants for semi-naive
+evaluation. Concretely, a conjunctive query $"Add" join "Mul" join "Sub"$ with arbitrary variables
+is split into the following:
+
+$
+  "Add"_#`new` &join& "Mul"_#`old` &join& "Sub"_#`old` \
+  "Add"_#`all` &join& "Mul"_#`new` &join& "Sub"_#`old` \
+  "Add"_#`all` &join& "Mul"_#`all` &join& "Sub"_#`new` \
+$
+
+As described in @section_background_seminaive, the point of this is to avoid re-discovering join
+results that are guaranteed to always be part of the database.
+
+=== Domination
+
+Invariant permutations on relations, as described in @eqmodperm, sometimes lead to symmetries on
+entire rewrite rules premises that lead to equivalent rules after the semi-naive transform. For
+example, the patterns $"Add"_#`old` ("Mul"_#`new` (a,b), "Mul"_#`all` (a,c))$ and $"Add"_#`old`
+("Mul"_#`old` (a,b), "Mul"_#`new` (a,c))$ are in general disjoint, but since Add is commutative the
+former in fact matches a superset of the latter.
+
+After the semi-naive transform, Oatlog eliminates all rules that match subsets of some other rule.
+We call this subset-like relation domination, where a rule A dominates a rule B if the matches of A
+are a superset of the matches of B. Equivalently, A dominates B if a variable substitution can be
+found such that the premise of A is a subset of the premise of B and the actions of A is a subset of
+the actions of B. This is an instance of the subgraph isomorphism problem between graphs
+representing the two rules, which is NP-complete. Luckily the number of atoms in realistic rules is
+relatively small, so Oatlog is efficiently able to determine domination using recursive
+backtracking, significantly reducing the search space by exploiting the fact that atoms of a given
+relation can only be paired with atoms of the same relation.
+
+While invariant permutations directly eliminate indexes and hence providing a speedup, domination
+extends this to a further speedup by elimination duplicated e-matching work.
 
 == TIR and query planning <section_implementation_tir_details>
 
-Generally for optimal query planning one would need to consider runtime information such as the sizes of the relations and the sizes of joins.
-We are performing static query planning at compile-time since that is less engineering effort and query planning is very well established research.
-Therefore, we have very limited information about the sizes of relations:
-- Old/New is smaller than All
-- Functional dependence may cause some joins to only produce a single element.
-- Some relations are known to only contain a single element (globals)
+Query planning in databases is the general problem of deciding an order in which to execute a query.
+Specifically for relational e-matching and Datalog, it refers to determining an order in which to
+join the atoms in a premise.
 
-At a high-level, the query planner greedily selects a primary or a semi-join and if it introduced variables, semi-joins are added.
+Oatlog query plans only generic joins as described in @section_background_wcoj. Generic join is
+worst-case optimal given identically sized relations, but for relations of different sizes one
+should prefer to join smaller relations first. Oatlog statically query-plans at compile-time since
+that requires less engineering effort and provides greater ABI freedom in code generation compared
+to run-time dynamic query planning. We are therefore very limited in terms of what relation size
+information is known when query planning. Oatlog makes the following assumptions
+- `new` is smaller than `old` is smaller than `all`.
+- Functional dependency may cause some joins to produce at most a single element.
+- Relations corresponding to global variables contain exactly one element.
 
-We use the following scoring to select what join to perform next.
+Generic join is usually formulated as selecting an order in which to determine variables, but
+Oatlog's query planning implicitly selects such an order by repeatly selecting an atom to join in
+from a set of premise atoms. Joins can be primary joins, which iterate all relation tuples matching
+some columns, or semi-joins which verify that there are at least one relation tuple that matches the
+known columns. Semi-joins, as dictated by the generic join algorithm take precedence over primary
+joins, aside from the optimization that single-element primary joins are preferred. Oatlog encodes
+this as selecting the option with the maximum associated `RelationScore`, an enum which is shown
+with cases in ascending order of priority in @fig_impl_relation_score.
 
-```rust
-enum RelationScore {
-    Disconnected,
-    AllConnected,
-    OldConnected,
-    SemiJoinOld,
-    SemiJoinAll,
-    LastPrimary,
-    SingleElementConnected,
-    AllBound,
-    Global,
-    New,
-}
-```
+#figure(
+  ```rust
+  enum RelationScore {
+      // disconnected premise graph, require fully iterating a relation
+      Disconnected,
+      // primary join `all`
+      AllConnected,
+      // primary join `old` (smaller than `all`)
+      OldConnected,
+      // semi-join `old`
+      SemiJoinOld,
+      // semi-join `all` (NOTE: inverted all/old order)
+      SemiJoinAll,
+      // semi-join is unnecessary if only a single premise atom is left
+      LastPrimary,
+      // at most one match due to functional dependency
+      SingleElementConnected,
+      // if all relation variables are already bound,
+      // there can be at most one match
+      AllBound,
+      // global variables are a single vector lookup
+      Global,
+      // there are no indexes on `new`, so it must be iterated first
+      New,
+  }
+  ```,
+  caption: [Join priorities in ascending order in Oatlog's implementation of Generic Join.],
+) <fig_impl_relation_score>
 
-We perform joins with new first mainly because we maintain new as a deduplicated list and do not have any indexes on it.
-Globals, relations with all variables bound always produce a single element and are therefore queried first.
-We select old before all, since old is smaller.
-To make sure we still perform WCOJ, we need to ensure that we perform semi-joins before joins that may increase the number of elements, however we perform semi-joins with all first to make sure that the last semi-join can become a primary join on old, if possible.
+Additionally, a later step in query planning will eliminate any semi-join directly followed by a
+primary join on the same atom. A crucial detail is that semi-joins prioritize `all`
+while primary joins prioritize `old`. If this was not the case, we would accidentally emit a
+`AllConnected` when a `OldConnected` could be used instead, for example by emitting
+`SemiJoinOld(Y); AllConnected(X); LastPrimary(Y)`
+rather than `SemiJoinAll(X); OldConnected(Y); LastPrimary(X)` for the query $X_#`all` (..) join Y_#`old` (..)$.
+
+With each rewrite rule effectively decomposed into a list of semi-joins and primary joins, Oatlog
+builds a trie from the rules with atoms as the alphabet. In order to actually achieve deduplication
+among rules, this is done allowing for variable renaming. Effectively, Oatlog finds, for every rule,
+the set of joins that score the highest on the scale shown in @fig_impl_relation_score, then groups
+rules based on compatibility modulo renaming. Note that this compatibility is not transitive if
+there are multiple joins at the maximum `RelationScore`. Oatlog therefore currently arbitrarily
+selects one of them arbitrarily, but one could also implement this with a bipartite matching between
+rules and joins.
 
 == LIR, code generation and the runtime <section_implementation_lir_details>
 
-This section describes the LIR and runtime implementation, such as indexes.
+TIR is eventually lowered to LIR, during which miscellanous decisions are made such as scheduling
+the actions within a rule and deciding which indexes are used for what relations and in what
+lookups. Unlike HIR and TIR processing, which is firmly the realm of abstract optimization and
+heuristics, the subsequent steps of lowering to LIR, lowering LIR to Rust and the runtime library
+now concern run-time representation and implementation details. This section will therefore describe
+their contents not organized by steps in a compiler but as aspects of the generated code that they
+affect.
+
+=== Size of e-class IDs
+
+Using 32-bit e-class IDs is preferable to 64-bit IDs since that roughly halves the size of indexes
+and union-finds. While it is entirely possibly to run out of the $2^32$ e-class IDs, it would
+require a larger e-graph than Oatlog can reasonably be expected to accomodate by default. The memory
+usage of an e-graph can be estimated as
+
+$
+"[bytes per e-class]"
+dot "[e-node arity]"
+dot "[indexes per relation]" \
+dot "[e-nodes per unique e-class]"
+dot "[unique e-classes]",
+$
+
+which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
+384 "GiB"$ of memory for the smallest e-graph that runs out of e-class IDs.
 
 === Index implementation
 
@@ -1860,15 +2045,6 @@ struct NonFdIndex<Key, Value> {
     list: Vec<Value>
 }
 ```
-
-=== Size of e-class IDs
-
-Using 32-bit e-class IDs is preferable to using 64-bit IDs since that halves the size of our indices.
-However, we might in theory run out of IDs, so to justify this we need to reason about how many IDs are needed in practice.
-As an extreme lower bound of memory usage per IDs, we can look at what is stored in the union-find.
-In the union-find we have at least 4 bytes per e-class ID which gives a lower bound of 16 GiB of memory usage before we run out of 32-bit IDs.
-A less conservative estimate would assume that each e-class ID corresponds to a row in a relation
-and let's say 3 indices and 3 columns, requiring in-total 40 GiB before running out of IDs.
 
 === Union-find
 
@@ -2030,7 +2206,7 @@ Assuming that in practice we have a bounded number of required rounds, we are in
 How canonicalization on the theory is implemented is shown in @figure_canonicalize_impl.
 First, we insert all of delta into the relations using `update_insert`.
 Then, we call `update` on each relation, which triggers unifications.
-`update` is called until we reach a fixpoint, meaning that no more unifications are triggered.
+`update` is called until we reach a fixed point, meaning that no more unifications are triggered.
 Then, to reconstruct the indexes, we call `update_finalize` on all the relations.
 
 The generated implementations of `update_insert`, `update` and `update_finalize` is shown in @figure_relation_update_insert_impl, @figure_relation_update_impl and @figure_relation_update_finalize_impl.
