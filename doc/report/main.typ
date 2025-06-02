@@ -181,9 +181,6 @@ noncommutative and destructive passes cannot be avoided within such a compiler.
 
 == Phase ordering and peephole rewriting
 
-// #TODO[the first sentence here is hard to parse]
-// static list of passes, allowing repeats
-
 In an optimization pass architecture, the phase ordering problem is often framed as figuring out
 what sequence of passes result in the best performing output programs. For LLVM, such pass
 configurations are in practice hundreds of entries long with many passes being repeated many times.
@@ -353,6 +350,9 @@ also used in eggcc @eggcc, an experimental optimizing compiler, and the webassem
 production compiler backend Cranelift @cranelift. Cranelift uses a weaker construct called acyclic
 e-graphs (aegraphs) due to performance problems of full e-graphs. A proliferation of e-graphs within
 compilers would require them to become faster.
+
+#TODO[We commented out Datalog section here, that's no good since we want to talk about Datalog
+later..]
 
 // #TODO[Explain limitations of aegraphs. Or not? Seems excessive]
 // it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
@@ -1320,8 +1320,11 @@ for _ in b_new(..) {
 
 === Worst-case optimal join <section_background_wcoj>
 
-WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the relations @agmbound.
-A triangle join is a motivating example for this#footnote[Triangle joins are somewhat common for rewrite rules, for example $a * c + b * c -> (a + b) * c$ is secretly just a triangle join.]:
+WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the
+relations @agmbound. A triangle join is a motivating example for this#footnote[Triangle joins are
+somewhat common for rewrite rules, for example is $a dot c + b dot c -> (a + b) dot c$ a triangle
+join.]:
+
 $
   "Foo"(a, b) join "Bar"(b, c) join "Baz"(c, a)
 $
@@ -2004,62 +2007,27 @@ require a larger e-graph than Oatlog can reasonably be expected to accomodate by
 usage of an e-graph can be estimated as
 
 $
-"[bytes per e-class]"
-dot "[e-node arity]"
-dot "[indexes per relation]" \
-dot "[e-nodes per unique e-class]"
-dot "[unique e-classes]",
+  "[bytes per e-class]"
+  dot "[e-node arity]"
+  dot "[indexes per relation]" \
+  dot "[e-nodes per unique e-class]"
+  dot "[unique e-classes]",
 $
 
 which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
 384 "GiB"$ of memory for the smallest e-graph that runs out of e-class IDs.
 
-=== Index implementation
-
-#TODO[Remember to discuss trade-offs]
-
-#TODO[
-  – why hash over btree index
-  – why full over trie index
-]
-
-For each relation, there are some number of indexes.
-We consider two types of indexes FD (functional dependency) and non-FD indexes.
-Initially, we tried using sorted lists and b-trees, but ended up performing badly due to the access patterns having low locality.
-Instead, we are using hash maps.
-
-==== FD indexes
-
-This type of index essentially corresponds to the hashcons, in e-graph theory.
-For every functional dependence in a relation, we have a FD index to enforce it, for a relation like `Add(x, y, res)` the key is `(x, y)` and the value is `res` and it is simply a `HashMap<Key, Value>`.
-
-==== non-FD indexes
-
-Without some functional dependency, performing lookups on a subset of all columns may yield multiple values, so a data structure like `HashMap<Key, Vec<Value>>` is needed.
-However, having many small lists adds both space and allocation overhead, since an empty `Vec<T>` uses 24 bytes and creates individual allocations.
-This motivates having a hash map that points into a list that is sorted by the key:
-```rust
-struct NonFdIndex<Key, Value> {
-    //                (start, end)
-    map: HashMap<Key, (u32, u32)>,
-    list: Vec<Value>
-}
-```
-
 === Union-find
+
+Oatlog's union-find does not do path compression and it merges e-classes younger-to-older. This
+merging scheme heurstically minimizes the number of uprooted e-nodes, assuming that older e-classes
+are more numerous in terms of e-nodes. Path compression turns out to not be beneficial, due to paths
+being short in practice, even when implemented with an unrolled loop or similar. Oatlog's
+union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
 
 #figure(
   placement: top,
   ```rust
-  // with path compression
-  fn find(i: u32, repr: &mut [u32]) -> u32 {
-      if repr[i] == i {
-          return i;
-      }
-      let root = find(repr[i], repr);
-      repr[i] = root;
-      root
-  }
   // without path compression
   fn find(mut i: u32, repr: &[u32]) -> u32 {
       loop {
@@ -2069,28 +2037,6 @@ struct NonFdIndex<Key, Value> {
               return i;
           }
       }
-  }
-  ```,
-  caption: [find function with and without path compression],
-) <fast-find-impl>
-
-#figure(
-  placement: top,
-  ```rust
-  // with smaller-to-larger
-  fn union(a: u32, b: u32, repr: &mut [u32], size: &mut [u32]) {
-      let a = find(a, repr);
-      let b = find(b, repr);
-      if a == b {
-          return;
-      }
-      let (smaller, larger) = if size[a] < size[b] {
-          (a, b)
-      } else {
-          (b, a)
-      };
-      repr[smaller] = larger;
-      size[larger] += size[smaller];
   }
   // with newer-to-older
   fn union(a: u32, b: u32, repr: &mut [u32]) -> u32 {
@@ -2103,23 +2049,66 @@ struct NonFdIndex<Key, Value> {
       repr[newer] = older;
   }
   ```,
-  caption: [union function based on smaller-to-larger and newer-to-older],
-) <fast-union-impl>
+  caption: [find function with and without path compression],
+) <fig_impl_oatlogs_uf>
 
-A typical implementation of union-find includes both path-compression (@fast-find-impl) and smaller-to-larger merging (@fast-union-impl), but we omit path-compression and merge based on the smallest e-class id.
+=== Index implementation
 
-While path-compression improves the computational complexity, it has worse constant factors.
-Specifically the implementation in @fast-find-impl uses (non-tail) recursion, writes to the same memory it is reading from.
-Additionally, these prohibit compiler optimizations.
-// #TODO[argue why we think path length is small in practice]
-Without path-compression, `find` is simply the equivalent of a do-while loop that may run $O(log n)$ iterations.
+Oatlog represents each relation by some number of indexes which all effectively store tuples of
+e-class IDs. This is unlike storing rows in an array and having indexes point into the array, as
+more typically done in a relational database. Storing the entire row in every index is beneficial
+for Oatlog as it saves an indirection, at the low cost of of requiring $12$ bytes per e-node and
+index rather than something like $8$ bytes. Traditional relational databases may do this trade-off
+differently due to having wider tables, with rows requiring more than just $12$ bytes.
 
-Smaller-to-larger has two constant factor issues, maintaining the sizes and reading the sizes.
-Maintaining sizes is hard because we ideally would want to track exactly how many times an e-class is referenced over all the relations and indexes, which hurts performance and makes relation code harder to optimize#footnote[We initially used smaller-to-larger merging.].
-Reading sizes more obviously hurts performance because it uses more of the limited cache and memory bandwidth resources.
+Indexes can be stored multiple conceptually different ways. Egglog @egglog uses trie indexes that
+for a relation with columns $(A, B, C)$ behave like `HashMap<A, HashMap<B, C>>`. In order to reduce
+indirection, but in actuality also somewhat arbitrarily, Oatlog instead uses single `HashMap`s for
+all indexes. In this model, indexes come in the two types FD (functional dependency) indexes and
+non-FD indexes. An example of the former is `HashMap<(A, B), C>` and for the latter
+`HashMap<A, Vec<(B, C)>>`.
 
-Newer-to-older merges smaller e-class ids into larger e-class ids#footnote[Newer-to-older merging is also done in egglog @egglog.].
-The reasoning is that this is a good heuristic for what e-class is referenced more often, this is because e-classes start with containing exactly one e-node and if e-classes tend to grow then we would expect older e-classes to increase how often they are referenced.
+Earlier in its development, Oatlog used static B+tree indexes @algorithmica_strees, but we eventually
+switched to hashbrown/SwissTable-based hashmaps. BTrees and related data structures are generally
+efficient when there is some locality among accesses, which for example makes them faster to
+construct, but Oatlog's relational e-matching was in practice too random, making BTrees
+significantly slower than a hashmap.
+
+==== FD indexes
+
+Oatlog's FD indexes are represented as `hashbrown::HashMap<Keys, Values>`, for some key and value
+columns where the value columns are uniquely determined through a functional dependency. In practice
+function dependencies are only derived from actual egglog-language-level functions, so there is
+always a single value column which also is the last column in a relation.
+
+The hashbrown/SwissTable hashmap uses open addressing, storing both an array of 8-bit integers and
+an array of key value pairs. The 8-bit integer has 1 bit indicating whether the slot is empty or a
+tombstone, while the remaining 7 bits come from the hash of the key in the corresponding slot.
+Lookups use 128-bit SIMD against the array of 8-bit integers to filter before linear probing in the
+key-value array with a $1/2^7 = 1/128$ false positive rate.
+
+==== Non-FD indexes
+
+In the absence of a functional dependency, lookups on a subset of all columns may match multiple
+values. A non-FD index should behave like a `HashMap<Keys, Vec<Values>>`. However, directly using
+that representation results in many individually allocated vectors. This is expensive due to a
+24-byte overhead per `Vec<T>` as as well as minimum allocation sizes. This can partly be addressed
+with a custom allocator and/or a short string optimization, but a more fundamental fix involves
+storing all `Values` in a single permuted list with the `HashMap` pointing into it. Oatlog therefore
+implements non-FD indexes as in @fig_impl_non_fd_index, with `Value`s being sorted by their
+corresponding `Key`.
+
+#figure(
+  ```rust
+  struct IndexedSortedList<Key, Value> {
+    // (start, end), exclusive range
+    map: HashMap<Key, (u32, u32)>,
+    list: Vec<Value>,
+  }
+  ```,
+  caption: [Oatlog's representation of non-FD indexes, effectively `HashMap<Key, Vec<Value>>` but
+    without small allocations.],
+)<fig_impl_non_fd_index>
 
 === Relations and theory codegen
 
