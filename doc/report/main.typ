@@ -352,7 +352,7 @@ e-graphs (aegraphs) due to performance problems of full e-graphs. A proliferatio
 compilers would require them to become faster.
 
 #TODO[We commented out Datalog section here, that's no good since we want to talk about Datalog
-later..]
+  later..]
 
 // #TODO[Explain limitations of aegraphs. Or not? Seems excessive]
 // it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
@@ -2017,11 +2017,16 @@ $
 which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
 384 "GiB"$ of memory for the smallest e-graph that runs out of e-class IDs.
 
+=== Sorting
+
+#TODO[Sorting mostly pairs and triplets of `u32` unstably (because unique). Radix sort with
+  quicksort (stdlib) fallback, using voracious sort.]
+
 === Union-find
 
 Oatlog's union-find does not do path compression and it merges e-classes younger-to-older. This
 merging scheme heurstically minimizes the number of uprooted e-nodes, assuming that older e-classes
-are more numerous in terms of e-nodes. Path compression turns out to not be beneficial, due to paths
+are more numerous in terms of e-nodes. Path compression turns out to not be beneficial due to paths
 being short in practice, even when implemented with an unrolled loop or similar. Oatlog's
 union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
 
@@ -2039,7 +2044,7 @@ union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
       }
   }
   // with newer-to-older
-  fn union(a: u32, b: u32, repr: &mut [u32]) -> u32 {
+  fn union(a: u32, b: u32, repr: &mut [u32]) {
       let a = find(a, repr);
       let b = find(b, repr);
       if a == b {
@@ -2058,48 +2063,49 @@ Oatlog represents each relation by some number of indexes which all effectively 
 e-class IDs. This is unlike storing rows in an array and having indexes point into the array, as
 more typically done in a relational database. Storing the entire row in every index is beneficial
 for Oatlog as it saves an indirection, at the low cost of of requiring $12$ bytes per e-node and
-index rather than something like $8$ bytes. Traditional relational databases may do this trade-off
-differently due to having wider tables, with rows requiring more than just $12$ bytes.
+index rather than something like $8$ bytes. Traditional relational databases often store wider
+tables, with rows larger than $12$ bytes, in which case indirect indexes are sensible.
 
-Indexes can be stored multiple conceptually different ways. Egglog @egglog uses trie indexes that
+Indexes can be stored in multiple conceptually different ways. Egglog @egglog uses trie indexes that
 for a relation with columns $(A, B, C)$ behave like `HashMap<A, HashMap<B, C>>`. In order to reduce
-indirection, but in actuality also somewhat arbitrarily, Oatlog instead uses single `HashMap`s for
-all indexes. In this model, indexes come in the two types FD (functional dependency) indexes and
-non-FD indexes. An example of the former is `HashMap<(A, B), C>` and for the latter
-`HashMap<A, Vec<(B, C)>>`.
+indirection, but also somewhat arbitrarily, Oatlog instead uses single `HashMap`s for all indexes.
+In this model, indexes come in the two types: FD (functional dependency) indexes, which store at
+most one row per key, and non-FD indexes which may store any number of rows per key. An example of
+the former is `HashMap<(A, B), C>` and for the latter `HashMap<A, Vec<(B, C)>>`.
 
-Earlier in its development, Oatlog used static B+tree indexes @algorithmica_strees, but we eventually
-switched to hashbrown/SwissTable-based hashmaps. BTrees and related data structures are generally
-efficient when there is some locality among accesses, which for example makes them faster to
-construct, but Oatlog's relational e-matching was in practice too random, making BTrees
-significantly slower than a hashmap.
-
-==== FD indexes
-
-Oatlog's FD indexes are represented as `hashbrown::HashMap<Keys, Values>`, for some key and value
-columns where the value columns are uniquely determined through a functional dependency. In practice
-function dependencies are only derived from actual egglog-language-level functions, so there is
-always a single value column which also is the last column in a relation.
+Oatlog's FD indexes are indeed represented as `hashbrown::HashMap<Keys, Values>`, for some key and
+value columns where the value columns are uniquely determined through a functional dependency. In
+practice function dependencies are only derived from actual egglog-language-level functions, so
+there is always a single value column which also is the last column in a relation.
 
 The hashbrown/SwissTable hashmap uses open addressing, storing both an array of 8-bit integers and
 an array of key value pairs. The 8-bit integer has 1 bit indicating whether the slot is empty or a
 tombstone, while the remaining 7 bits come from the hash of the key in the corresponding slot.
-Lookups use 128-bit SIMD against the array of 8-bit integers to filter before linear probing in the
+Lookups use 128-bit SIMD against the array of 8-bit integers to do filtered linear probing in the
 key-value array with a $1/2^7 = 1/128$ false positive rate.
 
-==== Non-FD indexes
+Earlier in its development, Oatlog used static B+tree indexes @algorithmica_strees, but we
+eventually switched to hashbrown/SwissTable-based hashmaps. BTrees and related data structures are
+generally efficient when there is some locality among accesses, which for example makes them faster
+to construct, but Oatlog's relational e-matching was in practice too random, making BTrees
+significantly slower than hashmaps.
 
 In the absence of a functional dependency, lookups on a subset of all columns may match multiple
-values. A non-FD index should behave like a `HashMap<Keys, Vec<Values>>`. However, directly using
-that representation results in many individually allocated vectors. This is expensive due to a
-24-byte overhead per `Vec<T>` as as well as minimum allocation sizes. This can partly be addressed
-with a custom allocator and/or a short string optimization, but a more fundamental fix involves
-storing all `Values` in a single permuted list with the `HashMap` pointing into it. Oatlog therefore
-implements non-FD indexes as in @fig_impl_non_fd_index, with `Value`s being sorted by their
-corresponding `Key`.
+values. A non-FD index should behave like a `HashMap<Keys, Vec<Values>>`, but directly using that
+representation results in many individually allocated vectors. This is expensive due to a 24-byte
+overhead per `Vec<T>` as as well as minimum allocation sizes. This can partly be addressed with a
+custom allocator and/or a short string optimization, but a more fundamental fix involves storing all
+`Values` in a single permuted list with the `HashMap` pointing into it. Oatlog therefore implements
+non-FD indexes as in @fig_impl_non_fd_index, with `Value`s being sorted by their corresponding
+`Key`.
 
 #figure(
+  placement: auto,
   ```rust
+  // Constructed by
+  // 1. Sorting a list of (Key, Value).
+  // 2. Building the hashmap.
+  // 3. Shrinking the list by retaining only the Values.
   struct IndexedSortedList<Key, Value> {
     // (start, end), exclusive range
     map: HashMap<Key, (u32, u32)>,
@@ -2110,434 +2116,219 @@ corresponding `Key`.
     without small allocations.],
 )<fig_impl_non_fd_index>
 
-=== Relations and theory codegen
+=== E-graph theory codegen <section_implementation_codegen_theory>
 
-Each relation is generated as a struct and contains some indexes and one instance of each relation is contained in the main theory struct as can be seen in @figure_relation_struct.
-Additional functions are also generated for iterating, notably to iterate the "old" set, we filter based on timestamps.
-The relations are only updated through canonicalization.
+Building on the primitives of union-find, FD- and non-FD indexes, we will now concretely show Rust
+code as generated by Oatlog. @fig_impl_codegen_theory shows the egglog program and the `Theory`
+struct definition generated from it, showing how the e-graph is represented with a union-find, some
+indexes and some vectors of e-nodes pending insertion.
 
-#figure(
-  text(
-    9pt,
-    grid(
-      columns: (1fr, 1fr),
-      ```rust
-      use runtime::{self, *}
+The function `Theory::new()` initializes the theory, including initializing global variables and
+executing various egglog commands hard-coded in the theory definition, but neither of these are
+present in @fig_impl_codegen_theory. The theory will be interacted with by interleaving calls to
+`step` with insertions and queries whose helper functions are not depicted in the listing.
 
-      struct Math(u32);
-      struct TimeStamp(u32);
-
-      struct Theory {
-          add: AddRelation,
-          mul: MulRelation,
-          /* ... */
-
-          latest_timestamp: TimeStamp,
-          delta: Delta,
-          uf: Unification,
-      }
-
-      struct Delta {
-          add: Vec<(Math, Math, Math)>,
-          mul: Vec<(Math, Math, Math)>,
-          /* ... */
-      }
-
-      // we have a separate union-find per type
-      struct Unification {
-          math: UnionFind<Math>,
-          /* ... */
-      }
-      ```,
-      ```rust
-      struct AddRelation {
-          new: Vec<(Math, Math, Math)>,
-
-          // the "hashcons" for the add relation
-          // a, b -> res
-          fd_index_0_1: runtime::HashMap<
-              (Math, Math), (Math, TimeStamp)
-          >,
-
-          // a -> b, res
-          nofd_index_0: runtime::IndexedSortedList<
-              (Math,), (Math, Math, TimeStamp)
-          >,
-
-          // b -> a, res
-          nofd_index_1: runtime::IndexedSortedList<
-              (Math,), (Math, Math, TimeStamp)
-          >,
-
-          // res -> a, b
-          nofd_index_2: runtime::IndexedSortedList<
-              (Math,), (Math, Math, TimeStamp)
-          >,
-
-          math_num_uprooted_at_latest_retain: usize,
-      }
-      ```,
-    ),
-  ),
-  caption: [codegen example of a relation],
-) <figure_relation_struct>
-
-=== Canonicalization
-
-To implement canonicalization in $O(n log n)$, one would need to maintain an index from e-class to row (essentially reverse of hashcons) and merge smaller-to-larger.
-Informally, this is $O(n log n)$ because there are $O(n)$ e-classes and each e-class is changed at most $O(log n)$ times.
-
-However, we do not do that because we want to avoid creating and maintaining a index from e-class to row.
-We instead alternate between filtering out non-canonical rows from the hashcons and then canonicalizing them and re-inserting them into the hashcons again.
-While this does bump our worst case to $O(n^2)$, for the benchmarks that we used we only needed at most 3 or 4 rounds at most to canonicalize.
-Assuming that in practice we have a bounded number of required rounds, we are in some sense still performing canonicalization in $O(n)$.
-
-How canonicalization on the theory is implemented is shown in @figure_canonicalize_impl.
-First, we insert all of delta into the relations using `update_insert`.
-Then, we call `update` on each relation, which triggers unifications.
-`update` is called until we reach a fixed point, meaning that no more unifications are triggered.
-Then, to reconstruct the indexes, we call `update_finalize` on all the relations.
-
-The generated implementations of `update_insert`, `update` and `update_finalize` is shown in @figure_relation_update_insert_impl, @figure_relation_update_impl and @figure_relation_update_finalize_impl.
-`update_insert` inserts or re-inserts into the hashcons. It iterates through a slice, canonicalizes each row and if the e-node is already present, it unifies the output of the old and new e-node.
-The timestamp is only updated if the output e-node actually changes, which minimizes the size of the new set.
-`update` removes all non-canonical e-nodes from the hashcons and calls `update_insert` to re-insert them.
-`update_finalize` reconstructs all indexes, specifically it creates the "new" set by looking at timestamps in the hashcons, creates a list of all elements in the hashcons and sorts it according to each index order to facilitate index reconstruction.
+Equality saturation involves repeatedly calling `step`. When doing this, `apply_rules` performs
+relational e-matching by reading from the various `new`/`fd_index_`/`nofd_index_` indexes, with
+rewrite rule actions creating e-classes in the union-find, merging e-classes and push pending
+insertions to `delta`. The function `canonicalize` applies the pending insertions, then resolves
+functional dependencies within every relation to a fixed point.
 
 #figure(
-  text(
-    size: 9pt,
-    ```rust
-    fn update_insert(
-        &mut self,
-        insertions: &[Self::Row],
-        uf: &mut Unification,
-        latest_timestamp: TimeStamp,
-    ) {
-        for &(mut x0, mut x1, mut x2) in insertions {
-            match self
-                .fd_index_0_1
-                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-            {
-                runtime::HashMapEntry::Occupied(mut entry) => {
-                    let (y2, timestamp) = entry.get_mut();
-                    let changed = false;
-                    let old_val = *y2;
-                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                    if changed {
-                        *timestamp = latest_timestamp;
-                    }
-                }
-                runtime::HashMapEntry::Vacant(entry) => {
-                    entry.insert((uf.math_.find(x2), latest_timestamp));
-                }
-            }
-        }
-    }
-    ```,
-  ),
-  caption: [`update_begin` implementation for the add relation. This has been modified for readability.],
-) <figure_relation_update_insert_impl>
+  {
+    let start = 1
+    let end = 62
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
+
+    let content = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
+    text(size: 8pt, setup + content + reset)
+  },
+  caption: [Generated code for theory struct definitions, slightly simplified and re-arranged.],
+) <fig_impl_codegen_theory>
+
+=== Relational e-matching codegen <section_implementation_codegen_ematching>
+
+@section_implementation_tir_details has already discussed query planning as a worst-case-optimal
+generic join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
+lowered to a tree of nested loops in the generated code, each performing a semi-join or a primary
+join. @fig_impl_codegen_ematching shows generated code for `apply_rules`, including the
+index-accessing functions on the `AddRelation`. No-FD indexes iterate their outputs while FD indexes
+do direct hashmap lookups. Calling `entry` returns the e-class containing a given e-node, creating a
+new e-class and inserting the e-node if not already present in the indexes from a previous step.
+
+This particular code was generated in Oatlog's relaxed mode, which through symmetry reduces the
+number of semi-naive variants of the distributive law from 3 to 2, as well as causing additional
+insertions to uphold the invariant that an index that contains `(a,b,c)` must also contain
+`(b,a,c)`.
+
+Finally, note that the indexes store timestamps, which are integers incremented with every call to
+`canonicalize` that serve as a way to distinguish `old` from `all` tuples within calls such as
+`self.mul_.iter_old_2_to_0_1`.
 
 #figure(
-  text(
-    size: 9pt,
-    ```rust
-    fn canonicalize(&mut self) {
-        self.latest_timestamp += 1;
+  {
+    let start = 64
+    let end = 130
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
 
-        // insert new e-nodes into the relations
-        self.mul.clear_new();
-        self.add.clear_new();
-        self.mul.update_insert(&mut self.delta.mul, &mut self.uf, self.latest_timestamp);
-        self.add.update_insert(&mut self.delta.add, &mut self.uf, self.latest_timestamp);
+    let content = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
 
-        // canonicalize until fixpoint
-        loop {
-            let mut progress = false;
-            progress |= self.mul.update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-            progress |= self.add.update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-            if !progress {
-                break;
-            }
-        }
+    text(size: 8pt, setup + content + reset)
+  },
+  caption: [Generated code for e-matching, slightly simplified and re-arranged. Corresponding
+    `iter`/`entry`/`check` functions for `MulRelation` are elided.],
+) <fig_impl_codegen_ematching>
 
-        // reconstruct all indexes
-        self.mul_.update_finalize(
-            &mut self.delta.mul,
-            &mut self.uf,
-            self.latest_timestamp,
-        );
-        self.add_.update_finalize(
-            &mut self.delta.add,
-            &mut self.uf,
-            self.latest_timestamp,
-        );
-    }
-    ```,
-  ),
-  caption: [Canonicaliztion driver code for the main theory struct. This has been modified for readability.],
-) <figure_canonicalize_impl>
+=== Canonicalization codegen <section_implementation_codegen_canonicalize>
 
-#figure(
-  text(
-    size: 9pt,
-    ```rust
-    fn update(
-        &mut self,
-        insertions: &mut Vec<Self::Row>,
-        uf: &mut Unification,
-        latest_timestamp: TimeStamp,
-    ) -> bool {
-        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-            // we have reached a fixpoint for this relation if there where no more unifications since we
-            // last ran update.
-            return false;
-        }
-        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-        self.fd_index_0_1
-            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
-                    true
-                } else {
-                    insertions.push((x0, x1, x2));
-                    false
-                }
-            });
-        self.update_insert(&insertions, uf, latest_timestamp);
-        insertions.clear();
-        true
-    }
-    ```,
-  ),
-  caption: [`update` implementation for the add relation. This has been modified for readability.],
-) <figure_relation_update_impl>
+Canonicalization involves inserting all tuples that have been stored as pending in `delta`, then
+resolving any functional dependency violations that arise by merging e-classes. Finally, after this
+process has finished all indexes must contain exactly the tuples that logically are stored in the
+relation.
+
+Canonicalization can be implemented in amortized $O(n log n)$ time, with $n$ being the number of
+individual insertions, by using both FD and inverted indexes. The inverted indexes would for a given
+e-class list all e-nodes containing it, which can then all be removed from all indexes and replaced
+with canonicalized versions of the e-node. By merging e-class smaller-to-larger by e-node count in
+the union-find, a given e-class would only be uprooted a logarithmic number of times and a round of
+canonicalization would take only $O("insertions" dot log("e-nodes"))$ time.
+
+However, such canonicalization, although easy to prove asymptotically efficient, requires
+maintaining the inverted index. It requires the index data structures to support efficient point
+updates and is comparatively most efficient for few insertions into a large e-graph. These
+restrictions affect performance adversely in practice, especially given that equality saturation
+steps usually grow the e-graph exponentially, with $"insertions" = O("e-nodes")$ in any given step.
+Therefore, based on the performance profile of EqSat steps in practice, Oatlog prefers data
+structures oriented for batched updates, where having operations for example iterate the entire data
+structure is amortized and becomes faster than point updates.
+
+In practice, Oatlog splits the canonicalization phase into computing the functional dependency fixed
+point using only FD indexes, then recreating all non-FD indexes. This relaxation of non-FD index
+consistency means those indexes are updated fewer times, which by itself is more efficient while
+also unlocking using a sorted list within the non-FD indexes, which is faster than having many small
+vectors or a dynamic BTree.
+
+Concretely, canonicalization is as shown in @fig_impl_codegen_canonicalization_top implemented on
+top the three functions `update_begin`, `update` and `update_finalize`.
 
 #figure(
-  text(
-    size: 9pt,
-    ```rust
-    fn update_finalize(
-        &mut self,
-        uf: &mut Unification,
-        latest_timestamp: TimeStamp,
-    ) {
-        // fill new with the "new" part of the hashcons according to the timestamp.
-        self.new.extend(self.fd_index_0_1.iter().filter_map(
-            |(&(x0, x1), &(x2, timestamp))| {
-                if timestamp == latest_timestamp {
-                    Some((x0, x1, x2))
-                } else {
-                    None
-                }
-            },
-        ));
-        // sort new using radix sort
-        RadixSortable::wrap(&mut self.new).voracious_sort();
+  {
+    let start = 176
+    let end = 209
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
 
-        // fill a vector will all rows in the table to facilitate index reconstruction.
-        let mut all: Vec<_> = self.fd_index_0_1
-          .iter()
-          .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp))
-          .collect();
+    let a = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
 
-        // radix sort the "all" list by the relevant column set and reconstruct the index.
-        RowSort100::sort(&mut self.all);
-        self.nofd_index_0.reconstruct(
-            &mut self.all,
-            |(x0, x1, x2, timestamp)| (x0,),
-            |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-        );
+    text(
+      size: 8pt,
+      setup + a + reset,
+    )
+  },
+  caption: [Generated code for `canonicalize`, slightly simplified and re-arranged.],
+) <fig_impl_codegen_canonicalization_top>
 
-        // radix sort the "all" list by the relevant column set and reconstruct the index.
-        RowSort010::sort(&mut self.all);
-        self.nofd_index_1.reconstruct(
-            &mut self.all,
-            |(x0, x1, x2, timestamp)| (x1,),
-            |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-        );
-
-        // radix sort the "all" list by the relevant column set and reconstruct the index.
-        RowSort001::sort(&mut self.all);
-        self.nofd_index_2.reconstruct(
-            &mut self.all,
-            |(x0, x1, x2, timestamp)| (x2,),
-            |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-        );
-
-        self.math_num_uprooted_at_latest_retain = 0;
-    }
-    ```,
-  ),
-  caption: [`update_finalize` implementation for the add relation],
-) <figure_relation_update_finalize_impl>
-
-// self.uf.reset_num_uprooted();
-
-=== Applying rules
-
-An example of the generated code for applying rules is in @figure_apply_rules.
-The structure of the generated code matches the shape of the TIR, with some sharing between rules.
-Actions are applied through `entry`, `insert` and `union` which modify the union-find and delta.
-Entry checks if a given e-node is already part of a relation in the previous step, and then either returns the e-class for an existing e-node or creates a new e-node.
+As shown in @fig_impl_codegen_canonicalization_update_begin, `update_begin` performs multiple
+insertions by doing many hashmap lookups, each inserting a single e-node or doing a FD union in case
+of a key collision. Since unions are performed while doing insertions, each tuple is canonicalized
+using `find` right before being inserted. The timestamp is only updated if the e-node actually
+changes, minimizing the size of the `new` set.
 
 #figure(
-  text(
-    size: 9pt,
-    ```rust
+  {
+    let start = 218
+    let end = 242
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
 
-    fn apply_rules(&mut self) {
-        for (x_4, v14, v15) in self.mul.iter_new() {
-            // ( rewrite ( Mul a b ) ( Mul b a ) )
-            self.delta.insert_mul((v14, x_4, v15));
-            if let v13 = self.global_i64.get(0usize) {
-                if self.const_.check_0_1(v13, v14) {
-                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
-                    self.uf.math_.union(v14, v15);
-                }
-            }
-        }
-        for (x, v2, v3) in self.add_.iter_new() {
-            // ( rewrite ( Mul a b ) ( Mul b a ) )
-            self.delta.insert_add((v2, x, v3));
-            for (x_11, v77) in self.mul_.iter_old_1_to_0_2(v3, self.latest_timestamp) {
-                // ( rewrite ( Mul x ( Add a b ) ) ( Add ( Mul x a ) ( Mul x b ) ) )
-                let (v79,) = self
-                    .mul_
-                    .entry_0_1_to_2(x_11, v2, &mut self.delta, &mut self.uf);
-                let (v78,) = self
-                    .mul_
-                    .entry_0_1_to_2(x_11, x, &mut self.delta, &mut self.uf);
-                self.delta.insert_add((v78, v79, v77));
-            }
-            for (c_3, v58) in self.add_.iter_all_0_to_1_2(v3) {
-                // ( rewrite ( Add ( Add a b ) c ) ( Add a ( Add b c ) ) )
-                let (v59,) = self
-                    .add_
-                    .entry_0_1_to_2(v2, c_3, &mut self.delta, &mut self.uf);
-                self.delta.insert_add((x, v59, v58));
-            }
-            for (a_6, b_6) in self.add_.iter_old_2_to_0_1(x, self.latest_timestamp) {
-                // ( rewrite ( Add ( Add a b ) c ) ( Add a ( Add b c ) ) )
-                let (v65,) = self
-                    .add_
-                    .entry_0_1_to_2(b_6, v2, &mut self.delta, &mut self.uf);
-                self.delta.insert_add((a_6, v65, v3));
-            }
-            if let v1 = self.global_i64.get(0usize) {
-                if self.const_.check_0_1(v1, v2) {
-                    // ( rewrite ( Add x ( Const 0 ) ) x )
-                    self.uf.math_.union(x, v3);
-                }
-            }
-        }
-        for (v5, v6) in self.const_.iter_new() {
-            if v5 == self.global_i64.get(0usize) {
-                for (x_5, v19) in self.mul_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
-                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
-                    self.uf.math_.union(v6, v19);
-                }
-                for (x_2, v7) in self.add_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
-                    // ( rewrite ( Add x ( Const 0 ) ) x )
-                    self.uf.math_.union(x_2, v7);
-                }
-            }
-        }
-        if let Some(v9) = self.global_i64.get_new(0usize) {
-            for (v10,) in self.const_.iter_old_0_to_1(v9, self.latest_timestamp) {
-                for (x_6, v23) in self.mul_.iter_old_1_to_0_2(v10, self.latest_timestamp) {
-                    // ( rewrite ( Mul x ( Const 0 ) ) ( Const 0 ) )
-                    self.uf.math_.union(v10, v23);
-                }
-                for (x_3, v11) in self.add_.iter_old_1_to_0_2(v10, self.latest_timestamp) {
-                    // ( rewrite ( Add x ( Const 0 ) ) x )
-                    self.uf.math_.union(x_3, v11);
-                }
-            }
-        }
-    }
+    let a = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
 
-    ```,
-  ),
-  caption: [Example of generated code for `apply_rules`],
-) <figure_apply_rules>
+    text(
+      size: 8pt,
+      setup + a + reset,
+    )
+  },
+  caption: [Generated code for `AddRelation::update_begin`, slightly simplified and re-arranged.],
+) <fig_impl_codegen_canonicalization_update_begin>
 
-/*
-```python
-class AddRelation:
-    new: List[(Math, Math, Math)]
-    fd_index_x_y_to_res: Dict[(Math, Math), (Math, TimeStamp)]
-    index_x_to_y_res: Dict[(Math,), List[(Math, Math, TimeStamp)]]
-    index_y_to_x_res: Dict[(Math,), List[(Math, Math, TimeStamp)]]
+As shown in @fig_impl_codegen_canonicalization_update, `update` is called in a fixed point loop when
+canonicalizing, linearly scanning the hashmap for uprooted e-nodes using `retain` which are pushed
+to a vector of pending insertions. These insertions are then applied using `update_begin`, and the
+process repeated until all relations contain only up-to-date e-nodes in their FD indexes.
 
-    # insert delta into FD index
-    def update_insert(self,
-        delta: List[(Math, Math, Math)],
-        uf: UnionFind,
-        latest_timestamp: TimeStamp
-    ):
-        fd_index = self.fd_index_x_y_to_res
-        for (x, y, res) in delta:
-            if (x, y) in fd_index:
-                (old_res, old_timestamp) = fd_index[(x, y)]
-                uf.union(res, old_res)
+The `update` fixed point loop makes Oatlog's implementation of `canonicalize` quadratic in the worst
+case , if for example an e-graph of $n$ e-nodes has `update` called $n$ times with `update_begin` in
+every iteration performing exactly one union. This does however not occur in practice, with the
+`update` fixed point loop typically having a low single digit number of iterations.
 
-                if old_res != uf.find(res):
-                    fd_index[(x, y)] = (uf.find(res), old_timestamp)
-                else:
-                    fd_index[(x, y)] = (uf.find(res), old_timestamp)
+#figure(
+  {
+    let start = 243
+    let end = 266
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
 
-            else:
-                fd_index[(x, y)] = (res, latest_timestamp)
+    let a = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
 
-    # remove non-canonical rows from FD index
-    def update(self, uf: UnionFind, latest_timestamp: TimeStamp):
-        fd_index = self.fd_index_0_1_to_2
-        delta = []
-        for ((x, y), res) in fd_index:
-            if !(uf.is_root(x), uf.is_root(y), uf.is_root(res)):
-                delta.append((x, y, res))
-                del fd_index[(x, y)]
+    text(
+      size: 8pt,
+      setup + a + reset,
+    )
+  },
+  caption: [Generated code for `AddRelation::update`, slightly simplified and re-arranged.],
+) <fig_impl_codegen_canonicalization_update>
 
-        update_insert(fd_index, delta)
+Finally, `update_finalize` -- as shown in @fig_impl_codegen_canonicalization_update_finalize --
+rebuilds the `new` vector and all non-FD indexes, by comparing timestamps and repeatedly sorting a
+vector of e-class tuples according to different comparators. The listing shows only the helper
+`RowSort100` sorting tuples `(a,b,c)` by `a`, but for relations with multiple non-FD indexes
+`self.all` is repeatedly sorted using different helpers.
 
-    # reconstruct non-FD indexes
-    def update_finalize(self, latest_timestamp: TimeStamp):
-        self.new = []
-        self.index_x_to_y_res = dict()
-        self.index_y_to_x_res = dict()
-        for ((x, y), (res, timestamp)) in self.fd_index_x_y_to_res:
-            self.index_x_to_y_res.get(x), []).append((y, res, timestamp))
-            self.index_y_to_x_res.get(x), []).append((y, res, timestamp))
-            if timestamp == latest_timestamp:
-                self.new.append((x, y, res))
-```
+#figure(
+  {
+    let start = 267
+    let end = 298
+    let setup = raw_line_offset.update(_ => start - 1)
+    let reset = raw_line_offset.update(_ => 0)
 
-```python
-class Theory:
-    add: AddRelation
-    mul: MulRelation
-    add_delta: List[(Math, Math, Math)]
-    mul_delta: List[(Math, Math, Math)]
-    latest_timestamp: TimeStamp
-    uf: UnionFind
+    let a = raw(
+      read("example_codegen.rs").split("\n").slice(start - 1, end).join("\n"),
+      lang: "rust",
+      block: true,
+    )
 
-    def canonicalize(self):
-        self.latest_timestamp += 1
-        self.add.update_insert(self.add_delta, self.uf, self.latest_timestamp)
-        self.mul.update_insert(self.mul_delta, self.uf, self.latest_timestamp)
+    text(
+      size: 8pt,
+      setup + a + reset,
+    )
+  },
+  caption: [Generated code for `AddRelation::update_finalize`, slightly simplified and re-arranged.],
+) <fig_impl_codegen_canonicalization_update_finalize>
 
-        while not reached fixpoint:
-            self.add.update(self.uf, self.latest_timestamp)
-            self.mul.update(self.uf, self.latest_timestamp)
-
-        self.add.update_finalize(self.latest_timestamp)
-        self.mul.update_finalize(self.latest_timestamp)
-
-```
-*/
-
-#TODO[]
+The full code from which we in these sections have shown snippets as available in its entirety in
+@appendix_codegen_example.
 
 = Evaluation <chapter_evaluation>
 
@@ -3108,159 +2899,20 @@ INNER JOIN Mul ON Add.result = Mul.lhs;
 FROM Add
 ```
 
-= Example of generated theory code <appendix_codegen_example_theory>
+= Full example of generated theory code <appendix_codegen_example>
 
 Egglog code is orders of magnitude more brief than the generated code that Oatlog outputs. In this
-example, we consider the following egglog code implementing the distributive law:
+example, 7 lines of egglog is compiled into almost 500 lines of Rust, even after slightly
+simplifying the generated code.
 
-```egglog
-(datatype Math
-    (Mul Math Math)
-    (Add Math Math)
-)
-(rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-```
+This code is the full example from which @section_implementation_codegen_theory,
+@section_implementation_codegen_ematching and @section_implementation_codegen_canonicalize show
+snippets.
 
-The two most important part of the generated theory code are the functions `apply_rules` and
-`canonicalize` that implement the two phases of equality saturation.
-
-Note that less important parts of the generated code have been elided to make the example easier to
-read.
-
-#TODO[Outdated]
-
-```rust
-pub struct Delta {
-    mul_relation_delta: Vec<<MulRelation as Relation>::Row>,
-    add_relation_delta: Vec<<AddRelation as Relation>::Row>,
+#{
+  let content = raw(read("example_codegen.rs"), lang: "rust", block: true)
+  text(size: 10pt, content)
 }
-struct Unification {
-    pub math_uf: UnionFind<Math>,
-}
-pub struct Theory {
-    pub delta: Delta,
-    pub uf: Unification,
-    pub mul_relation: MulRelation,
-    pub add_relation: AddRelation,
-}
-impl Theory {
-    pub fn apply_rules(&mut self) {
-        // (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        for (a, b, p2) in self.add_relation.iter_new() {
-            for (c, p4) in self.mul_relation.iter1_0_1_2(p2) {
-                let a5 = self.uf.math_uf.add_eclass();
-                let a4 = self.uf.math_uf.add_eclass();
-                self.delta.insert_add((a4, a5, p4));
-                self.delta.insert_mul((b, c, a5));
-                self.delta.insert_mul((a, c, a4));
-            }
-        }
-        // (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-        for (p2, c, p4) in self.mul_relation.iter_new() {
-            for (a, b) in self.add_relation.iter1_2_0_1(p2) {
-                let a5 = self.uf.math_uf.add_eclass();
-                let a4 = self.uf.math_uf.add_eclass();
-                self.delta.insert_add((a4, a5, p4));
-                self.delta.insert_mul((b, c, a5));
-                self.delta.insert_mul((a, c, a4));
-            }
-        }
-    }
-    pub fn canonicalize(&mut self) {
-        self.mul_relation.clear_new();
-        self.add_relation.clear_new();
-        while self.uf.has_new_uproots() || self.delta.has_new_inserts() {
-            self.uf.snapshot_all_uprooted();
-            self.mul_relation.update(&mut self.uf, &mut self.delta);
-            self.add_relation.update(&mut self.uf, &mut self.delta);
-        }
-        self.uf.snapshot_all_uprooted();
-        self.mul_relation.update_finalize(&mut self.uf);
-        self.add_relation.update_finalize(&mut self.uf);
-    }
-}
-```
-
-= Example of generated relation code <appendix_codegen_example_relation>
-
-#TODO[Outdated]
-
-This is part of the generated Rust code for a binary operator `Add`. The querying functions are
-elided, but the included functions `update` and `update_finalize` are used within the theory's
-`canonicalize` step.
-
-```rust
-struct AddRelation {
-    new: Vec<<Self as Relation>::Row>,
-    all_index_0_1_2: IndexImpl<RadixSortCtx<Row3_0_1<Math, Math, Math>, u128>>,
-    all_index_1_0_2: IndexImpl<RadixSortCtx<Row3_1_0_2<Math, Math, Math>, u128>>,
-    all_index_2_0_1: IndexImpl<RadixSortCtx<Row3_2_0_1<Math, Math, Math>, u128>>,
-}
-impl AddRelation {
-    fn update(&mut self, uf: &mut Unification, delta: &mut Delta) {
-        let mut inserts = take(&mut delta.add_relation_delta);
-        let orig_inserts = inserts.len();
-        self.all_index_0_1_2.first_column_uproots(
-            uf.math_uf.get_uprooted_snapshot(),
-            |deleted_rows| inserts.extend(deleted_rows),
-        );
-        self.all_index_1_0_2.first_column_uproots(
-            uf.math_uf.get_uprooted_snapshot(),
-            |deleted_rows| inserts.extend(deleted_rows),
-        );
-        self.all_index_2_0_1.first_column_uproots(
-            uf.math_uf.get_uprooted_snapshot(),
-            |deleted_rows| inserts.extend(deleted_rows),
-        );
-        inserts[orig_inserts..].sort_unstable();
-        runtime::dedup_suffix(&mut inserts, orig_inserts);
-        self.all_index_0_1_2.delete_many(&mut inserts[orig_inserts..]);
-        self.all_index_1_0_2.delete_many(&mut inserts[orig_inserts..]);
-        self.all_index_2_0_1.delete_many(&mut inserts[orig_inserts..]);
-        inserts.iter_mut().for_each(|row| {
-            row.0 = uf.math_uf.find(row.0);
-            row.1 = uf.math_uf.find(row.1);
-            row.2 = uf.math_uf.find(row.2);
-        });
-        self.all_index_0_1_2
-            .insert_many(&mut inserts, |mut old, mut new| {
-                let (x2,) = old.value_mut();
-                let (y2,) = new.value_mut();
-                uf.math_uf.union_mut(x2, y2);
-                old
-            });
-        self.all_index_1_0_2
-            .insert_many(&mut inserts, |mut old, mut new| {
-                let () = old.value_mut();
-                let () = new.value_mut();
-                panic!("panicking merge action")
-            });
-        self.all_index_2_0_1
-            .insert_many(&mut inserts, |mut old, mut new| {
-                let () = old.value_mut();
-                let () = new.value_mut();
-                panic!("panicking merge action")
-            });
-        self.new.extend_from_slice(&inserts);
-    }
-    fn update_finalize(&mut self, uf: &mut Unification) {
-        self.new.sort_unstable();
-        self.new.dedup();
-        self.new.retain(|(x0, x1, x2)| {
-            if *x0 != uf.math_uf.find(*x0) {
-                return false;
-            }
-            if *x1 != uf.math_uf.find(*x1) {
-                return false;
-            }
-            if *x2 != uf.math_uf.find(*x2) {
-                return false;
-            }
-            true
-        });
-    }
-}
-```
 
 = Benchmarks <appendix_benchmarks>
 
