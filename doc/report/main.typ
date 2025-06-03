@@ -351,38 +351,35 @@ production compiler backend Cranelift @cranelift. Cranelift uses a weaker constr
 e-graphs (aegraphs) due to performance problems of full e-graphs. A proliferation of e-graphs within
 compilers would require them to become faster.
 
-#TODO[We commented out Datalog section here, that's no good since we want to talk about Datalog
-  later..]
-
-// #TODO[Explain limitations of aegraphs. Or not? Seems excessive]
-// it is actually unclear what exactly the weaknesses are with aegraphs, and therefore very hard to
-// explain.
-
-/*
 == Relational databases and Datalog
 
-#TODO[is this suitable for people who don't know databases or Datalog?]
+Relational databases are a mature technology that are used across computer science. Their success is
+supported by multiple key advantages: They logically represent data as tables, i.e. collections of
+identically structed records called rows. This representation is abstract and many computations can
+be expressed in the domain-specific query languages such as SQL based on relational algebra.
+High-level queries can be executed efficiently by leveraging well-studied query planning and join
+algorithms. At the same time the abstract tables can be physically implemented in different ways,
+with acceleration structures called indexes affecting the performance characteristics of a logically
+identical table.
 
-#TODO[add paragraph mentioning how databases have been a useful tool, what indexes are, why they are useful]
+Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm
+@egglog have identified a connection to relational databases. Adding indexes to e-graphs adds
+flexibility to its pattern-matching, effectively formulating e-matching as executing relational
+queries. This illustrates a connection between equality saturation and Datalog @egglog, a
+declarative logic programming language implemented as relational queries iteratively inferring facts
+to add to the database. In fact, this similarity extends to the degree that e-graphs may be best
+thought of as Datalog extended with a unification operation.
 
-Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm @egglog have
-shown that adding indexes to e-graph pattern-matching creates a structure that is very similar to
-relational databases and in particular Datalog @egglog. Datalog is a declarative logic programming language that
-reasons bottom-up by inserting rows into tables. In fact, this similarity extends to the degree
-that e-graphs may be best thought of as Datalog extended with a unification operation.
-
-This allows EqSat @equalitysaturation to leverage algorithms from Datalog, in particular the
-algorithm semi-naive evaluation which, rather than running queries against the entire database,
+This identifiction allows equality saturation to leverage algorithms from Datalog, in particular the
+algorithm semi-naive evaluation. Rather than running queries against the entire database, it
 specifically queries newly inserted rows in a manner similar to a database trigger. Incremental rule
-matching, together with indexes and simple query planning, has brought an order of magnitude speedup
-to the e-graph engine egglog @egglog when compared to its predecessor egg @egg.
+matching, together with indexes and simple query planning, brought an order of magnitude speedup to
+the e-graph engine egglog @egglog when compared to its predecessor egg @egg.
 
-Relational databases are a mature technology with rich theory and a wide breadth of implementations,
-providing many techniques that could be transferred to e-graphs beyond those already incorporated
-into egglog. At the same time, e-graphs have unique requirements and have been understood as
-databases only recently. This background is what motivated us to look at Datalog-like e-graph
-implementation for our master's thesis.
-*/
+Relational databases use many implementation techniques that could be transferred to e-graphs beyond
+those already incorporated into egglog. At the same time, e-graphs have unique requirements and have
+been understood as databases only recently. This background is what motivated us to look at
+Datalog-like e-graph implementation for our master's thesis.
 
 == Oatlog
 
@@ -405,33 +402,31 @@ preprocessing, query planning, index implementation and general performance engi
 
 == This thesis
 
-// #TODO[Elaborate further with short section summaries once the respective sections have been
-// written.]
+@chapter_background, Background, extends this introduction by explaining e-graphs and key aspects of
+e-graph engine implementation. It does so by first motivating e-graphs starting from expression
+trees, then by incrementally showcasing a full self-contained implementation of equality saturation
+in about 100 lines of code, before finally explaining the similarity between e-graphs and relational
+databases and how this can be leveraged for a significantly more efficient implementation.
 
-@chapter_background extends this introduction with a step-by-step explanation of the topics relevant to
-implementing a state of the art e-graph engine.
-// It does so by first motivating e-graphs starting
-// from expression trees, then by incrementally showcasing a full self-contained implementation of
-// equality saturation in about 100 lines of code, before finally explaining the similarity between
-// e-graphs and relational databases and how this can be leveraged for a significantly more efficient
-//implementation.
-@chapter_implementation then concretely describes the application of these techniques in Oatlog and
-the implementation decisions we have made, in addition to showing how Oatlog is used and its
-capabilities.
-@chapter_evaluation follows by evaluating Oatlog through its test suite and benchmarks.
-@chapter_conclusion discusses future work, both algorithmic and constant factor performance improvements.
+@chapter_implementation, Implementation, then concretely describes the application of these
+techniques in Oatlog and the implementation decisions we have made, in addition to showing how
+Oatlog is used and its capabilities. @chapter_evaluation follows by evaluating Oatlog through its
+test suite and benchmarks. @chapter_conclusion discusses future work, both algorithmic and constant
+factor performance improvements.
 
 = Background <chapter_background>
 
 This background introduces relevant concepts to understand Oatlog and its implementation.
-@section_group_egraphs introduces e-graphs at a conceptual level.
-@section_background_practice discusses how e-graphs are used in practice and how they can be implemented.
-@section_background_relational_databases discusses database joins and how they are related to pattern matching in an e-graph.
-@section_background_theory_languages explains the basics of the egglog language, which is the frontend language used in Oatlog.
+@section_group_egraphs introduces e-graphs at a conceptual level and @section_background_practice
+explains how e-graphs can be implemented and are used in practice.
+@section_background_relational_databases then shows how e-graphs can be implemented as relational
+databases, unlocking significant optimizations. Finally, @section_background_theory_languages
+explains the basics of the egglog language -- the frontend language used in Oatlog.
 
 == E-graphs <section_group_egraphs>
 
-This section discusses the background needed to understand e-graphs.
+This section introduces e-graphs as mathematical objects before going on to explain how e-graphs can
+be implemented in relatively simple code.
 
 === Expression trees and DAGs <section_background_dags>
 
@@ -923,11 +918,10 @@ acceptable.
   in linear time for e-graphs of bounded treewidth @fastextract.
 - Finally, for arbitrary cost functions approximate solutions can be found using various heuristics.
 
-However, Oatlog does not in its current form implement any extraction, so it is not a major topic in
-this thesis.
-Extraction is not implemented because the problem of extraction is unrelated to the problem of
-constructing the e-graph and the thesis is about the performance of constructing the e-graph.
-Note that existing extraction libraries could be used by serializing the e-graph.
+While extraction is an important part of equality saturation, Oatlog does not implement any
+extraction. Extraction is largely independent functionality from the building of the e-graph, so
+scope constraints led us to prioritize performant e-graph building for this thesis. There are
+standalone e-graph extraction libraries that could be fed a serialized e-graph from Oatlog.
 
 #figure(
   {
