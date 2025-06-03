@@ -33,6 +33,9 @@
               cargo = rust-stable;
             };
         };
+
+        pythonWithLibraries = (pkgs.python3.withPackages
+          (py-pkgs: with py-pkgs; [ matplotlib numpy ]));
       in {
         formatter = pkgs.writeShellApplication {
           name = "format";
@@ -52,8 +55,6 @@
             p.tinymist
             p.typstyle
             (p.crate2nix.override { cargo = rust-stable; })
-            (p.python3.withPackages
-              (py-pkgs: with py-pkgs; [ matplotlib numpy ]))
             (rust-stable.override {
               extensions = [ "rust-src" "rust-analyzer" ];
             })
@@ -82,6 +83,7 @@
             set -v -e
             PATH="${pkgs.ripgrep}/bin:$PATH"
             PATH="${pkgs.graphviz}/bin:$PATH"
+            PATH="${pythonWithLibraries}/bin:$PATH"
             make -C ./doc/report lint dependencies
             ${
               lib.getExe pkgs.typst
