@@ -2020,10 +2020,11 @@ which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
 === Sorting
 
 One of Oatlog's core operations, alongside for example union-find lookups and hashmap accesses, is
-sorting arrays of e-nodes, concretely tuples -- mostly triplets -- of 32-bit integers. For this
-Oatlog uses the library Voracious sort @voracious_sort, which sorts using a most-significant-digit
-radix sort with a fallback on the Rust standard library's pattern-defeating quicksort on small
-inputs.
+sorting arrays of e-nodes, concretely tuples -- mostly triplets -- of 32-bit integers. The sorting
+algorithm can be and for performance reasons therefore in practice is an unstable sort, meaning that
+tuples that compare equal can be permuted arbitrarily. For this Oatlog uses the library Voracious
+sort @voracious_sort, which sorts using a most-significant-digit radix sort with a fallback on the
+Rust standard library's pattern-defeating quicksort on small inputs.
 
 Radix sorts are linear time algorithms to sort (anything interpretable as) fixed width integers. At
 their simplest, input numbers are written to a 256-entry histogram based on their highest or lowest
