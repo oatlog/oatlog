@@ -2497,7 +2497,7 @@ but there are also differences, such as Oatlog
   indexes (effectively a single `HashMap<A, HashMap<B, C>>`),
 - exploiting invariant permutations for saturation benchmarks
 
-#TODO[Ablation? Although it would possibly be annoying to implement]
+/*#TODO[Ablation? Although it would possibly be annoying to implement] OUT OF SCOPE */
 
 #figure(
   text(
@@ -2713,7 +2713,7 @@ perspective, to study further.
 
 == Future work
 
-#TODO[Compare performance with Datalog engines, borrow more tricks from there]
+/*#TODO[Compare performance with Datalog engines, borrow more tricks from there] OUT OF SCOPE */
 
 Aside from studying how implementation details drive performance differences in Oatlog and egglog,
 possible future work on Oatlog includes adding features to improve egglog compatibility, smaller
