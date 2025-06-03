@@ -1436,21 +1436,28 @@ prototype of egglog, egglite, was originally implemented on top of sqlite @eggli
 
 == The egglog language and nomenclature <section_background_theory_languages>
 
-#TODO[rework, we already do translation to relational database in another section, but maybe it
-  could help to repeat ourselves?]
+E-graph theories and their rewrite rules are specified in what are called theory languages. These
+are in effect domain-specific languages for declaring relations and rewrite rules, but expressed at
+a high level where for example functional dependency rewrites are implicit consequences of
+language-level functions.
 
-The egglog language, not to be confused with egglog, an interpreter of the egglog
-language, is used in Oatlog, and some understanding of it is helpful to understand Oatlog.
+Egglog's predecessor egg @egg had its rewrite rules declared in an ad-hoc manner through a
+combination of a Rust procedural macro and S-expression strings, but egglog defined a complete
+language for equality saturation designed to be usable in a REPL or otherwise standalone from a Rust
+program. While Oatlog is designed to be used to embed e-graphs within programs, it implements the
+egglog language for compatibility and because it is an effective language for describing EqSat
+theories.
 
-@informal-theory-example shows an example EqSat theory specified in the egglog domain-specific
-language @egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc. are constructors.
-Rewrites mean that if the left side matches, add the right side to the database and unify it with
-the left side. Egglog semantics define running a set of rules as using their left side patterns to
-figure out what right side actions to perform, then doing all actions as a batch. Egglog defines a
-command `(run <count>)`, not shown here, that runs the set of all rules some number of times or until
-convergence.
+@informal-theory-example shows an example theory specified in the egglog domain-specific language
+@egglog. `Math` is essentially a sum type, where `Add`, `Sub`, etc. are constructors. Rewrites mean
+that if the left side matches, add the right side to the database and unify it with the left side.
+Egglog semantics define running a set of rules once as using their left side patterns to figure out
+what right side actions to perform, then doing all actions as a batch. Egglog defines a command
+`(run <count>)`, not shown here, that runs the set of all rules some number of times or until the
+e-graph is saturated.
 
 #figure(
+  placement: auto,
   ```egglog
   (datatype Math
       (Add (Math Math))
@@ -1480,81 +1487,19 @@ convergence.
   caption: [A theory written in the egglog language.],
 ) <informal-theory-example>
 
-Egglog also supports a form of sum types
+The egglog language also supports many features outside its core functionality, a lot of which are
+not implemented by Oatlog. This notably includes custom merge functionality, where functions can
+return primitives whose functional dependency violations are merged using a primitive function.
+Custom merge could for example be used to track upper bounds on the size of a mathematical
+expression, in which case the upper bounds would be merged with `min`. These are called
+lattice-based computations and they are crucial to enable rewrite rules triggered by not just
+syntactic patterns but also semantic analysis.
 
-```egglog
-```
-
-This is analogous to sum types in other languages like Rust or Haskell, which could be written as:
-```rust
-enum Math {
-    Add(&Math, &Math),
-    Mul(&Math, &Math),
-    Const(i64),
-}
-```
-```haskell
-data Math =
-   Add Math Math |
-   Mul Math Math |
-   Const Int
-```
-
-Here, `Add`, `Mul`, `Const` are constructors for `Math`.
-
-Implementing Math like this would not work for several reasons, firstly we
-want the constructors to return e-classes, and take in e-classes, and secondly,
-sum types can not directly be stored in a relational database.
-
-This can be solved by creating a new table per constructor, as in @sum_type_tables. Now, all
-e-classes are just integer IDs, and exist implicitly in the tables.
-
-#figure(
-  grid(
-    columns: (auto, auto, auto),
-    rows: (auto, auto),
-    gutter: 8pt,
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Add*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 3, [*Mul*]),
-        [x],
-        [y],
-        [res],
-      ),
-
-      [...], [...], [...],
-    ),
-    table(
-      columns: (auto, auto),
-      inset: 8pt,
-      align: horizon,
-      table.header(
-        table.cell(colspan: 2, [*Const*]),
-        [x],
-        [res],
-      ),
-
-      [...], [...],
-    ),
-  ),
-  caption: [Sum types as multiple tables.],
-) <sum_type_tables>
+Datatypes provide a simple type system on top of untyped e-classes, but the egglog language also
+supports primitives such as `i64`, `String` and `bool`. The language separates relations and
+functions, the latter being implemented as relations with a functional dependency. There are also
+primitive functions such as `+`, `-`,  and `*`, etc, on `i64`. Datatype constructors such as `Add`
+or `Mul` are effectively functions.
 
 @appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
 
