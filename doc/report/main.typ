@@ -1944,7 +1944,7 @@ now concern run-time representation and implementation details. This section wil
 their contents not organized by steps in a compiler but as aspects of the generated code that they
 affect.
 
-=== Size of e-class IDs
+=== E-class bitwidth
 
 Using 32-bit e-class IDs is preferable to 64-bit IDs since that roughly halves the size of indexes
 and union-finds. While it is entirely possibly to run out of the $2^32$ e-class IDs, it would
