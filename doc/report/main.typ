@@ -1498,7 +1498,7 @@ syntactic patterns but also semantic analysis.
 Datatypes provide a simple type system on top of untyped e-classes, but the egglog language also
 supports primitives such as `i64`, `String` and `bool`. The language separates relations and
 functions, the latter being implemented as relations with a functional dependency. There are also
-primitive functions such as `+`, `-`,  and `*`, etc, on `i64`. Datatype constructors such as `Add`
+primitive functions such as `+`, `-`, and `*`, etc, on `i64`. Datatype constructors such as `Add`
 or `Mul` are effectively functions.
 
 @appendix_rosettaexample shows how an egglog rule can be transformed to eqlog, Rust, and SQL.
@@ -2859,6 +2859,19 @@ INNER JOIN Mul ON Add.result = Mul.lhs;
 FROM Add
 ```
 
+= Oatlog example -- the quadratic formula <appendix_example_quadratic_formula>
+
+This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As evidenced by the
+need to define e-node insertion helpers, Oatlog's current run-time API is quite unergonomic.
+
+#columns(
+  2,
+  text(
+    size: 8pt,
+    raw(read("../../examples/quadratic-formula/src/main.rs").trim(), lang: "rust", block: true),
+  ),
+)
+
 = Full example of generated theory code <appendix_codegen_example>
 
 Egglog code is orders of magnitude more brief than the generated code that Oatlog outputs. In this
@@ -2968,7 +2981,13 @@ snippets.
 //
 // ======== STEP took 8187.570132999999 ms ==========
 
-#TODO[explain driver code]
+Both of the math and boolean adder benchmarks grow to very large sizes and are benchmarked by
+measuring the time required to instantiate the theory, including constructing globals etc, then
+taking some number of EqSat steps. The math benchmark is made saturating for the benchmarks
+`fuelN_math` with $N=1,2,3$ by adding an additional argument of type `Fuel` to `Integral`, which
+initially is `(Fuel (Fuel (Fuel (ZeroFuel))))` for the $N=3$ case with one level of nesting removed
+for each application of integration by parts. This limits nested integration by parts to $N$ levels,
+leading the e-graph to saturate at a reasonable number of e-nodes.
 
 == Math
 
@@ -2985,18 +3004,5 @@ snippets.
       lang: "egglog",
       block: true,
     ),
-  ),
-)
-
-= Oatlog example -- the quadratic formula <appendix_example_quadratic_formula>
-
-This example proves that if $x = -b + sqrt(b^2 - c)$ then $x^2 + 2 b x + c = 0$. As evidenced by the
-need to define e-node insertion helpers, Oatlog's current run-time API is quite unergonomic.
-
-#columns(
-  2,
-  text(
-    size: 8pt,
-    raw(read("../../examples/quadratic-formula/src/main.rs").trim(), lang: "rust", block: true),
   ),
 )
