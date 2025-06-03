@@ -2019,8 +2019,22 @@ which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
 
 === Sorting
 
-#TODO[Sorting mostly pairs and triplets of `u32` unstably (because unique). Radix sort with
-  quicksort (stdlib) fallback, using voracious sort.]
+One of Oatlog's core operations, alongside for example union-find lookups and hashmap accesses, is
+sorting arrays of e-nodes, concretely tuples -- mostly triplets -- of 32-bit integers. For this
+Oatlog uses the library Voracious sort @voracious_sort, which sorts using a most-significant-digit
+radix sort with a fallback on the Rust standard library's pattern-defeating quicksort on small
+inputs.
+
+Radix sorts are linear time algorithms to sort (anything interpretable as) fixed width integers. At
+their simplest, input numbers are written to a 256-entry histogram based on their highest or lowest
+byte, then recursing into each of the 256 sub-lists. Least significant digit (LSD) radix sorts merge
+sorted runs and work out-of-place, similarly to merge sort. MSD radix sorts, like Voracious sort,
+can however be implemented in-place, leaving their buckets to be sorted recursively similarly to
+quicksort.
+
+Voracious sort generally achieves a 1x to 1.3x speedup relative to the standard library unstable
+sort. Oatlog benefits moderately from this speedup given that it sorts for a large fraction but not
+a majority of its run time.
 
 === Union-find
 
