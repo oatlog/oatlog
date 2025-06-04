@@ -90,11 +90,11 @@
 
 Modern software development depends on efficient and reliable compilers, which apply sophisticated
 optimizations to improve performance while enabling portability and abstraction. For example,
-autovectorization allows code to take advantage of SIMD hardware without using architecture-specific
-intrinsics, while function inlining eliminates the overhead of function calls, enabling higher-level
-abstractions without sacrificing performance. These optimizations not only enhance program execution
-and energy efficiency but also make it easier for developers to write maintainable and portable
-code.
+autovectorization @compiler_autovectorization allows code to take advantage of SIMD hardware without
+using architecture-specific intrinsics and function inlining @compiler_inlining eliminates the
+overhead of function calls, enabling higher-level abstractions without sacrificing performance.
+These optimizations not only enhance program execution and energy efficiency but also make it easier
+for developers to write maintainable and portable code.
 
 Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
 that have received significant engineering effort and which are used across the industry to compile
@@ -107,6 +107,7 @@ generated-code-quality trade-off.
   {
     let n(pos, content, ..any) = node(pos, align(left, content), ..any)
     fletcher.diagram(
+      spacing: 26pt,
       n(
         (0, 0),
         ```
@@ -172,14 +173,16 @@ The second part of the phase ordering problem is that optimization passes are de
 noncommutative, so the optimized output program may be different based on what order passes were
 applied in even if a fixed point was reached. Concretely, we can consider the program `(x*2)/2`.
 Strength reduction could be applied first, giving `(x<<1)/2`, or the expression could be
-reassociated to `x*(2/2)` which constant folds to `x`. Depending on how the optimization passes
-are constructed, it is not obvious that the same simplification could be done from `(x<<1)/2`,
-in which case the program would be stuck in a local but not global optimum due to previous
-scheduling of optimization passes. While most specific scenarios of noncommutative passes can be
-resolved at the cost of only slightly complicating the compiler, the general problem of
-noncommutative and destructive passes cannot be avoided within such a compiler.
+reassociated to `x*(2/2)` which constant folds to `x`. Depending on how the optimization passes are
+constructed, it is not obvious that the same simplification could be done from `(x<<1)/2`, in which
+case the program would be stuck in a local but not global optimum due to previous scheduling of
+optimization passes. Specific scenarios involving noncommutative passes can be solved by keeping the
+program in a canonical form, such as writing all shifts as multiplications and doing strength
+reduction as part of a later intermediate representation lowering. Such special treatment is however
+less composable and cannot fully address the problem of noncommutativity inherent to compilers
+applying destructive passes.
 
-== Phase ordering and peephole rewriting
+== Phase ordering and peephole optimization
 
 In an optimization pass architecture, the phase ordering problem is often framed as figuring out
 what sequence of passes result in the best performing output programs. For LLVM, such pass
@@ -191,66 +194,68 @@ optimization passes to the program in a loop until having reached a fixed point.
 done in practice for the simple reason that doing so would result in excessively long compile times
 -- each pass processes the entire program in at least linear time and there are hundreds of passes.
 
-Optimization to a fixed point is made possible by peephole rewriting, which takes the optimization
-pass architecture and makes it incremental. Rather than passes (re)processing the entire program, a
-data structure directs them towards the parts of the program that have been changed. In practice
-this requires two things: a program representation with a useful notion of locality and phrasing the
-optimizations as local rewrites on this representation.
+Optimization to a fixed point is made possible by peephole optimization @son, which takes the
+optimization pass architecture and makes it incremental. Rather than passes (re)processing the
+entire program, a data structure directs them towards the parts of the program that have been
+changed. In practice this requires two things: a program representation with a useful notion of
+locality and phrasing the optimizations as local rewrites on this representation.
 
-Such program representations #footnote[Sea of Nodes @son is a compiler IR design that represents both
-data flow and control flow as expressions with no side effects, making it especially suited to
-peephole rewriting.] are usually trees or (directed acyclic) graphs (DAGs), with
-representations typically enforcing single static assignment (SSA), i.e. that variables are written
-to exactly once. @fig_intro_peephole_ir shows the program fragment of @fig_intro_compiler_passes
-represented in such an intermediate representation (IR). It is crucial that the IR is designed in
-such a way that its optimizations become local, for if optimizations need to mutate large sections
-of the IR or if the applicability of optimizations depend on non-local properties, then incremental
-processing becomes impossible. This is why a linear list of instructions is an unsatisfactory IR for
-peephole rewriting -- the definition and usage of a variable must not be far away from each other
-and optimizations cannot lead to unnecessary mutation, such as shifting line numbers around or
-similar. If everything works out, peephole rewriting in some sense decreases the time complexity of
-optimization from $O("program size" dot "applied rewrites")$ to $O("program size"
-+ "applied rewrites")$.
+Such program representations #footnote[For example, Sea of Nodes @son is a compiler IR design that
+represents both data flow and control flow as expressions with no side effects, making it especially
+suited to peephole optimization.] are usually trees, directed acyclig graphs (DAGs) or general
+graphs, with representations typically enforcing single static assignment (SSA), i.e. that variables
+are written to exactly once. @fig_intro_peephole_ir shows the program fragment of
+@fig_intro_compiler_passes represented in such an intermediate representation (IR). It is crucial
+that the IR is designed in such a way that its optimizations become local, for if optimizations need
+to mutate large sections of the IR or if the applicability of optimizations depend on non-local
+properties, then incremental processing becomes impossible. This is why a linear list of
+instructions is an unsatisfactory IR for peephole optimization -- the definition and usage of a
+variable must not be far away from each other and optimizations cannot lead to unnecessary mutation,
+such as shifting line numbers around or similar. If everything works out, peephole optimization in
+some sense decreases the time complexity of optimization from
+$O("program size" dot "applied rewrites")$ to $O("program size" + "applied rewrites")$, as every
+applied rewrite creates new work only in its constant-sized neighborhood rather than anywhere in
+the program.
 
 #figure(
   image("../figures/peephole_example.svg", fit: "contain", width: 50%),
   caption: [Representing the program fragment of @fig_intro_compiler_passes in an IR suitable for
-    peephole rewriting. The IR is illustrative and simplified compared to real designs.],
+    peephole optimization. The IR is illustrative and simplified compared to real designs.],
   placement: auto,
 ) <fig_intro_peephole_ir>
 
 From a pure software organization perspective, the optimization passes (or now rather rewrite rules)
-must declare their inputs in sufficient detail that the peephole rewriting engine can dispatch them
-to parts of the program where optimizations are possible. For example, a constant folding rewrite
-rule may watch for substructures `<lhs> + <rhs>` where `<lhs>` and `<rhs>` themselves are constant.
-This rule input declaration interface takes the form of a syntactic pattern over terms in the IR,
-which the peephole rewriting engine is able to incrementally resolve into a set of candidate
-locations. Once a pattern match is found, some rewrite rules may need to run arbitrary logic to
-figure out whether their optimizations are applicable and how to modify the program, but other
-rewrite rules may directly specify a syntactic rewrite performing the optimization. In this latter
-case we have a purely syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
-`Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier to
-reason about than ad-hoc passes, expressed in possibly very many lines of code.
+must declare their inputs in sufficient detail that the peephole engine can dispatch them to parts
+of the program where optimizations are possible. For example, a constant folding rewrite rule may
+watch for substructures `<lhs> + <rhs>` where `<lhs>` and `<rhs>` themselves are constant. This rule
+input declaration interface takes the form of a syntactic pattern over terms in the IR, which the
+peephole engine is able to incrementally resolve into a set of candidate locations. Once a pattern
+match is found, some rewrite rules may need to run arbitrary logic to figure out whether their
+optimizations are applicable and how to modify the program, but other rewrite rules may directly
+specify a syntactic rewrite performing the optimization. In this latter case we have a purely
+syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or `Add(Mul(a,b), Mul(a,c))
+=> Mul(a, Add(b,c))`, which not only are easy to state but also easier to reason about than ad-hoc
+passes, expressed in possibly very many lines of code.
 
-In summary, peephole rewriting has fundamental advantages over an optimization pass architecture
+In summary, peephole optimization has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
 optimizes to a fixed point, never leaving obvious further optimizations on the table. It does this
 incrementally, requiring significantly less computation than an optimization pass architecture.
 Finally, it specifies many optimizations as syntactic rewrite rules, which are easier than passes to
 formally reason about when for example proving the correctness of optimizations.
 
-However, peephole rewriting does not avoid the second part of the phase ordering problem:
+However, peephole optimization does not avoid the second part of the phase ordering problem:
 destructive rewrites are still order-dependent in the face of multiple potentially good but mutually
 incompatible rewrites. Since one rewrite can unlock other beneficial rewrites later, one cannot
 select them greedily. This could be handled with a slow backtracking search or with heuristics, with
-most compilers doing the latter. But there is a third approach, using equality saturation and
-e-graphs, that can be used to augment peephole rewriting to make it nondestructive.
+most compilers doing the latter. However, there is a third approach -- using equality saturation and
+e-graphs -- that can be used to augment peephole optimization to make it nondestructive.
 
 == Equality saturation and e-graphs
 
 E-graphs @oldegraph are data structures for rewriting that allow multiple representations of a
 value, committing to one only after all rewrites have been searched. The representations are stored
-simultaneously and, since there is no backtracking there is no duplicated post-branch work.
+simultaneously and, since there is no backtracking, there is no duplicated post-branch work.
 
 The trick that allows e-graphs to compactly represent an exponential number of equivalent
 expressions is that operators take equivalence classes as inputs instead of individual expressions.
@@ -353,14 +358,14 @@ compilers would require them to become faster.
 
 == Relational databases and Datalog
 
-Relational databases are a mature technology that are used across computer science. Their success is
-supported by multiple key advantages: They logically represent data as tables, i.e. collections of
-identically structed records called rows. This representation is abstract and many computations can
-be expressed in the domain-specific query languages such as SQL based on relational algebra.
-High-level queries can be executed efficiently by leveraging well-studied query planning and join
-algorithms. At the same time the abstract tables can be physically implemented in different ways,
-with acceleration structures called indexes affecting the performance characteristics of a logically
-identical table.
+Relational databases @codd1970relational are a mature technology used across computer science. Their
+success is supported by multiple key advantages: They logically represent data as tables, i.e.
+collections of identically structed records called rows. This representation is abstract and many
+computations can be expressed in domain-specific query languages -- such as SQL -- based on
+relational algebra. High-level queries can be executed efficiently by leveraging well-studied query
+planning and join algorithms. At the same time the abstract tables can be physically implemented in
+different ways, with acceleration structures called indexes affecting the performance
+characteristics of a logically identical table.
 
 Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm
 @egglog have identified a connection to relational databases. Adding indexes to e-graphs adds
@@ -370,8 +375,8 @@ declarative logic programming language implemented as relational queries iterati
 to add to the database. In fact, this similarity extends to the degree that e-graphs may be best
 thought of as Datalog extended with a unification operation.
 
-This identifiction allows equality saturation to leverage algorithms from Datalog, in particular the
-algorithm semi-naive evaluation. Rather than running queries against the entire database, it
+This identification allows equality saturation to leverage algorithms from Datalog, in particular
+the algorithm semi-naive evaluation. Rather than running queries against the entire database, it
 specifically queries newly inserted rows in a manner similar to a database trigger. Incremental rule
 matching, together with indexes and simple query planning, brought an order of magnitude speedup to
 the e-graph engine egglog @egglog when compared to its predecessor egg @egg.
@@ -402,17 +407,17 @@ preprocessing, query planning, index implementation and general performance engi
 
 == This thesis
 
-@chapter_background, Background, extends this introduction by explaining e-graphs and key aspects of
+@chapter_background[Chapter] extends this introduction by explaining e-graphs and key aspects of
 e-graph engine implementation. It does so by first motivating e-graphs starting from expression
 trees, then by incrementally showcasing a full self-contained implementation of equality saturation
 in about 100 lines of code, before finally explaining the similarity between e-graphs and relational
 databases and how this can be leveraged for a significantly more efficient implementation.
 
-@chapter_implementation, Implementation, then concretely describes the application of these
-techniques in Oatlog and the implementation decisions we have made, in addition to showing how
-Oatlog is used and its capabilities. @chapter_evaluation follows by evaluating Oatlog through its
-test suite and benchmarks. @chapter_conclusion discusses future work, both algorithmic and constant
-factor performance improvements.
+@chapter_implementation[Chapter] concretely describes the application of these techniques in Oatlog
+and the implementation decisions we have made, in addition to showing how Oatlog is used and its
+capabilities. @chapter_evaluation[Chapter] follows by evaluating Oatlog through its test suite and
+benchmarks. @chapter_conclusion[Chapter] discusses future work, both algorithmic and constant factor
+performance improvements.
 
 = Background <chapter_background>
 
