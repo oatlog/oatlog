@@ -2343,10 +2343,10 @@ We developed Oatlog alongside a few different kinds of tests. These are
 The compatibility tests are those most relevant to egglog compatibility and therefore those we focus
 on here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility
 tests run egglog's test suite. Of its 93 tests,
-- 11 are successful, while outputting an e-graph with a nonzero number of e-nodes,
-- 5 are successful, but output an empty e-graph,
+- 14 are successful, while outputting an e-graph with a nonzero number of e-nodes,
+- 6 are successful, but output an empty e-graph,
 - 2 cause egglog to panic, and
-- 74 require egglog features missing in Oatlog.
+- 71 require egglog features missing in Oatlog.
 
 A successful test means that both egglog and Oatlog are able to run the program, that every relation
 contains an equal number of e-nodes in both engines, and that this continues to hold for an
