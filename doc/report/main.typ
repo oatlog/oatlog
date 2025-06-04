@@ -2060,12 +2060,11 @@ value columns where the value columns are uniquely determined through a function
 practice function dependencies are only derived from actual egglog-language-level functions, so
 there is always a single value column which also is the last column in a relation.
 
-The hashbrown#footnote[https://github.com/rust-lang/hashbrown]/SwissTable hashmap uses open addressing,
-storing both an array of 8-bit integers and
-an array of key value pairs. The 8-bit integer has 1 bit indicating whether the slot is empty or a
-tombstone, while the remaining 7 bits come from the hash of the key in the corresponding slot.
-Lookups use 128-bit SIMD against the array of 8-bit integers to do filtered linear probing in the
-key-value array with a $1/2^7 = 1/128$ false positive rate.
+The hashbrown @hashbrown/SwissTable @swisstable hashmap uses open addressing, storing both an array
+of 8-bit integers and an array of key value pairs. The 8-bit integer has 1 bit indicating whether
+the slot is empty or a tombstone, while the remaining 7 bits come from the hash of the key in the
+corresponding slot. Lookups use 128-bit SIMD against the array of 8-bit integers to do filtered
+linear probing in the key-value array with a $1/2^7 = 1/128$ false positive rate.
 
 Earlier in its development, Oatlog used static B+tree indexes @algorithmica_strees, but we
 eventually switched to hashbrown/SwissTable-based hashmaps. BTrees and related data structures are
