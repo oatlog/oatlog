@@ -1940,7 +1940,7 @@ builds a trie from the rules with atoms as the alphabet. In order to actually ac
 among rules, this is done allowing for variable renaming. Effectively, Oatlog finds, for every rule,
 the set of joins that score the highest on the scale shown in @fig_impl_relation_score, then groups
 rules based on compatibility modulo renaming. Note that this compatibility is not transitive if
-there are multiple joins at the maximum `RelationScore`. 
+there are multiple joins at the maximum `RelationScore`.
 
 In general we want to select the fewest atoms such that all rules are covered, which is the set-cover problem.
 Oatlog solves it greedily by repeatedly selecting the atom which covers the most new rules.
@@ -2049,7 +2049,7 @@ value columns where the value columns are uniquely determined through a function
 practice function dependencies are only derived from actual egglog-language-level functions, so
 there is always a single value column which also is the last column in a relation.
 
-The hashbrown#footnote[https://github.com/rust-lang/hashbrown]/SwissTable hashmap uses open addressing, 
+The hashbrown#footnote[https://github.com/rust-lang/hashbrown]/SwissTable hashmap uses open addressing,
 storing both an array of 8-bit integers and
 an array of key value pairs. The 8-bit integer has 1 bit indicating whether the slot is empty or a
 tombstone, while the remaining 7 bits come from the hash of the key in the corresponding slot.
