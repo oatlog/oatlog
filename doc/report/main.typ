@@ -57,15 +57,15 @@
     #TODO[revisit]
 
     Modern software development depends on efficient and reliable optimizing compilers. Traditional
-    compilers apply transformations on a single instance of a program until reaching a fixed point, but
-    since each transformation has to be strictly beneficial, compiler authors need to be
-    conservative. This motivates equality saturation which efficiently keeps multiple versions of a
-    program using e-graphs and later extracting the optimal program.
+    compilers apply transformations on a single instance of a program until reaching a fixed point,
+    but since each transformation has to be strictly beneficial compiler authors need to be
+    conservative. This motivates equality saturation which efficiently stores multiple versions of a
+    program using e-graphs and later extracts the optimal program.
 
     However, the performance of e-graphs engines is a major obstacle for using them in compilers,
-    which motivates improving the underlying e-graph technology. We have created Oatlog, which is an
-    ahead-of-time compiled e-graph engine. It significantly outperforms egglog, which is the current
-    fastest mainstream e-graph engine.
+    motivating improving the underlying e-graph technology. We contribute towards this by
+    introducing Oatlog, an ahead-of-time compiling e-graph engine. It significantly outperforms
+    egglog, the current fastest mainstream e-graph engine.
 
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite systems"),
