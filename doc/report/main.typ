@@ -46,26 +46,39 @@
 
   title: [Oatlog: A high-performance #box[e-graph] engine],
   subtitle: [],
-  //title: [Oatlog: A performant ahead-of-time compiled #box[e-graph] engine],
-  //subtitle: [Implementing a high-performance relational #box[e-graph] engine],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
   supervisor: ("Hazem Torfah", department),
   advisor: ("Alejandro Luque Cerpa", department),
   examiner: ("Matti Karppa", department),
   abstract: [
-    #TODO[revisit]
 
     Modern software development depends on efficient and reliable optimizing compilers. Traditional
-    compilers apply transformations on a single instance of a program until reaching a fixed point,
-    but since each transformation has to be strictly beneficial compiler authors need to be
-    conservative. This motivates equality saturation which efficiently stores multiple versions of a
-    program using e-graphs and later extracts the optimal program.
+    compilers apply a sequence of transformations to a single version of a program, with the final
+    result being dependent on the order in which optimizations are applied. However, no single
+    ordering can capture all beneficial optimizations for all programs, a limitation known as the
+    phase ordering problem. This motivates equality saturation, a technique in which the compiler
+    compactly represents many program variants using e-graphs and later extracts the optimal
+    representation using a global profitability heuristic. Equality saturation can improve code
+    quality while simplifying compiler development.
 
-    However, the performance of e-graphs engines is a major obstacle for using them in compilers,
-    motivating improving the underlying e-graph technology. We contribute towards this by
-    introducing Oatlog, an ahead-of-time compiling e-graph engine. It significantly outperforms
-    egglog, the current fastest mainstream e-graph engine.
+    Despite these advantages, the adoption of e-graphs in compilers and other domains is limited by
+    performance challenges. These arise from a combinatorial explosion in rewrite possibilities,
+    requiring sophisticated e-graph engines and motivating research into e-graph technology.
+
+    We introduce Oatlog, an ahead-of-time compiled e-graph engine that significantly outperforms
+    egglog, the currently fastest mainstream e-graph engine. Oatlog achieves speedups over 100x for
+    very small e-graphs, gradually decreasing to a 2x speedup at $10^6$ e-nodes and matches egglog's
+    performance beyond $10^7$ e-nodes.
+
+    Oatlog implements a subset of the egglog language and can itself be seen as a compiler from
+    egglog to Rust. As a Rust procedural macro, it complements egglog by focusing on being
+    embeddable within applications rather than on interactive use.
+
+    We primarily attribute Oatlog's performance gain to careful programming and performance
+    engineering, but it also benefits from two novel techniques. The first, invariant permutations,
+    exploits commutative relations to optimize queries and reduce memory usage. The second, trie
+    query planning, amortizes index lookups across rewrite rules during e-matching.
 
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite systems"),
