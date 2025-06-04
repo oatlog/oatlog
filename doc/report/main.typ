@@ -96,8 +96,6 @@ overhead of function calls, enabling higher-level abstractions without sacrifici
 These optimizations not only enhance program execution and energy efficiency but also make it easier
 for developers to write maintainable and portable code.
 
-#TODO[grammar: foremost is not a noun]
-
 Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
 that have received significant engineering effort and which are used across the industry to compile
 everything from database queries to GPU shaders in addition to traditional programs. The foremost of
@@ -574,7 +572,7 @@ of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
 E-graphs are, at their core, a solution to the node duplication illustrated in
 @fig_background_dag_duplicated, where identical usages of syntactically different inputs result in
 duplicated storage within an expression DAG. E-graphs do this not by representing functions
-#footnote[There is an e-graph variant called slotted e-graphs @slotted_egraph which deduplicate data
+#footnote[There is an e-graph variant called slotted e-graphs @slotted_egraph which deduplicates data
 using functions.], but by grouping syntactically different, but semantically equal expressions into
 the same equivalence class.
 
@@ -864,7 +862,7 @@ $a dot b=c => b dot a=c$, and distributivity, $(a+b) dot c = d => a dot c + b do
 
 @fig_background_practice_apply_rules implements this, for simplicity in a hard-coded manner. This is
 unlike a generic e-graph engine, which must be able to handle arbitrary rules by interpreting or
-compiling them rather than relying on them being hand-written.
+compiling them.
 
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
 matching specific patterns in the existing structure. If this was the only effect of the rules then
@@ -1711,7 +1709,7 @@ includes a description what indexes are required on every relation and precisely
 actions should be performed. The structure of the LIR's `RuleTrie` is shown in @fig_impl_lir.
 
 #figure(
-  placement: auto,
+  // placement: auto,
   {
     let a = [```rust
       enum Inclusion {
@@ -1942,9 +1940,10 @@ builds a trie from the rules with atoms as the alphabet. In order to actually ac
 among rules, this is done allowing for variable renaming. Effectively, Oatlog finds, for every rule,
 the set of joins that score the highest on the scale shown in @fig_impl_relation_score, then groups
 rules based on compatibility modulo renaming. Note that this compatibility is not transitive if
-there are multiple joins at the maximum `RelationScore`. Oatlog therefore currently arbitrarily
-selects one of them arbitrarily, but one could also implement this with a bipartite matching between
-rules and joins.
+there are multiple joins at the maximum `RelationScore`. 
+
+In general we want to select the fewest atoms such that all rules are covered, which is the set-cover problem.
+Oatlog solves it greedily by repeatedly selecting the atom which covers the most new rules.
 
 == LIR, code generation and the runtime <section_implementation_lir_details>
 
@@ -2050,7 +2049,8 @@ value columns where the value columns are uniquely determined through a function
 practice function dependencies are only derived from actual egglog-language-level functions, so
 there is always a single value column which also is the last column in a relation.
 
-The hashbrown/SwissTable hashmap uses open addressing, storing both an array of 8-bit integers and
+The hashbrown#footnote[https://github.com/rust-lang/hashbrown]/SwissTable hashmap uses open addressing, 
+storing both an array of 8-bit integers and
 an array of key value pairs. The 8-bit integer has 1 bit indicating whether the slot is empty or a
 tombstone, while the remaining 7 bits come from the hash of the key in the corresponding slot.
 Lookups use 128-bit SIMD against the array of 8-bit integers to do filtered linear probing in the
@@ -2327,8 +2327,8 @@ We developed Oatlog alongside a few different kinds of tests. These are
 - Compatibility tests, where Oatlog and egglog run the same egglog program and their outputs are
   compared.
 
-#TODO[knapsack is now allcorrect]
-#TODO[looking up..good is zrocorrect]
+// #TODO[knapsack is now allcorrect]
+// #TODO[looking up..good is zrocorrect]
 
 The compatibility tests are those most relevant to egglog compatibility and therefore those we focus
 on here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility

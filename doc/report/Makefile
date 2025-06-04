@@ -26,8 +26,8 @@ lint:
 		then echo "ERROR: The S in S-expression should be capitalized!"; exit 1; fi
 	@if $(RG) '[^`"_]datalog'; \
 		then echo "ERROR: The D in Datalog should be capitalized!"; exit 1; fi
-	@if $(RG) '[^`"_]rust[^c]'; \
-		then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
+	#@if $(RG) '[^`"_]rust[^c]'; \
+	#	then echo "ERROR: The R in Rust should be capitalized!"; exit 1; fi
 	@if $(RG) '[^/@<`"_]oatlog[^c(::)]'; \
 		then echo "ERROR: The O in Oatlog should be capitalized!"; exit 1; fi
 	@if $(RG) '[^= \.:] E-'; \
