@@ -96,6 +96,8 @@ overhead of function calls, enabling higher-level abstractions without sacrifici
 These optimizations not only enhance program execution and energy efficiency but also make it easier
 for developers to write maintainable and portable code.
 
+#TODO[grammar: foremost is not a noun]
+
 Implementing such a compiler is a complex task. In practice, there are a few large compiler backends
 that have received significant engineering effort and which are used across the industry to compile
 everything from database queries to GPU shaders in addition to traditional programs. The foremost of
@@ -202,7 +204,7 @@ locality and phrasing the optimizations as local rewrites on this representation
 
 Such program representations #footnote[For example, Sea of Nodes @son is a compiler IR design that
 represents both data flow and control flow as expressions with no side effects, making it especially
-suited to peephole optimization.] are usually trees, directed acyclig graphs (DAGs) or general
+suited to peephole optimization.] are usually trees, directed acyclic graphs (DAGs) or general
 graphs, with representations typically enforcing single static assignment (SSA), i.e. that variables
 are written to exactly once. @fig_intro_peephole_ir shows the program fragment of
 @fig_intro_compiler_passes represented in such an intermediate representation (IR). It is crucial
@@ -1155,7 +1157,7 @@ and lookups are in form of one of
 + Recursive e-matching case, with the output known.
 + Recursive e-matching alternative case, with the output and some inputs known.
 
-This is very reminicient of various indexed lookups on a table. The table columns are the inputs and
+This is very reminiscent of various indexed lookups on a table. The table columns are the inputs and
 outputs of the operator, which each row being an e-node and each cell being an e-class identifier.
 Functional dependencies, such as all operators uniquely determining their output from their input or
 addition uniquely determining any input from the other input and the output, correspond in database
@@ -1195,8 +1197,8 @@ Relational e-matching improves upon recursive e-matching by being able to join i
 just recursively from the root of the pattern. We also benefit from already having implicit indices
 on e-node type, in that tuples for different partial functions are stored separately.
 
-As a contextual tangent, egg @egg was released in 2021 and used recursive e-matching in a similar
-manner to how we describe it in @section_background_recursive_ematching. Later the same year,
+As a contextual tangent, egg @egg was released in 2021 and used recursive e-matching similarly
+to how we describe it in @section_background_recursive_ematching. Later the same year,
 relational e-matching @relationalematching was published with a prototyped implementation on top of
 egg. The prototype used egg's canonicalization implementation and fully rebuilt the tables in every
 iteration of applying rules, achieving a large speedup over egg despite switching the data format
@@ -1891,7 +1893,7 @@ size information is known when query planning. Oatlog makes the following assump
 - Relations corresponding to global variables contain exactly one element.
 
 Generic join is usually formulated as selecting an order in which to determine variables, but
-Oatlog's query planning implicitly selects such an order by repeatly selecting an atom to join in
+Oatlog's query planning implicitly selects such an order by repeatedy selecting an atom to join in
 from a set of premise atoms. Joins can be primary joins, which iterate all relation tuples matching
 some columns, or semi-joins which verify that there are at least one relation tuple that matches the
 known columns. Semi-joins, as dictated by the generic join algorithm take precedence over primary
@@ -1994,8 +1996,8 @@ a majority of its run time.
 
 === Union-find
 
-Oatlog's union-find does not do path compression and it merges e-classes younger-to-older. This
-merging scheme heurstically minimizes the number of uprooted e-nodes, assuming that older e-classes
+Oatlog's union-find does not perform path compression and it merges e-classes younger-to-older. This
+merging scheme heuristically minimizes the number of uprooted e-nodes, assuming that older e-classes
 are more numerous in terms of e-nodes. Path compression turns out to not be beneficial due to paths
 being short in practice, even when implemented with an unrolled loop or similar. Oatlog's
 union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
@@ -2032,7 +2034,7 @@ union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
 Oatlog represents each relation by some number of indexes which all effectively store tuples of
 e-class IDs. This is unlike storing rows in an array and having indexes point into the array, as
 more typically done in a relational database. Storing the entire row in every index is beneficial
-for Oatlog as it saves an indirection, at the low cost of of requiring $12$ bytes per e-node and
+for Oatlog as it saves an indirection, at the low cost of requiring $12$ bytes per e-node and
 index rather than something like $8$ bytes. Traditional relational databases often store wider
 tables, with rows larger than $12$ bytes, in which case indirect indexes are sensible.
 
@@ -2670,7 +2672,7 @@ amortized over the data plane.
 The second consequence of an ahead-of-time architecture lies in improving prototypability and
 debuggability driven by reading and modifying the Rust code generated by the e-graph compiler. This
 aspect simplifies performance engineering for Oatlog, as one can easily separate the problems of
-determinining what efficient codegen looks like and how to modify to compiler to generate such code,
+determining what efficient codegen looks like and how to modify to compiler to generate such code,
 in constrast to an interpreter where compiler complexity mixes with ABI concerns. We could summarize
 our opinion of the AOT-compiler architectural choice as a way of simplifying development and
 performance engineering at the cost of significantly limiting REPL use.
@@ -2678,7 +2680,7 @@ performance engineering at the cost of significantly limiting REPL use.
 Oatlog supports two modes: strict and relaxed. Oatlog's strict mode is step-by-step equivalent to
 egglog modulo e-class renaming, providing essentially identical output guarantees as egglog's
 nondeterministic mode. Oatlog's relaxed mode guarantees only that the post-saturation e-graph is
-identical to renaming, allowing Oatlog to derive invariant permutations that eliminates duplicate
+identical to renaming, allowing Oatlog to derive invariant permutations that eliminate duplicate
 work while at the same time allowing rules to run earlier and therefore reach saturation in fewer
 steps.
 
