@@ -94,8 +94,6 @@
     and guidance on our work.
 
     We would also like to thank our opponent group Edvin Nilsson and Enayatullah Norozi for their feedback.
-
-    We also thank our fellow student Samuel Kyletoft for their peer review.
   ],
 )
 
