@@ -2325,6 +2325,9 @@ We developed Oatlog alongside a few different kinds of tests. These are
 - Compatibility tests, where Oatlog and egglog run the same egglog program and their outputs are
   compared.
 
+#TODO[knapsack is now allcorrect]
+#TODO[looking up..good is zrocorrect]
+
 The compatibility tests are those most relevant to egglog compatibility and therefore those we focus
 on here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility
 tests run egglog's test suite. Of its 93 tests,
