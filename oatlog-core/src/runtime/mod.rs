@@ -35,6 +35,40 @@ pub use std::{
 };
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
+pub use std::cmp::Ordering;
+
+pub use std::iter::once;
+
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
+pub struct OrdF64(pub f64);
+impl Eq for OrdF64 {}
+impl PartialOrd for OrdF64 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(std::cmp::Ord::cmp(self, other))
+    }
+}
+impl Ord for OrdF64 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.total_cmp(&other.0)
+    }
+}
+impl std::hash::Hash for OrdF64 {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+impl std::fmt::Display for OrdF64 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <f64 as std::fmt::Display>::fmt(&self.0, f)
+    }
+}
+
+impl RelationElement for OrdF64 {
+    const MIN_ID: Self = OrdF64(f64::MIN);
+
+    const MAX_ID: Self = OrdF64(f64::MAX);
+}
+
 /// semantically a HashMap<Key, Vec<Value>>
 #[derive(Debug, Default)]
 pub struct IndexedSortedList<Key, Value> {

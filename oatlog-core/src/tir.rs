@@ -1255,15 +1255,15 @@ mod lowering {
 
             // Arbitrary atom that through `.entry()` binds a missing variable.
             let atom_entry = remaining_atoms
-            .iter()
-            .filter(|atom| {
-                atom.entry_inputs(relations)
-                    .into_iter()
-                    .all(|col| bound_variables.contains(&col))
-            })
-            .max_by_key(|atom| atom.entry_outputs(relations).len())
-            .unwrap_or_else(|| panic!("must exist some atom for which all input columns are bound {actions:?} {bound_premise:?}"))
-            .clone();
+                .iter()
+                .filter(|atom| {
+                    atom.entry_inputs(relations)
+                        .into_iter()
+                        .all(|col| bound_variables.contains(&col))
+                })
+                .max_by_key(|atom| atom.entry_outputs(relations).len())
+                .unwrap_or_else(|| panic!("must exist some atom for which all input columns are bound {actions:#?} {bound_premise:?}"))
+                .clone();
 
             bound_variables.extend(&atom_entry.columns);
             remaining_atoms.remove(&atom_entry);

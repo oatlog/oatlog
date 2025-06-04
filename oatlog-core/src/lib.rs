@@ -250,15 +250,19 @@ fn universal(input: Input, config: Configuration) -> Result<Output, CompileError
 
     fn compile_impl(sexps: Vec<frontend::ParseInput>, config: Configuration) -> MResult<Output> {
         let mut parser = frontend::Parser::new();
+        tracing::trace!("reading input...");
         parser.ingest_all(sexps, config)?;
 
+        tracing::trace!("hir processing");
         let hir = parser
             .emit_hir()
             .optimize(config)
             .transform_into_seminaive();
 
+        tracing::trace!("tir processing");
         let (_, _, lir) = query_planning::emit_lir_theory(hir);
 
+        tracing::trace!("lir processing");
         let generated_tokens = codegen::codegen(&lir);
         Ok(Output::Tokens(generated_tokens))
     }

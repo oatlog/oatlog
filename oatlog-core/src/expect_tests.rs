@@ -13,12 +13,14 @@ impl Steps {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
         // breaks if multiple tests are running.
-        // if !tracing::dispatcher::has_been_set() {
-        //     tracing_subscriber::fmt()
-        //         .with_max_level(tracing::Level::TRACE)
-        //         .with_writer(std::io::stdout)
-        //         .init();
-        // }
+        /*
+        if !tracing::dispatcher::has_been_set() {
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::TRACE)
+                .with_writer(std::io::stdout)
+                .init();
+        }
+        */
 
         let sexps = crate::frontend::parse_str_to_sexps(self.code).unwrap();
         let config = crate::Configuration {
@@ -103,6 +105,7 @@ fn shrink_cases() {
     //     expect!["DOES NOT ERROR?"],
     // );
 
+    /*
     shrink_err(
         expect![[r"
              (datatype Math (Sub Math Math) (Const i64))
@@ -119,6 +122,104 @@ fn shrink_cases() {
              (rewrite (Sub ty a b) a)"]],
         expect!["DOES NOT ERROR?"],
     );
+    */
+
+    // (datatype TypeList
+    //     (TCons TypeList TypeList)
+    //     (TNil)
+    // )
+    // (function TypeList-length (TypeList) i64 :no-merge)
+    // ( rule ( ( TNil ) ) ( ( set ( TypeList-length ( TNil ) ) 0 ) ) :ruleset type-helpers )
+    /*
+    shrink_err(
+        expect![[r#"
+            (datatype TypeList (TNil ))
+            (function TypeList-length (TypeList) i64 :no-merge)
+            (rule ((TNil )) ((set (TypeList-length (TNil )) 0)))
+            "#]],
+        expect!["PANIC: must exist some atom for which all input columns are bound [Atom { is_premise: Action, relation: r1, columns: {c0: v0, c1: v1}, entry: None, incl: All }, Atom { is_premise: Action, relation: r2, columns: {c0: v1}, entry: None, incl: All }] {v0}"],
+    )
+    */
+    shrink_err(
+        expect![[r#"
+
+(sort Expr)
+
+(sort TypeList)
+
+(datatype BaseType
+  (IntT)
+  (BoolT)
+  (FloatT)
+  ; a pointer to a memory region with a particular type
+  (PointerT BaseType)
+  (StateT))
+
+(datatype Type
+  ; a primitive type
+  (Base BaseType)
+  ; a typed tuple. Use an empty tuple as a unit type.
+  ; state edge also has unit type
+  (TupleT TypeList)
+)
+
+
+(datatype Assumption
+  ; Assume nothing
+  (InFunc String)
+  ; The term is in a loop with `input` and `pred_output`.
+  ; InLoop is a special context because it describes the argument of the loop. It is a *scope context*.
+  ;      input    pred_output
+  (InLoop Expr     Expr)
+  ; Branch of the switch, and what the predicate is, and what the input is
+  (InSwitch i64 Expr Expr)
+  ; If the predicate was true, and what the predicate is, and what the input is
+  (InIf i64 Expr Expr)
+)
+(relation FunctionHasType (String Type Type))
+(relation HasType (Expr Type))
+(function hoisted-loop (Expr Expr) bool :merge (or old new) )
+(function tuple-length (Expr) i64 :no-merge)
+(constructor Concat (Expr        Expr)       Expr)
+
+(relation boundary-Expr (Expr Expr))
+(function Expr-size (Expr) i64 :merge (min old new) )
+(constructor DoWhile (Expr    Expr)                   Expr)
+(relation ContextOf (Expr Assumption))
+(constructor Single (Expr) Expr)
+(constructor Subst (Assumption Expr Expr) Expr :unextractable)
+(constructor TLConcat (TypeList TypeList) TypeList :unextractable)
+(constructor TNil () TypeList)
+(constructor TCons (BaseType TypeList) TypeList) ; Head element should never be a tuple
+(constructor InExtendedLoop (Expr Expr Expr) Assumption)
+(constructor Get   (Expr i64) Expr)
+(constructor Arg (Type Assumption) Expr)
+(constructor SubTuple (Expr  i64   i64) Expr :unextractable)
+
+(rule((boundary-Expr loop inv) (> (Expr-size inv) 1)
+(= loop (DoWhile in pred_out)) (ContextOf loop loop_ctx) (HasType in in_type)
+(HasType inv inv_type) (= inv_type(Base base_inv_ty))
+(= in_type(TupleT tylist)) (= false (hoisted-loop in pred_out))
+(= len(tuple-length in)))
+((let new_input(Concat in (Single(Subst loop_ctx in inv))))
+(let new_input_type(TupleT(TLConcat tylist(TCons base_inv_ty(TNil)))))
+(let assum(InExtendedLoop in pred_out new_input))
+(let new_out_branch(Get(Arg new_input_type assum) len))
+(let
+substed_pred_out(Subst assum(SubTuple(Arg new_input_type assum) 0 len)
+pred_out))
+(let
+inv_in_new_loop(Subst assum(SubTuple(Arg new_input_type assum) 0 len) inv))
+(let new_pred_out(Concat substed_pred_out(Single new_out_branch)))
+(let new_loop(DoWhile new_input new_pred_out))
+(union assum(InLoop new_input new_pred_out))
+(union inv_in_new_loop new_out_branch) (let wrapper(SubTuple new_loop 0 len))
+(union loop wrapper) (DoWhile in pred_out)
+(set(hoisted-loop in pred_out) true)) :ruleset loop-inv-motion)
+
+        "#]],
+        expect!["DOES NOT ERROR?"],
+    )
 }
 
 // TODO erik: This is expressible when we have custom implicit functionality rules.
@@ -128,6 +229,655 @@ fn shrink_cases() {
 //
 // Premise: (Add a b b)
 // Action: (Neg a b), (Neg a c)
+
+#[test]
+fn test_edgecase3() {
+    Steps {
+        strict_egglog_compat: false,
+        code: r"
+            (datatype TypeList (TNil ))
+            (function TypeList-length (TypeList) i64 :no-merge)
+            (rule ((TNil )) ((set (TypeList-length (TNil )) 0)))
+            ",
+        expected_hir: Some(expect![[r#"
+            Theory {
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, TypeList]: [symbolic],
+                },
+                symbolic_rules: [
+                    SymbolicRule {
+                        src: "( rule ( ( TNil ) ) ( ( set ( TypeList-length ( TNil ) ) 0 ) ) )",
+                        atoms: [
+                            Premise { relation: TNil, columns: [v0] },
+                            Action { relation: TypeList-length, columns: [v0, v1] },
+                            Action { relation: g0, columns: [v1], entry: [!] },
+                        ],
+                        variables: {
+                            v0: VariableMeta { name: None, ty: t1 },
+                            v1: VariableMeta { name: None, ty: t0 },
+                        },
+                        unify: [],
+                    },
+                ],
+                relations: {
+                    r0: TNil { columns: [TypeList], kind: Table, implicit_rules: {n0: [U]} },
+                    r1: TypeList-length { columns: [TypeList, i64], kind: Table, implicit_rules: {n0: [_, !]} },
+                    r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
+                },
+            }"#]]),
+        expected_tir: Some(expect![[r#"
+            Trie {
+                map: {
+                    Primary(r0_New(*v0*)): Trie {
+                        map: {},
+                    },
+                },
+            }"#]]),
+        expected_lir: Some(expect![[r#"
+            Theory {
+                name: None,
+                types: {
+                    [t0, i64]: std::primitive::i64,
+                    [t1, TypeList]: [symbolic],
+                },
+                relations: {
+                    r0: RelationData {
+                        name: "TNil",
+                        param_types: {c0: t1},
+                        kind: Table {
+                            index_to_info: {ir0: =>0:union},
+                        },
+                    },
+                    r1: RelationData {
+                        name: "TypeList-length",
+                        param_types: {c0: t1, c1: t0},
+                        kind: Table {
+                            index_to_info: {ir0: 0=>1:panic},
+                        },
+                    },
+                    r2: RelationData {
+                        name: "g0",
+                        param_types: {c0: t0},
+                        kind: [Global, g0],
+                    },
+                },
+                rule_variables: {
+                    [v0, qv0]: t1,
+                    [v1, qv1]: t0,
+                },
+                global_variable_types: {
+                    g0: t0,
+                },
+                rule_tries: [
+                    premise: [IterNew, r0(v0)]
+                    meta: "( rule ( ( TNil ) ) ( ( set ( TypeList-length ( TNil ) ) 0 ) ) )"
+                    actions: [
+                        [Action::Entry, r2(v1) on ir_bogus],
+                        [Action::Insert, r1(v0, v1)],
+                    ],
+                ],
+                initial: [
+                    ComputeGlobal {
+                        global_id: g0,
+                        compute: Literal(I64(0)),
+                    },
+                ],
+            }"#]]),
+        expected_codegen: Some(expect![[r#"
+            use oatlog::runtime::{self, *};
+            eclass_wrapper_ty!(TypeList);
+            #[derive(Debug, Default)]
+            struct TNilRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all: Vec<(TypeList, TimeStamp)>,
+                fd_index_: runtime::HashMap<(), (TypeList, TimeStamp)>,
+                type_list_num_uprooted_at_latest_retain: usize,
+            }
+            impl Relation for TNilRelation {
+                type Row = (TypeList,);
+                type Unification = Unification;
+                const COST: u32 = 1u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.fd_index_.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, ((), (x0, _timestamp))) in
+                        self.fd_index_.iter().map(|(k, v)| ((*k), (*v))).enumerate()
+                    {
+                        writeln!(buf, "{}_{i} -> {}_{};", "t_nil", "type_list", x0).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "t_nil").unwrap();
+                    }
+                }
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_begin {}: {}", "t_nil", {
+                        for &(mut x0,) in insertions {
+                            match self.fd_index_.entry(()) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y0, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    let old_val = *y0;
+                                    let changed = changed | (old_val != uf.type_list_.union_mut(&mut x0, y0));
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((uf.type_list_.find(x0), latest_timestamp));
+                                }
+                            }
+                        }
+                    });
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
+                    log_duration!("update {}: {}", "t_nil", {
+                        if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
+                        self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
+                        self.fd_index_.retain(|&(), &mut (x0, _timestamp)| {
+                            if uf.type_list_.is_root(x0) {
+                                true
+                            } else {
+                                insertions.push((x0,));
+                                false
+                            }
+                        });
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
+                }
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_finalize {}: {}", "t_nil", {
+                        assert!(self.new.is_empty());
+                        log_duration!("fill new and all: {}", {
+                            self.new
+                                .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
+                                    if timestamp == latest_timestamp {
+                                        Some((x0,))
+                                    } else {
+                                        None
+                                    }
+                                }));
+                            RadixSortable::wrap(&mut self.new).voracious_sort();
+                            self.all.clear();
+                            self.all.extend(
+                                self.fd_index_
+                                    .iter()
+                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                            );
+                            insertions.clear();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0,)| {
+                                assert_eq!((x0,), (uf.type_list_.find(x0),), "new is canonical");
+                            });
+                            let mut new = self.new.clone();
+                            new.sort();
+                            new.dedup();
+                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, _timestamp)| {
+                                assert_eq!((x0,), (uf.type_list_.find(x0),), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        self.type_list_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+            }
+            impl TNilRelation {
+                fn iter_all__to_0(&self) -> impl Iterator<Item = (TypeList,)> + use<'_> {
+                    self.fd_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .map(|(x0, _timestamp)| (x0,))
+                }
+                fn iter_old__to_0(
+                    &self,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (TypeList,)> + use<'_> {
+                    self.fd_index_
+                        .get(&())
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x0, timestamp)| (timestamp < latest_timestamp).then_some((x0,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry__to_0(&self, delta: &mut Delta, uf: &mut Unification) -> (TypeList,) {
+                    if let Some((x0,)) = self.iter_all__to_0().next() {
+                        return (x0,);
+                    }
+                    let x0 = uf.type_list_.add_eclass();
+                    delta.t_nil_.push((x0,));
+                    (x0,)
+                }
+                fn check_(&self) -> bool {
+                    self.iter_all__to_0().next().is_some()
+                }
+            }
+            #[derive(Debug, Default)]
+            struct TypeListLengthRelation {
+                new: Vec<<Self as Relation>::Row>,
+                all: Vec<(TypeList, std::primitive::i64, TimeStamp)>,
+                fd_index_0: runtime::HashMap<(TypeList,), (std::primitive::i64, TimeStamp)>,
+                type_list_num_uprooted_at_latest_retain: usize,
+                i64_num_uprooted_at_latest_retain: usize,
+            }
+            impl Relation for TypeListLengthRelation {
+                type Row = (TypeList, std::primitive::i64);
+                type Unification = Unification;
+                const COST: u32 = 2u32;
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new(&self) -> bool {
+                    !self.new.is_empty()
+                }
+                fn clear_new(&mut self) {
+                    self.new.clear();
+                }
+                fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row> {
+                    self.new.iter().copied()
+                }
+                fn len(&self) -> usize {
+                    self.fd_index_0.len()
+                }
+                fn emit_graphviz(&self, buf: &mut String) {
+                    use std::fmt::Write;
+                    for (i, ((x0,), (x1, _timestamp))) in self
+                        .fd_index_0
+                        .iter()
+                        .map(|(k, v)| ((*k), (*v)))
+                        .enumerate()
+                    {
+                        writeln!(buf, "{}_{i} -> {}_{};", "type_list_length", "type_list", x0).unwrap();
+                        writeln!(buf, "{}_{i} -> {}_{};", "type_list_length", "i64", x1).unwrap();
+                        writeln!(buf, "{}_{i} [shape = box];", "type_list_length").unwrap();
+                    }
+                }
+                fn update_begin(
+                    &mut self,
+                    insertions: &[Self::Row],
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_begin {}: {}", "type_list_length", {
+                        for &(mut x0, mut x1) in insertions {
+                            match self.fd_index_0.entry((uf.type_list_.find(x0),)) {
+                                runtime::HashMapEntry::Occupied(mut entry) => {
+                                    let (y1, timestamp) = entry.get_mut();
+                                    let changed = false;
+                                    panic!("panic merge");
+                                    if changed {
+                                        *timestamp = latest_timestamp;
+                                    }
+                                }
+                                runtime::HashMapEntry::Vacant(entry) => {
+                                    entry.insert((x1, latest_timestamp));
+                                }
+                            }
+                        }
+                    });
+                }
+                fn update(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) -> bool {
+                    log_duration!("update {}: {}", "type_list_length", {
+                        if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
+                            return false;
+                        }
+                        let offset = insertions.len();
+                        self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
+                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
+                            if uf.type_list_.is_root(x0) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                        true
+                    })
+                }
+                fn update_finalize(
+                    &mut self,
+                    insertions: &mut Vec<Self::Row>,
+                    uf: &mut Unification,
+                    latest_timestamp: TimeStamp,
+                ) {
+                    log_duration!("update_finalize {}: {}", "type_list_length", {
+                        assert!(self.new.is_empty());
+                        log_duration!("fill new and all: {}", {
+                            self.new.extend(
+                                self.fd_index_0
+                                    .iter()
+                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                        if timestamp == latest_timestamp {
+                                            Some((x0, x1))
+                                        } else {
+                                            None
+                                        }
+                                    }),
+                            );
+                            self.new.sort_unstable();
+                            self.all.clear();
+                            self.all.extend(
+                                self.fd_index_0
+                                    .iter()
+                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                            );
+                            insertions.clear();
+                        });
+                        #[cfg(debug_assertions)]
+                        {
+                            self.new.iter().for_each(|&(x0, x1)| {
+                                assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "new is canonical");
+                            });
+                            let mut new = self.new.clone();
+                            new.sort();
+                            new.dedup();
+                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                                assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "all is canonical");
+                            });
+                            let mut all_: Vec<_> = self.all.clone();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                            let mut all_: Vec<_> = self
+                                .all
+                                .iter()
+                                .map(|&(x0, x1, _timestamp)| (x0, x1))
+                                .collect();
+                            all_.sort();
+                            all_.dedup();
+                            assert_eq!(
+                                all_.len(),
+                                self.all.len(),
+                                "all does not have duplicate timestamps"
+                            );
+                        }
+                        self.type_list_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+            }
+            impl TypeListLengthRelation {
+                fn iter_all_0_to_1(
+                    &self,
+                    x0: TypeList,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.fd_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .map(|(x1, _timestamp)| (x1,))
+                }
+                fn iter_old_0_to_1(
+                    &self,
+                    x0: TypeList,
+                    latest_timestamp: TimeStamp,
+                ) -> impl Iterator<Item = (std::primitive::i64,)> + use<'_> {
+                    self.fd_index_0
+                        .get(&(x0,))
+                        .into_iter()
+                        .copied()
+                        .filter_map(move |(x1, timestamp)| (timestamp < latest_timestamp).then_some((x1,)))
+                }
+                #[allow(unreachable_code)]
+                fn entry_0_to_1(
+                    &self,
+                    x0: TypeList,
+                    delta: &mut Delta,
+                    uf: &mut Unification,
+                ) -> (std::primitive::i64,) {
+                    if let Some((x1,)) = self.iter_all_0_to_1(x0).next() {
+                        return (x1,);
+                    }
+                    let x1 = panic!("entry on value not present in database for a panic-merge implicit rule");
+                    delta.type_list_length_.push((x0, x1));
+                    (x1,)
+                }
+                fn check_0(&self, x0: TypeList) -> bool {
+                    self.iter_all_0_to_1(x0).next().is_some()
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Delta {
+                t_nil_: Vec<<TNilRelation as Relation>::Row>,
+                type_list_length_: Vec<<TypeListLengthRelation as Relation>::Row>,
+            }
+            impl Delta {
+                fn new() -> Self {
+                    Self::default()
+                }
+                fn has_new_inserts(&self) -> bool {
+                    let mut has_new_inserts = false;
+                    has_new_inserts |= !self.t_nil_.is_empty();
+                    has_new_inserts |= !self.type_list_length_.is_empty();
+                    has_new_inserts
+                }
+                pub fn insert_t_nil(&mut self, x: <TNilRelation as Relation>::Row) {
+                    self.t_nil_.push(x);
+                }
+                pub fn insert_type_list_length(&mut self, x: <TypeListLengthRelation as Relation>::Row) {
+                    self.type_list_length_.push(x);
+                }
+            }
+            #[derive(Debug, Default)]
+            struct Unification {
+                pub type_list_: UnionFind<TypeList>,
+            }
+            impl Unification {
+                fn num_uprooted(&mut self) -> usize {
+                    let mut ret = 0;
+                    ret += self.type_list_.num_uprooted();
+                    ret
+                }
+                fn reset_num_uprooted(&mut self) {
+                    self.type_list_.reset_num_uprooted();
+                }
+            }
+            #[derive(Debug, Default)]
+            pub struct Theory {
+                pub latest_timestamp: TimeStamp,
+                pub delta: Delta,
+                pub uf: Unification,
+                global_i64: GlobalVars<std::primitive::i64>,
+                pub t_nil_: TNilRelation,
+                pub type_list_length_: TypeListLengthRelation,
+            }
+            impl Theory {
+                pub fn new() -> Self {
+                    let mut theory = Self::default();
+                    theory.global_i64.define(0usize, 0i64);
+                    theory.canonicalize();
+                    theory
+                }
+                pub fn step(&mut self) -> [std::time::Duration; 2] {
+                    log_duration!("======== STEP took {} ==========", {
+                        [
+                            {
+                                let start = std::time::Instant::now();
+                                log_duration!("apply_rules: {}", {
+                                    self.apply_rules();
+                                });
+                                start.elapsed()
+                            },
+                            {
+                                let start = std::time::Instant::now();
+                                self.canonicalize();
+                                start.elapsed()
+                            },
+                        ]
+                    })
+                }
+                #[inline(never)]
+                pub fn apply_rules(&mut self) {
+                    for (qv0,) in self.t_nil_.iter_new() {
+                        #[doc = "( rule ( ( TNil ) ) ( ( set ( TypeList-length ( TNil ) ) 0 ) ) )"]
+                        let qv1 = self.global_i64.get(0usize);
+                        self.delta.insert_type_list_length((qv0, qv1));
+                    }
+                }
+                fn emit_graphviz(&self) -> String {
+                    let mut buf = String::new();
+                    buf.push_str("digraph G {\n");
+                    self.t_nil_.emit_graphviz(&mut buf);
+                    self.type_list_length_.emit_graphviz(&mut buf);
+                    buf.push_str("}\n");
+                    buf
+                }
+                pub fn get_total_relation_entry_count(&self) -> usize {
+                    self.get_relation_entry_count().values().sum()
+                }
+                pub fn get_relation_entry_count(&self) -> std::collections::BTreeMap<&'static str, usize> {
+                    [
+                        ("TNil", self.t_nil_.len()),
+                        ("TypeList-length", self.type_list_length_.len()),
+                    ]
+                    .into_iter()
+                    .collect()
+                }
+                pub fn get_total_uf_count(&self) -> (usize, usize) {
+                    self.get_uf_count()
+                        .values()
+                        .fold((0, 0), |(at, ar), (t, r)| (at + t, ar + r))
+                }
+                pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
+                    [(
+                        "TypeList",
+                        (self.uf.type_list_.len(), self.uf.type_list_.num_roots()),
+                    )]
+                    .into_iter()
+                    .collect()
+                }
+                #[inline(never)]
+                pub fn canonicalize(&mut self) {
+                    self.latest_timestamp.0 += 1;
+                    log_duration!("canonicalize (total): {}", {
+                        self.t_nil_.clear_new();
+                        self.type_list_length_.clear_new();
+                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                            return;
+                        }
+                        log_duration!("update_begin (total): {}", {
+                            self.t_nil_.update_begin(
+                                &mut self.delta.t_nil_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.type_list_length_.update_begin(
+                                &mut self.delta.type_list_length_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                        });
+                        log_duration!("update_loop (total): {}", {
+                            loop {
+                                let mut progress = false;
+                                progress |= self.t_nil_.update(
+                                    &mut self.delta.t_nil_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                progress |= self.type_list_length_.update(
+                                    &mut self.delta.type_list_length_,
+                                    &mut self.uf,
+                                    self.latest_timestamp,
+                                );
+                                if !progress {
+                                    break;
+                                }
+                            }
+                        });
+                        log_duration!("update_finalize (total): {}", {
+                            self.t_nil_.update_finalize(
+                                &mut self.delta.t_nil_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.type_list_length_.update_finalize(
+                                &mut self.delta.type_list_length_,
+                                &mut self.uf,
+                                self.latest_timestamp,
+                            );
+                            self.global_i64.update_finalize();
+                            self.uf.reset_num_uprooted();
+                        });
+                    });
+                }
+            }
+            impl EclassProvider<TypeList> for Theory {
+                fn make(&mut self) -> TypeList {
+                    self.uf.type_list_.add_eclass()
+                }
+                fn find(&mut self, t: TypeList) -> TypeList {
+                    self.uf.type_list_.find(t)
+                }
+                fn union(&mut self, a: TypeList, b: TypeList) {
+                    self.uf.type_list_.union(a, b);
+                }
+            }
+            impl std::ops::Deref for Theory {
+                type Target = Delta;
+                fn deref(&self) -> &Self::Target {
+                    &self.delta
+                }
+            }
+            impl std::ops::DerefMut for Theory {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.delta
+                }
+            }
+        "#]]),
+    }.check()
+}
 
 #[test]
 fn test_primitive_in_premise() {
@@ -286,44 +1036,44 @@ fn test_primitive_in_premise() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t0,
-                    [v1, v1]: t1,
-                    [v10, b_2]: t0,
-                    [v11, v11]: t1,
-                    [v12, v12]: t0,
-                    [v13, v13]: t1,
-                    [v14, v14]: t0,
-                    [v15, v15]: t1,
-                    [v16, a_3]: t0,
-                    [v17, v17]: t1,
-                    [v18, b_3]: t0,
-                    [v19, v19]: t1,
-                    [v2, b]: t0,
-                    [v20, v20]: t0,
-                    [v21, v21]: t1,
-                    [v22, v22]: t0,
-                    [v23, v23]: t1,
-                    [v24, a_4]: t0,
-                    [v25, v25]: t1,
-                    [v26, b_4]: t0,
-                    [v27, v27]: t1,
-                    [v28, v28]: t0,
-                    [v29, v29]: t1,
-                    [v3, v3]: t1,
-                    [v30, a_5]: t0,
-                    [v31, v31]: t1,
-                    [v32, b_5]: t0,
-                    [v33, v33]: t1,
-                    [v34, v34]: t0,
-                    [v35, v35]: t1,
-                    [v36, b_6]: t0,
-                    [v37, a_6]: t0,
-                    [v4, v4]: t0,
-                    [v5, v5]: t1,
-                    [v6, v6]: t0,
-                    [v7, v7]: t1,
-                    [v8, a_2]: t0,
-                    [v9, v9]: t1,
+                    [v0, qa]: t0,
+                    [v1, qv1]: t1,
+                    [v10, qb_2]: t0,
+                    [v11, qv11]: t1,
+                    [v12, qv12]: t0,
+                    [v13, qv13]: t1,
+                    [v14, qv14]: t0,
+                    [v15, qv15]: t1,
+                    [v16, qa_3]: t0,
+                    [v17, qv17]: t1,
+                    [v18, qb_3]: t0,
+                    [v19, qv19]: t1,
+                    [v2, qb]: t0,
+                    [v20, qv20]: t0,
+                    [v21, qv21]: t1,
+                    [v22, qv22]: t0,
+                    [v23, qv23]: t1,
+                    [v24, qa_4]: t0,
+                    [v25, qv25]: t1,
+                    [v26, qb_4]: t0,
+                    [v27, qv27]: t1,
+                    [v28, qv28]: t0,
+                    [v29, qv29]: t1,
+                    [v3, qv3]: t1,
+                    [v30, qa_5]: t0,
+                    [v31, qv31]: t1,
+                    [v32, qb_5]: t0,
+                    [v33, qv33]: t1,
+                    [v34, qv34]: t0,
+                    [v35, qv35]: t1,
+                    [v36, qb_6]: t0,
+                    [v37, qa_6]: t0,
+                    [v4, qv4]: t0,
+                    [v5, qv5]: t1,
+                    [v6, qv6]: t0,
+                    [v7, qv7]: t1,
+                    [v8, qa_2]: t0,
+                    [v9, qv9]: t1,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -678,44 +1428,50 @@ fn test_primitive_in_premise() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, v1) in self.const_.iter_new() {
-                        for (b, v3) in self.const_.iter_all__to_0_1() {
-                            for (v4,) in i64_add012(a, b) {
-                                for (v5,) in self.const_.iter_all_0_to_1(v4) {
+                    for (qa, qv1) in self.const_.iter_new() {
+                        for (qb, qv3) in self.const_.iter_all__to_0_1() {
+                            for (qv4,) in i64_add012(qa, qb) {
+                                for (qv5,) in self.const_.iter_all_0_to_1(qv4) {
                                     #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
-                                    let (v6,) = i64_sub012(a, b).next().unwrap();
-                                    let (v7,) = self.const_.entry_0_to_1(v6, &mut self.delta, &mut self.uf);
+                                    let (qv6,) = i64_sub012(qa, qb).next().unwrap();
+                                    let (qv7,) = self.const_.entry_0_to_1(qv6, &mut self.delta, &mut self.uf);
                                 }
                             }
-                            for () in i64_ne01(a, b) {
+                            for () in i64_ne01(qa, qb) {
                                 #[doc = "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"]
-                                let (v28,) = i64_sub012(a, b).next().unwrap();
-                                let (v29,) = self.const_.entry_0_to_1(v28, &mut self.delta, &mut self.uf);
+                                let (qv28,) = i64_sub012(qa, qb).next().unwrap();
+                                let (qv29,) = self
+                                    .const_
+                                    .entry_0_to_1(qv28, &mut self.delta, &mut self.uf);
                             }
-                            for (a_2, v9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
-                                for (b_6,) in i64_add012(a_2, a) {
-                                    if b == b_6 {
+                            for (qa_2, qv9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                                for (qb_6,) in i64_add012(qa_2, qa) {
+                                    if qb == qb_6 {
                                         #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
-                                        let (v14,) = i64_sub012(a_2, a).next().unwrap();
-                                        let (v15,) =
-                                            self.const_.entry_0_to_1(v14, &mut self.delta, &mut self.uf);
+                                        let (qv14,) = i64_sub012(qa_2, qa).next().unwrap();
+                                        let (qv15,) =
+                                            self.const_
+                                                .entry_0_to_1(qv14, &mut self.delta, &mut self.uf);
                                     }
                                 }
                             }
                         }
-                        for (a_2, v9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
-                            for () in i64_ne01(a_2, a) {
+                        for (qa_2, qv9) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                            for () in i64_ne01(qa_2, qa) {
                                 #[doc = "( rule ( ( Const a ) ( Const b ) ( != a b ) ) ( ( Const ( - a b ) ) ) )"]
-                                let (v34,) = i64_sub012(a_2, a).next().unwrap();
-                                let (v35,) = self.const_.entry_0_to_1(v34, &mut self.delta, &mut self.uf);
+                                let (qv34,) = i64_sub012(qa_2, qa).next().unwrap();
+                                let (qv35,) = self
+                                    .const_
+                                    .entry_0_to_1(qv34, &mut self.delta, &mut self.uf);
                             }
-                            for (b_3, v19) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
-                                for (a_6,) in i64_add012(a_2, b_3) {
-                                    if a == a_6 {
+                            for (qb_3, qv19) in self.const_.iter_old__to_0_1(self.latest_timestamp) {
+                                for (qa_6,) in i64_add012(qa_2, qb_3) {
+                                    if qa == qa_6 {
                                         #[doc = "( rule ( ( Const a ) ( Const b ) ( Const ( + a b ) ) ) ( ( Const ( - a b ) ) ) )"]
-                                        let (v22,) = i64_sub012(a_2, b_3).next().unwrap();
-                                        let (v23,) =
-                                            self.const_.entry_0_to_1(v22, &mut self.delta, &mut self.uf);
+                                        let (qv22,) = i64_sub012(qa_2, qb_3).next().unwrap();
+                                        let (qv23,) =
+                                            self.const_
+                                                .entry_0_to_1(qv22, &mut self.delta, &mut self.uf);
                                     }
                                 }
                             }
@@ -1025,8 +1781,8 @@ fn test_frontend_function() {
                     },
                 },
                 rule_variables: {
-                    [v0, value]: t0,
-                    [v1, eclass]: t1,
+                    [v0, qvalue]: t0,
+                    [v1, qeclass]: t1,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -1484,18 +2240,18 @@ fn hir_global() {
                     },
                 },
                 rule_variables: {
-                    [v0, one]: t0,
-                    [v1, v1]: t2,
-                    [v10, v10]: t1,
-                    [v11, v11]: t2,
-                    [v2, v2]: t1,
-                    [v3, v3]: t2,
-                    [v4, v4]: t1,
-                    [v5, v5]: t2,
-                    [v6, one_2]: t0,
-                    [v7, v7]: t2,
-                    [v8, v8]: t1,
-                    [v9, v9]: t2,
+                    [v0, qone]: t0,
+                    [v1, qv1]: t2,
+                    [v10, qv10]: t1,
+                    [v11, qv11]: t2,
+                    [v2, qv2]: t1,
+                    [v3, qv3]: t2,
+                    [v4, qv4]: t1,
+                    [v5, qv5]: t2,
+                    [v6, qone_2]: t0,
+                    [v7, qv7]: t2,
+                    [v8, qv8]: t1,
+                    [v9, qv9]: t2,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -1655,18 +2411,18 @@ fn regression_tir2() {
                     },
                 },
                 rule_variables: {
-                    [v0, x]: t1,
-                    [v1, v1]: t0,
-                    [v10, v10]: t1,
-                    [v11, v11]: t1,
-                    [v2, v2]: t1,
-                    [v3, v3]: t1,
-                    [v4, x_2]: t1,
-                    [v5, v5]: t0,
-                    [v6, v6]: t1,
-                    [v7, v7]: t1,
-                    [v8, x_3]: t1,
-                    [v9, v9]: t0,
+                    [v0, qx]: t1,
+                    [v1, qv1]: t0,
+                    [v10, qv10]: t1,
+                    [v11, qv11]: t1,
+                    [v2, qv2]: t1,
+                    [v3, qv3]: t1,
+                    [v4, qx_2]: t1,
+                    [v5, qv5]: t0,
+                    [v6, qv6]: t1,
+                    [v7, qv7]: t1,
+                    [v8, qx_3]: t1,
+                    [v9, qv9]: t0,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -2466,27 +3222,27 @@ fn regression_tir2() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (x, v2, v3) in self.pow_.iter_new() {
-                        if let v1 = self.global_i64.get(0usize) {
-                            if self.const_.check_0_1(v1, v2) {
+                    for (qx, qv2, qv3) in self.pow_.iter_new() {
+                        if let qv1 = self.global_i64.get(0usize) {
+                            if self.const_.check_0_1(qv1, qv2) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x, x, v3));
+                                self.delta.insert_mul((qx, qx, qv3));
                             }
                         }
                     }
-                    for (v5, v6) in self.const_.iter_new() {
-                        if v5 == self.global_i64.get(0usize) {
-                            for (x_2, v7) in self.pow_.iter_old_1_to_0_2(v6, self.latest_timestamp) {
+                    for (qv5, qv6) in self.const_.iter_new() {
+                        if qv5 == self.global_i64.get(0usize) {
+                            for (qx_2, qv7) in self.pow_.iter_old_1_to_0_2(qv6, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x_2, x_2, v7));
+                                self.delta.insert_mul((qx_2, qx_2, qv7));
                             }
                         }
                     }
-                    if let Some(v9) = self.global_i64.get_new(0usize) {
-                        for (v10,) in self.const_.iter_old_0_to_1(v9, self.latest_timestamp) {
-                            for (x_3, v11) in self.pow_.iter_old_1_to_0_2(v10, self.latest_timestamp) {
+                    if let Some(qv9) = self.global_i64.get_new(0usize) {
+                        for (qv10,) in self.const_.iter_old_0_to_1(qv9, self.latest_timestamp) {
+                            for (qx_3, qv11) in self.pow_.iter_old_1_to_0_2(qv10, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x_3, x_3, v11));
+                                self.delta.insert_mul((qx_3, qx_3, qv11));
                             }
                         }
                     }
@@ -2694,13 +3450,13 @@ fn regression_tir1() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t1,
-                    [v1, v1]: t1,
-                    [v2, v2]: t0,
-                    [v3, f]: t1,
-                    [v4, g]: t1,
-                    [v5, v5]: t1,
-                    [v6, a_2]: t1,
+                    [v0, qa]: t1,
+                    [v1, qv1]: t1,
+                    [v2, qv2]: t0,
+                    [v3, qf]: t1,
+                    [v4, qg]: t1,
+                    [v5, qv5]: t1,
+                    [v6, qa_2]: t1,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -3191,16 +3947,16 @@ fn regression_tir1() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, a_2, v1) in self.sub_.iter_new() {
-                        if a == a_2 {
+                    for (qa, qa_2, qv1) in self.sub_.iter_new() {
+                        if qa == qa_2 {
                             #[doc = "( rewrite ( Sub a a ) ( Const 0 ) )"]
-                            let v2 = self.global_i64.get(0usize);
-                            self.delta.insert_const((v2, v1));
+                            let qv2 = self.global_i64.get(0usize);
+                            self.delta.insert_const((qv2, qv1));
                         }
                     }
-                    for (f, g, v5) in self.sub_.iter_new() {
+                    for (qf, qg, qv5) in self.sub_.iter_new() {
                         #[doc = "( rewrite ( Sub f g ) g )"]
-                        self.uf.math_.union(g, v5);
+                        self.uf.math_.union(qg, qv5);
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -4164,42 +4920,42 @@ fn codegen_constant_propagation() {
                     },
                 },
                 rule_variables: {
-                    [v0, e]: t1,
-                    [v1, a]: t0,
-                    [v10, v10]: t1,
-                    [v11, v11]: t0,
-                    [v12, e_3]: t1,
-                    [v13, a_3]: t0,
-                    [v14, v14]: t1,
-                    [v15, b_3]: t0,
-                    [v16, v16]: t1,
-                    [v17, v17]: t0,
-                    [v18, e_4]: t1,
-                    [v19, a_4]: t0,
-                    [v2, v2]: t1,
-                    [v20, v20]: t1,
-                    [v21, b_4]: t0,
-                    [v22, v22]: t1,
-                    [v23, v23]: t0,
-                    [v24, e_5]: t1,
-                    [v25, a_5]: t0,
-                    [v26, v26]: t1,
-                    [v27, b_5]: t0,
-                    [v28, v28]: t1,
-                    [v29, v29]: t0,
-                    [v3, b]: t0,
-                    [v30, e_6]: t1,
-                    [v31, a_6]: t0,
-                    [v32, v32]: t1,
-                    [v33, b_6]: t0,
-                    [v34, v34]: t1,
-                    [v35, v35]: t0,
-                    [v4, v4]: t1,
-                    [v5, v5]: t0,
-                    [v6, e_2]: t1,
-                    [v7, a_2]: t0,
-                    [v8, v8]: t1,
-                    [v9, b_2]: t0,
+                    [v0, qe]: t1,
+                    [v1, qa]: t0,
+                    [v10, qv10]: t1,
+                    [v11, qv11]: t0,
+                    [v12, qe_3]: t1,
+                    [v13, qa_3]: t0,
+                    [v14, qv14]: t1,
+                    [v15, qb_3]: t0,
+                    [v16, qv16]: t1,
+                    [v17, qv17]: t0,
+                    [v18, qe_4]: t1,
+                    [v19, qa_4]: t0,
+                    [v2, qv2]: t1,
+                    [v20, qv20]: t1,
+                    [v21, qb_4]: t0,
+                    [v22, qv22]: t1,
+                    [v23, qv23]: t0,
+                    [v24, qe_5]: t1,
+                    [v25, qa_5]: t0,
+                    [v26, qv26]: t1,
+                    [v27, qb_5]: t0,
+                    [v28, qv28]: t1,
+                    [v29, qv29]: t0,
+                    [v3, qb]: t0,
+                    [v30, qe_6]: t1,
+                    [v31, qa_6]: t0,
+                    [v32, qv32]: t1,
+                    [v33, qb_6]: t0,
+                    [v34, qv34]: t1,
+                    [v35, qv35]: t0,
+                    [v4, qv4]: t1,
+                    [v5, qv5]: t0,
+                    [v6, qe_2]: t1,
+                    [v7, qa_2]: t0,
+                    [v8, qv8]: t1,
+                    [v9, qb_2]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -5103,55 +5859,55 @@ fn codegen_constant_propagation() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (v2, v4, e) in self.add_.iter_new() {
-                        if self.const_.check_1(v2) {
-                            for (b,) in self.const_.iter_all_1_to_0(v4) {
-                                for (a,) in self.const_.iter_all_1_to_0(v2) {
+                    for (qv2, qv4, qe) in self.add_.iter_new() {
+                        if self.const_.check_1(qv2) {
+                            for (qb,) in self.const_.iter_all_1_to_0(qv4) {
+                                for (qa,) in self.const_.iter_all_1_to_0(qv2) {
                                     #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                    let (v5,) = i64_add012(a, b).next().unwrap();
-                                    self.delta.insert_const((v5, e));
+                                    let (qv5,) = i64_add012(qa, qb).next().unwrap();
+                                    self.delta.insert_const((qv5, qe));
                                 }
                             }
                         }
                     }
-                    for (v20, v22, e_4) in self.mul_.iter_new() {
-                        if self.const_.check_1(v20) {
-                            for (b_4,) in self.const_.iter_all_1_to_0(v22) {
-                                for (a_4,) in self.const_.iter_all_1_to_0(v20) {
+                    for (qv20, qv22, qe_4) in self.mul_.iter_new() {
+                        if self.const_.check_1(qv20) {
+                            for (qb_4,) in self.const_.iter_all_1_to_0(qv22) {
+                                for (qa_4,) in self.const_.iter_all_1_to_0(qv20) {
                                     #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                    let (v23,) = i64_mul012(a_4, b_4).next().unwrap();
-                                    self.delta.insert_const((v23, e_4));
+                                    let (qv23,) = i64_mul012(qa_4, qb_4).next().unwrap();
+                                    self.delta.insert_const((qv23, qe_4));
                                 }
                             }
                         }
                     }
-                    for (a_2, v8) in self.const_.iter_new() {
-                        for (v10, e_2) in self.add_.iter_old_0_to_1_2(v8, self.latest_timestamp) {
-                            for (b_2,) in self.const_.iter_all_1_to_0(v10) {
+                    for (qa_2, qv8) in self.const_.iter_new() {
+                        for (qv10, qe_2) in self.add_.iter_old_0_to_1_2(qv8, self.latest_timestamp) {
+                            for (qb_2,) in self.const_.iter_all_1_to_0(qv10) {
                                 #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                let (v11,) = i64_add012(a_2, b_2).next().unwrap();
-                                self.delta.insert_const((v11, e_2));
+                                let (qv11,) = i64_add012(qa_2, qb_2).next().unwrap();
+                                self.delta.insert_const((qv11, qe_2));
                             }
                         }
-                        for (v14, e_3) in self.add_.iter_old_1_to_0_2(v8, self.latest_timestamp) {
-                            for (a_3,) in self.const_.iter_old_1_to_0(v14, self.latest_timestamp) {
+                        for (qv14, qe_3) in self.add_.iter_old_1_to_0_2(qv8, self.latest_timestamp) {
+                            for (qa_3,) in self.const_.iter_old_1_to_0(qv14, self.latest_timestamp) {
                                 #[doc = "( rule ( ( = e ( Add ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( + a b ) ) ) ) )"]
-                                let (v17,) = i64_add012(a_3, a_2).next().unwrap();
-                                self.delta.insert_const((v17, e_3));
+                                let (qv17,) = i64_add012(qa_3, qa_2).next().unwrap();
+                                self.delta.insert_const((qv17, qe_3));
                             }
                         }
-                        for (v28, e_5) in self.mul_.iter_old_0_to_1_2(v8, self.latest_timestamp) {
-                            for (b_5,) in self.const_.iter_all_1_to_0(v28) {
+                        for (qv28, qe_5) in self.mul_.iter_old_0_to_1_2(qv8, self.latest_timestamp) {
+                            for (qb_5,) in self.const_.iter_all_1_to_0(qv28) {
                                 #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                let (v29,) = i64_mul012(a_2, b_5).next().unwrap();
-                                self.delta.insert_const((v29, e_5));
+                                let (qv29,) = i64_mul012(qa_2, qb_5).next().unwrap();
+                                self.delta.insert_const((qv29, qe_5));
                             }
                         }
-                        for (v32, e_6) in self.mul_.iter_old_1_to_0_2(v8, self.latest_timestamp) {
-                            for (a_6,) in self.const_.iter_old_1_to_0(v32, self.latest_timestamp) {
+                        for (qv32, qe_6) in self.mul_.iter_old_1_to_0_2(qv8, self.latest_timestamp) {
+                            for (qa_6,) in self.const_.iter_old_1_to_0(qv32, self.latest_timestamp) {
                                 #[doc = "( rule ( ( = e ( Mul ( Const a ) ( Const b ) ) ) ) ( ( union e ( Const ( * a b ) ) ) ) )"]
-                                let (v35,) = i64_mul012(a_6, a_2).next().unwrap();
-                                self.delta.insert_const((v35, e_6));
+                                let (qv35,) = i64_mul012(qa_6, qa_2).next().unwrap();
+                                self.delta.insert_const((qv35, qe_6));
                             }
                         }
                     }
@@ -5577,9 +6333,9 @@ fn codegen_commutative() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, b, e) in self.add_.iter_new() {
+                    for (qa, qb, qe) in self.add_.iter_new() {
                         #[doc = "( rule ( ( = e ( Add a b ) ) ) ( ( union e ( Add b a ) ) ) )"]
-                        self.delta.insert_add((b, a, e));
+                        self.delta.insert_add((qb, qa, qe));
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -5733,10 +6489,10 @@ fn regression_entry2() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t1,
-                    [v1, b]: t1,
-                    [v2, v2]: t1,
-                    [v3, v3]: t0,
+                    [v0, qa]: t1,
+                    [v1, qb]: t1,
+                    [v2, qv2]: t1,
+                    [v3, qv3]: t0,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -6219,10 +6975,10 @@ fn regression_entry2() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, b, v2) in self.sub_.iter_new() {
+                    for (qa, qb, qv2) in self.sub_.iter_new() {
                         #[doc = "( rewrite ( Sub a b ) ( Const -1 ) )"]
-                        let v3 = self.global_i64.get(0usize);
-                        self.delta.insert_const((v3, v2));
+                        let qv3 = self.global_i64.get(0usize);
+                        self.delta.insert_const((qv3, qv2));
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -6388,10 +7144,10 @@ fn regression_entry() {
                     },
                 },
                 rule_variables: {
-                    [v0, f]: t0,
-                    [v1, g]: t0,
-                    [v2, v2]: t0,
-                    [v3, v3]: t0,
+                    [v0, qf]: t0,
+                    [v1, qg]: t0,
+                    [v2, qv2]: t0,
+                    [v3, qv3]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -6876,12 +7632,12 @@ fn regression_entry() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (f, g, v2) in self.add_.iter_new() {
+                    for (qf, qg, qv2) in self.add_.iter_new() {
                         #[doc = "( rewrite ( Add f g ) ( Add ( Integral f f ) g ) )"]
-                        let (v3,) = self
+                        let (qv3,) = self
                             .integral_
-                            .entry_0_1_to_2(f, f, &mut self.delta, &mut self.uf);
-                        self.delta.insert_add((v3, g, v2));
+                            .entry_0_1_to_2(qf, qf, &mut self.delta, &mut self.uf);
+                        self.delta.insert_add((qv3, qg, qv2));
                     }
                 }
                 fn emit_graphviz(&self) -> String {
@@ -7038,9 +7794,9 @@ fn test_bind_variable_multiple_times() {
                     },
                 },
                 rule_variables: {
-                    [v0, x]: t0,
-                    [v1, v1]: t0,
-                    [v2, x_2]: t0,
+                    [v0, qx]: t0,
+                    [v1, qv1]: t0,
+                    [v2, qx_2]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -7315,10 +8071,10 @@ fn test_bind_variable_multiple_times() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (x, x_2, v1) in self.same_.iter_new() {
-                        if x == x_2 {
+                    for (qx, qx_2, qv1) in self.same_.iter_new() {
+                        if qx == qx_2 {
                             #[doc = "( rewrite ( Same x x ) x )"]
-                            self.uf.foo_.union(x, v1);
+                            self.uf.foo_.union(qx, qv1);
                         }
                     }
                 }
@@ -7521,11 +8277,11 @@ fn codegen_variable_reuse_bug() {
                     },
                 },
                 rule_variables: {
-                    [v0, zerozero]: t0,
-                    [v1, x]: t0,
-                    [v2, zerozero_2]: t0,
-                    [v3, x_2]: t0,
-                    [v4, zerozero_3]: t0,
+                    [v0, qzerozero]: t0,
+                    [v1, qx]: t0,
+                    [v2, qzerozero_2]: t0,
+                    [v3, qx_2]: t0,
+                    [v4, qzerozero_3]: t0,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -8038,21 +8794,21 @@ fn codegen_variable_reuse_bug() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (zerozero, x, zerozero_3) in self.add_.iter_new() {
-                        if zerozero == zerozero_3 {
-                            if zerozero == self.global_math.get(0usize) {
+                    for (qzerozero, qx, qzerozero_3) in self.add_.iter_new() {
+                        if qzerozero == qzerozero_3 {
+                            if qzerozero == self.global_math.get(0usize) {
                                 #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                                self.delta.insert_zero((x,));
+                                self.delta.insert_zero((qx,));
                             }
                         }
                     }
-                    if let Some(zerozero_2) = self.global_math.get_new(0usize) {
-                        for (x_2,) in self
-                            .add_
-                            .iter_old_0_2_to_1(zerozero_2, zerozero_2, self.latest_timestamp)
+                    if let Some(qzerozero_2) = self.global_math.get_new(0usize) {
+                        for (qx_2,) in
+                            self.add_
+                                .iter_old_0_2_to_1(qzerozero_2, qzerozero_2, self.latest_timestamp)
                         {
                             #[doc = "( rule ( ( = zero ( Add zero x ) ) ) ( ( union x ( Zero ) ) ) )"]
-                            self.delta.insert_zero((x_2,));
+                            self.delta.insert_zero((qx_2,));
                         }
                     }
                 }
@@ -10726,69 +11482,69 @@ fn test_primitives_simple() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, v24, v25) in self.mul_.iter_new() {
-                        if let v23 = self.global_i64.get(2usize) {
-                            if self.const_.check_0_1(v23, v24) {
+                    for (qa, qv24, qv25) in self.mul_.iter_new() {
+                        if let qv23 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(qv23, qv24) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(v24, v25);
+                                self.uf.math_.union(qv24, qv25);
                             }
                         }
                     }
-                    for (one, v1) in self.const_.iter_new() {
-                        if one == self.global_i64.get(0usize) {
+                    for (qone, qv1) in self.const_.iter_new() {
+                        if qone == self.global_i64.get(0usize) {
                             #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
-                            let v10 = self.global_string.get(1usize);
-                            let (v11,) = self.var_.entry_0_to_1(v10, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v11, v11, v1));
+                            let qv10 = self.global_string.get(1usize);
+                            let (qv11,) = self.var_.entry_0_to_1(qv10, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv11, qv11, qv1));
                         }
-                        if one == self.global_i64.get(1usize) {
+                        if qone == self.global_i64.get(1usize) {
                             #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
-                            let v2 = self.global_string.get(0usize);
-                            let (v3,) = self.var_.entry_0_to_1(v2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v3, v3, v1));
+                            let qv2 = self.global_string.get(0usize);
+                            let (qv3,) = self.var_.entry_0_to_1(qv2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv3, qv3, qv1));
                         }
-                        if one == self.global_i64.get(2usize) {
-                            for (a_2, v29) in self.mul_.iter_old_1_to_0_2(v1, self.latest_timestamp) {
+                        if qone == self.global_i64.get(2usize) {
+                            for (qa_2, qv29) in self.mul_.iter_old_1_to_0_2(qv1, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(v1, v29);
+                                self.uf.math_.union(qv1, qv29);
                             }
                         }
                     }
-                    for (v16, v17) in self.var_.iter_new() {
-                        if v16 == self.global_string.get(2usize) {
+                    for (qv16, qv17) in self.var_.iter_new() {
+                        if qv16 == self.global_string.get(2usize) {
                             #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                            let v18 = self.global_string.get(3usize);
-                            self.delta.insert_var((v18, v17));
+                            let qv18 = self.global_string.get(3usize);
+                            self.delta.insert_var((qv18, qv17));
                         }
                     }
-                    if let Some(v12) = self.global_i64.get_new(0usize) {
-                        for (v13,) in self.const_.iter_old_0_to_1(v12, self.latest_timestamp) {
+                    if let Some(qv12) = self.global_i64.get_new(0usize) {
+                        for (qv13,) in self.const_.iter_old_0_to_1(qv12, self.latest_timestamp) {
                             #[doc = "( rewrite ( Const 2 ) ( Add ( Var \"z\" ) ( Var \"z\" ) ) )"]
-                            let v14 = self.global_string.get(1usize);
-                            let (v15,) = self.var_.entry_0_to_1(v14, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v15, v15, v13));
+                            let qv14 = self.global_string.get(1usize);
+                            let (qv15,) = self.var_.entry_0_to_1(qv14, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv15, qv15, qv13));
                         }
                     }
-                    if let Some(one_2) = self.global_i64.get_new(1usize) {
-                        for (v5,) in self.const_.iter_old_0_to_1(one_2, self.latest_timestamp) {
+                    if let Some(qone_2) = self.global_i64.get_new(1usize) {
+                        for (qv5,) in self.const_.iter_old_0_to_1(qone_2, self.latest_timestamp) {
                             #[doc = "( rewrite ( Const one ) ( Add ( Var \"q\" ) ( Var \"q\" ) ) )"]
-                            let v6 = self.global_string.get(0usize);
-                            let (v7,) = self.var_.entry_0_to_1(v6, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v7, v7, v5));
+                            let qv6 = self.global_string.get(0usize);
+                            let (qv7,) = self.var_.entry_0_to_1(qv6, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv7, qv7, qv5));
                         }
                     }
-                    if let Some(v19) = self.global_string.get_new(2usize) {
-                        for (v20,) in self.var_.iter_old_0_to_1(v19, self.latest_timestamp) {
+                    if let Some(qv19) = self.global_string.get_new(2usize) {
+                        for (qv20,) in self.var_.iter_old_0_to_1(qv19, self.latest_timestamp) {
                             #[doc = "( rewrite ( Var \"x\" ) ( Var \"y\" ) )"]
-                            let v21 = self.global_string.get(3usize);
-                            self.delta.insert_var((v21, v20));
+                            let qv21 = self.global_string.get(3usize);
+                            self.delta.insert_var((qv21, qv20));
                         }
                     }
-                    if let Some(v31) = self.global_i64.get_new(2usize) {
-                        for (v32,) in self.const_.iter_old_0_to_1(v31, self.latest_timestamp) {
-                            for (a_3, v33) in self.mul_.iter_old_1_to_0_2(v32, self.latest_timestamp) {
+                    if let Some(qv31) = self.global_i64.get_new(2usize) {
+                        for (qv32,) in self.const_.iter_old_0_to_1(qv31, self.latest_timestamp) {
+                            for (qa_3, qv33) in self.mul_.iter_old_1_to_0_2(qv32, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(v32, v33);
+                                self.uf.math_.union(qv32, qv33);
                             }
                         }
                     }
@@ -11059,15 +11815,15 @@ fn triangle_join() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t0,
-                    [v1, b]: t0,
-                    [v2, c]: t0,
-                    [v3, a_2]: t0,
-                    [v4, b_2]: t0,
-                    [v5, c_2]: t0,
-                    [v6, a_3]: t0,
-                    [v7, b_3]: t0,
-                    [v8, c_3]: t0,
+                    [v0, qa]: t0,
+                    [v1, qb]: t0,
+                    [v2, qc]: t0,
+                    [v3, qa_2]: t0,
+                    [v4, qb_2]: t0,
+                    [v5, qc_2]: t0,
+                    [v6, qa_3]: t0,
+                    [v7, qb_3]: t0,
+                    [v8, qc_3]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -12056,32 +12812,32 @@ fn triangle_join() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, b) in self.foo_.iter_new() {
-                        if self.bar_.check_0(b) {
-                            for (c,) in self.baz_.iter_all_1_to_0(a) {
-                                if self.bar_.check_0_1(b, c) {
+                    for (qa, qb) in self.foo_.iter_new() {
+                        if self.bar_.check_0(qb) {
+                            for (qc,) in self.baz_.iter_all_1_to_0(qa) {
+                                if self.bar_.check_0_1(qb, qc) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a, b, c));
+                                    self.delta.insert_triangle((qa, qb, qc));
                                 }
                             }
                         }
                     }
-                    for (b_2, c_2) in self.bar_.iter_new() {
-                        if self.baz_.check_0(c_2) {
-                            for (a_2,) in self.foo_.iter_old_1_to_0(b_2, self.latest_timestamp) {
-                                if self.baz_.check_0_1(c_2, a_2) {
+                    for (qb_2, qc_2) in self.bar_.iter_new() {
+                        if self.baz_.check_0(qc_2) {
+                            for (qa_2,) in self.foo_.iter_old_1_to_0(qb_2, self.latest_timestamp) {
+                                if self.baz_.check_0_1(qc_2, qa_2) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a_2, b_2, c_2));
+                                    self.delta.insert_triangle((qa_2, qb_2, qc_2));
                                 }
                             }
                         }
                     }
-                    for (c_3, a_3) in self.baz_.iter_new() {
-                        if self.foo_.check_0(a_3) {
-                            for (b_3,) in self.bar_.iter_old_1_to_0(c_3, self.latest_timestamp) {
-                                if self.foo_.check_0_1(a_3, b_3) {
+                    for (qc_3, qa_3) in self.baz_.iter_new() {
+                        if self.foo_.check_0(qa_3) {
+                            for (qb_3,) in self.bar_.iter_old_1_to_0(qc_3, self.latest_timestamp) {
+                                if self.foo_.check_0_1(qa_3, qb_3) {
                                     #[doc = "( rule ( ( Foo a b ) ( Bar b c ) ( Baz c a ) ) ( ( Triangle a b c ) ) )"]
-                                    self.delta.insert_triangle((a_3, b_3, c_3));
+                                    self.delta.insert_triangle((qa_3, qb_3, qc_3));
                                 }
                             }
                         }
@@ -12344,27 +13100,27 @@ fn edgecase0() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t0,
-                    [v1, b]: t0,
-                    [v10, c_2]: t0,
-                    [v11, v11]: t0,
-                    [v12, v12]: t0,
-                    [v13, v13]: t0,
-                    [v14, a_3]: t0,
-                    [v15, b_3]: t0,
-                    [v16, v16]: t0,
-                    [v17, c_3]: t0,
-                    [v18, v18]: t0,
-                    [v19, v19]: t0,
-                    [v2, v2]: t0,
-                    [v20, v20]: t0,
-                    [v3, c]: t0,
-                    [v4, v4]: t0,
-                    [v5, v5]: t0,
-                    [v6, v6]: t0,
-                    [v7, a_2]: t0,
-                    [v8, b_2]: t0,
-                    [v9, v9]: t0,
+                    [v0, qa]: t0,
+                    [v1, qb]: t0,
+                    [v10, qc_2]: t0,
+                    [v11, qv11]: t0,
+                    [v12, qv12]: t0,
+                    [v13, qv13]: t0,
+                    [v14, qa_3]: t0,
+                    [v15, qb_3]: t0,
+                    [v16, qv16]: t0,
+                    [v17, qc_3]: t0,
+                    [v18, qv18]: t0,
+                    [v19, qv19]: t0,
+                    [v2, qv2]: t0,
+                    [v20, qv20]: t0,
+                    [v3, qc]: t0,
+                    [v4, qv4]: t0,
+                    [v5, qv5]: t0,
+                    [v6, qv6]: t0,
+                    [v7, qa_2]: t0,
+                    [v8, qb_2]: t0,
+                    [v9, qv9]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -13044,39 +13800,42 @@ fn edgecase0() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a, b, v2) in self.mul_.iter_new() {
-                        if self.mul_.check_0(a) {
-                            for (v4, v5) in self.add_.iter_all_0_to_1_2(v2) {
-                                for (c,) in self.mul_.iter_all_0_2_to_1(a, v4) {
+                    for (qa, qb, qv2) in self.mul_.iter_new() {
+                        if self.mul_.check_0(qa) {
+                            for (qv4, qv5) in self.add_.iter_all_0_to_1_2(qv2) {
+                                for (qc,) in self.mul_.iter_all_0_2_to_1(qa, qv4) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v6,) = self
-                                        .add_
-                                        .entry_0_1_to_2(b, c, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a, v6, v5));
+                                    let (qv6,) =
+                                        self.add_
+                                            .entry_0_1_to_2(qb, qc, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qa, qv6, qv5));
                                 }
                             }
                         }
-                        if self.add_.check_1(v2) {
-                            for (b_2, v9) in self.mul_.iter_old_0_to_1_2(a, self.latest_timestamp) {
-                                for (v12,) in self.add_.iter_all_0_1_to_2(v9, v2) {
+                        if self.add_.check_1(qv2) {
+                            for (qb_2, qv9) in self.mul_.iter_old_0_to_1_2(qa, self.latest_timestamp) {
+                                for (qv12,) in self.add_.iter_all_0_1_to_2(qv9, qv2) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v13,) =
+                                    let (qv13,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_2, b, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a, v13, v12));
+                                            .entry_0_1_to_2(qb_2, qb, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qa, qv13, qv12));
                                 }
                             }
                         }
                     }
-                    for (v16, v18, v19) in self.add_.iter_new() {
-                        if self.mul_.check_2(v16) {
-                            for (a_3, c_3) in self.mul_.iter_old_2_to_0_1(v18, self.latest_timestamp) {
-                                for (b_3,) in self.mul_.iter_old_0_2_to_1(a_3, v16, self.latest_timestamp) {
+                    for (qv16, qv18, qv19) in self.add_.iter_new() {
+                        if self.mul_.check_2(qv16) {
+                            for (qa_3, qc_3) in self.mul_.iter_old_2_to_0_1(qv18, self.latest_timestamp) {
+                                for (qb_3,) in self
+                                    .mul_
+                                    .iter_old_0_2_to_1(qa_3, qv16, self.latest_timestamp)
+                                {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v20,) =
+                                    let (qv20,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_3, c_3, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_3, v20, v19));
+                                            .entry_0_1_to_2(qb_3, qc_3, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qa_3, qv20, qv19));
                                 }
                             }
                         }
@@ -13312,26 +14071,26 @@ fn edgecase0_no_egglog_compat() {
                     },
                 },
                 rule_variables: {
-                    [v0, a]: t0,
-                    [v1, b]: t0,
-                    [v10, v10]: t0,
-                    [v11, v11]: t0,
-                    [v12, v12]: t0,
-                    [v13, a_4]: t0,
-                    [v14, b_4]: t0,
-                    [v15, v15]: t0,
-                    [v16, c_2]: t0,
-                    [v17, v17]: t0,
-                    [v18, v18]: t0,
-                    [v19, v19]: t0,
-                    [v2, v2]: t0,
-                    [v3, a_2]: t0,
-                    [v4, b_2]: t0,
-                    [v5, v5]: t0,
-                    [v6, a_3]: t0,
-                    [v7, b_3]: t0,
-                    [v8, v8]: t0,
-                    [v9, c]: t0,
+                    [v0, qa]: t0,
+                    [v1, qb]: t0,
+                    [v10, qv10]: t0,
+                    [v11, qv11]: t0,
+                    [v12, qv12]: t0,
+                    [v13, qa_4]: t0,
+                    [v14, qb_4]: t0,
+                    [v15, qv15]: t0,
+                    [v16, qc_2]: t0,
+                    [v17, qv17]: t0,
+                    [v18, qv18]: t0,
+                    [v19, qv19]: t0,
+                    [v2, qv2]: t0,
+                    [v3, qa_2]: t0,
+                    [v4, qb_2]: t0,
+                    [v5, qv5]: t0,
+                    [v6, qa_3]: t0,
+                    [v7, qb_3]: t0,
+                    [v8, qv8]: t0,
+                    [v9, qc]: t0,
                 },
                 global_variable_types: {},
                 rule_tries: [
@@ -13979,40 +14738,40 @@ fn edgecase0_no_egglog_compat() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (a_2, b_2, v5) in self.mul_.iter_new() {
+                    for (qa_2, qb_2, qv5) in self.mul_.iter_new() {
                         {
-                            self.delta.insert_mul((a_2, b_2, v5));
-                            self.delta.insert_mul((b_2, a_2, v5));
+                            self.delta.insert_mul((qa_2, qb_2, qv5));
+                            self.delta.insert_mul((qb_2, qa_2, qv5));
                         }
-                        if self.mul_.check_0(a_2) {
-                            for (v10, v11) in self.add_.iter_all_0_to_1_2(v5) {
-                                for (c,) in self.mul_.iter_all_0_2_to_1(a_2, v10) {
+                        if self.mul_.check_0(qa_2) {
+                            for (qv10, qv11) in self.add_.iter_all_0_to_1_2(qv5) {
+                                for (qc,) in self.mul_.iter_all_0_2_to_1(qa_2, qv10) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v12,) =
+                                    let (qv12,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_2, c, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_2, v12, v11));
-                                    self.delta.insert_mul((v12, a_2, v11));
-                                    self.delta.insert_add((c, b_2, v12));
+                                            .entry_0_1_to_2(qb_2, qc, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qa_2, qv12, qv11));
+                                    self.delta.insert_mul((qv12, qa_2, qv11));
+                                    self.delta.insert_add((qc, qb_2, qv12));
                                 }
                             }
                         }
                     }
-                    for (a, b, v2) in self.add_.iter_new() {
+                    for (qa, qb, qv2) in self.add_.iter_new() {
                         {
-                            self.delta.insert_add((a, b, v2));
-                            self.delta.insert_add((b, a, v2));
+                            self.delta.insert_add((qa, qb, qv2));
+                            self.delta.insert_add((qb, qa, qv2));
                         }
-                        if self.mul_.check_2(a) {
-                            for (a_4, c_2) in self.mul_.iter_old_2_to_0_1(b, self.latest_timestamp) {
-                                for (b_4,) in self.mul_.iter_old_0_2_to_1(a_4, a, self.latest_timestamp) {
+                        if self.mul_.check_2(qa) {
+                            for (qa_4, qc_2) in self.mul_.iter_old_2_to_0_1(qb, self.latest_timestamp) {
+                                for (qb_4,) in self.mul_.iter_old_0_2_to_1(qa_4, qa, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v19,) =
+                                    let (qv19,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_4, c_2, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((a_4, v19, v2));
-                                    self.delta.insert_mul((v19, a_4, v2));
-                                    self.delta.insert_add((c_2, b_4, v19));
+                                            .entry_0_1_to_2(qb_4, qc_2, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qa_4, qv19, qv2));
+                                    self.delta.insert_mul((qv19, qa_4, qv2));
+                                    self.delta.insert_add((qc_2, qb_4, qv19));
                                 }
                             }
                         }
@@ -14694,28 +15453,28 @@ fn test_into_codegen() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (v2, c, v4) in self.mul_.iter_new() {
-                        for (a, b) in self.add_.iter_all_2_to_0_1(v2) {
+                    for (qv2, qc, qv4) in self.mul_.iter_new() {
+                        for (qa, qb) in self.add_.iter_all_2_to_0_1(qv2) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                            let (v6,) = self
+                            let (qv6,) = self
                                 .mul_
-                                .entry_0_1_to_2(b, c, &mut self.delta, &mut self.uf);
-                            let (v5,) = self
+                                .entry_0_1_to_2(qb, qc, &mut self.delta, &mut self.uf);
+                            let (qv5,) = self
                                 .mul_
-                                .entry_0_1_to_2(a, c, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v5, v6, v4));
+                                .entry_0_1_to_2(qa, qc, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv5, qv6, qv4));
                         }
                     }
-                    for (a_2, b_2, v9) in self.add_.iter_new() {
-                        for (c_2, v11) in self.mul_.iter_old_0_to_1_2(v9, self.latest_timestamp) {
+                    for (qa_2, qb_2, qv9) in self.add_.iter_new() {
+                        for (qc_2, qv11) in self.mul_.iter_old_0_to_1_2(qv9, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul ( Add a b ) c ) ( Add ( Mul a c ) ( Mul b c ) ) )"]
-                            let (v13,) = self
+                            let (qv13,) = self
                                 .mul_
-                                .entry_0_1_to_2(b_2, c_2, &mut self.delta, &mut self.uf);
-                            let (v12,) = self
+                                .entry_0_1_to_2(qb_2, qc_2, &mut self.delta, &mut self.uf);
+                            let (qv12,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_2, c_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v12, v13, v11));
+                                .entry_0_1_to_2(qa_2, qc_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv12, qv13, qv11));
                         }
                     }
                 }
@@ -16043,337 +16802,337 @@ fn lir_math() {
                     },
                 },
                 rule_variables: {
-                    [v0, fuel]: t2,
-                    [v1, x]: t3,
-                    [v10, v10]: t3,
-                    [v100, c_5]: t3,
-                    [v101, v101]: t3,
-                    [v102, v102]: t3,
-                    [v103, v103]: t3,
-                    [v104, v104]: t3,
-                    [v105, a_18]: t3,
-                    [v106, b_9]: t3,
-                    [v107, c_6]: t3,
-                    [v108, v108]: t3,
-                    [v109, v109]: t3,
-                    [v11, v11]: t0,
-                    [v110, v110]: t3,
-                    [v111, v111]: t3,
-                    [v112, a_19]: t3,
-                    [v113, b_10]: t3,
-                    [v114, v114]: t3,
-                    [v115, c_7]: t3,
-                    [v116, v116]: t3,
-                    [v117, v117]: t3,
-                    [v118, v118]: t3,
-                    [v119, a_20]: t3,
-                    [v12, v12]: t3,
-                    [v120, b_11]: t3,
-                    [v121, v121]: t3,
-                    [v122, c_8]: t3,
-                    [v123, v123]: t3,
-                    [v124, v124]: t3,
-                    [v125, v125]: t3,
-                    [v126, a_21]: t3,
-                    [v127, b_12]: t3,
-                    [v128, v128]: t3,
-                    [v129, c_9]: t3,
-                    [v13, v13]: t3,
-                    [v130, v130]: t3,
-                    [v131, v131]: t3,
-                    [v132, v132]: t3,
-                    [v133, a_22]: t3,
-                    [v134, b_13]: t3,
-                    [v135, v135]: t3,
-                    [v136, c_10]: t3,
-                    [v137, v137]: t3,
-                    [v138, v138]: t3,
-                    [v139, v139]: t3,
-                    [v14, a]: t3,
-                    [v140, x_5]: t3,
-                    [v141, v141]: t0,
-                    [v142, v142]: t3,
-                    [v143, v143]: t3,
-                    [v144, x_6]: t3,
-                    [v145, v145]: t0,
-                    [v146, v146]: t3,
-                    [v147, v147]: t3,
-                    [v148, x_7]: t3,
-                    [v149, v149]: t0,
-                    [v15, b]: t3,
-                    [v150, v150]: t3,
-                    [v151, v151]: t3,
-                    [v152, x_8]: t3,
-                    [v153, v153]: t0,
-                    [v154, v154]: t3,
-                    [v155, v155]: t3,
-                    [v156, x_9]: t3,
-                    [v157, v157]: t0,
-                    [v158, v158]: t3,
-                    [v159, v159]: t3,
-                    [v16, v16]: t3,
-                    [v160, x_10]: t3,
-                    [v161, v161]: t0,
-                    [v162, v162]: t3,
-                    [v163, v163]: t3,
-                    [v164, x_11]: t3,
-                    [v165, a_23]: t3,
-                    [v166, b_14]: t3,
-                    [v167, v167]: t3,
-                    [v168, v168]: t3,
-                    [v169, v169]: t3,
-                    [v17, v17]: t0,
-                    [v170, v170]: t3,
-                    [v171, x_12]: t3,
-                    [v172, a_24]: t3,
-                    [v173, b_15]: t3,
-                    [v174, v174]: t3,
-                    [v175, v175]: t3,
-                    [v176, v176]: t3,
-                    [v177, v177]: t3,
-                    [v178, x_13]: t3,
-                    [v179, a_25]: t3,
-                    [v18, v18]: t3,
-                    [v180, b_16]: t3,
-                    [v181, v181]: t3,
-                    [v182, v182]: t3,
-                    [v183, v183]: t3,
-                    [v184, v184]: t3,
-                    [v185, v185]: t3,
-                    [v186, v186]: t3,
-                    [v187, x_14]: t3,
-                    [v188, a_26]: t3,
-                    [v189, b_17]: t3,
-                    [v19, v19]: t3,
-                    [v190, v190]: t3,
-                    [v191, v191]: t3,
-                    [v192, v192]: t3,
-                    [v193, v193]: t3,
-                    [v194, v194]: t3,
-                    [v195, v195]: t3,
-                    [v196, x_15]: t3,
-                    [v197, v197]: t3,
-                    [v198, v198]: t3,
-                    [v199, x_16]: t3,
-                    [v2, v2]: t3,
-                    [v20, x_3]: t3,
-                    [v200, v200]: t3,
-                    [v201, v201]: t3,
-                    [v202, fuel_3]: t2,
-                    [v203, v203]: t2,
-                    [v204, v204]: t0,
-                    [v205, v205]: t3,
-                    [v206, x_17]: t3,
-                    [v207, v207]: t3,
-                    [v208, fuel_4]: t2,
-                    [v209, v209]: t2,
-                    [v21, v21]: t3,
-                    [v210, v210]: t0,
-                    [v211, v211]: t3,
-                    [v212, x_18]: t3,
-                    [v213, v213]: t3,
-                    [v214, fuel_5]: t2,
-                    [v215, v215]: t2,
-                    [v216, v216]: t0,
-                    [v217, v217]: t3,
-                    [v218, x_19]: t3,
-                    [v219, v219]: t3,
-                    [v22, v22]: t3,
-                    [v220, fuel_6]: t2,
-                    [v221, v221]: t2,
-                    [v222, v222]: t0,
-                    [v223, v223]: t3,
-                    [v224, x_20]: t3,
-                    [v225, v225]: t3,
-                    [v226, fuel_7]: t2,
-                    [v227, v227]: t2,
-                    [v228, x_21]: t3,
-                    [v229, v229]: t3,
-                    [v23, v23]: t0,
-                    [v230, v230]: t3,
-                    [v231, fuel_8]: t2,
-                    [v232, v232]: t2,
-                    [v233, x_22]: t3,
-                    [v234, v234]: t3,
-                    [v235, v235]: t3,
-                    [v236, fuel_9]: t2,
-                    [v237, v237]: t2,
-                    [v238, x_23]: t3,
-                    [v239, v239]: t3,
-                    [v24, v24]: t3,
-                    [v240, v240]: t3,
-                    [v241, fuel_10]: t2,
-                    [v242, v242]: t2,
-                    [v243, f]: t3,
-                    [v244, g]: t3,
-                    [v245, v245]: t3,
-                    [v246, x_24]: t3,
-                    [v247, v247]: t3,
-                    [v248, v248]: t3,
-                    [v249, v249]: t3,
-                    [v25, v25]: t3,
-                    [v250, fuel_11]: t2,
-                    [v251, v251]: t2,
-                    [v252, f_2]: t3,
-                    [v253, g_2]: t3,
-                    [v254, v254]: t3,
-                    [v255, x_25]: t3,
-                    [v256, v256]: t3,
-                    [v257, v257]: t3,
-                    [v258, v258]: t3,
-                    [v259, fuel_12]: t2,
-                    [v26, x_4]: t3,
-                    [v260, v260]: t2,
-                    [v261, f_3]: t3,
-                    [v262, g_3]: t3,
-                    [v263, v263]: t3,
-                    [v264, x_26]: t3,
-                    [v265, v265]: t3,
-                    [v266, v266]: t3,
-                    [v267, v267]: t3,
-                    [v268, fuel_13]: t2,
-                    [v269, v269]: t2,
-                    [v27, v27]: t3,
-                    [v270, f_4]: t3,
-                    [v271, g_4]: t3,
-                    [v272, v272]: t3,
-                    [v273, x_27]: t3,
-                    [v274, v274]: t3,
-                    [v275, v275]: t3,
-                    [v276, v276]: t3,
-                    [v277, fuel_14]: t2,
-                    [v278, v278]: t2,
-                    [v279, f_5]: t3,
-                    [v28, v28]: t3,
-                    [v280, g_5]: t3,
-                    [v281, v281]: t3,
-                    [v282, x_28]: t3,
-                    [v283, v283]: t3,
-                    [v284, v284]: t3,
-                    [v285, v285]: t3,
-                    [v286, fuel_15]: t2,
-                    [v287, v287]: t2,
-                    [v288, f_6]: t3,
-                    [v289, g_6]: t3,
-                    [v29, v29]: t0,
-                    [v290, v290]: t3,
-                    [v291, x_29]: t3,
-                    [v292, v292]: t3,
-                    [v293, v293]: t3,
-                    [v294, v294]: t3,
-                    [v295, fuel_16]: t2,
-                    [v296, v296]: t2,
-                    [v297, a_27]: t3,
-                    [v298, b_18]: t3,
-                    [v299, v299]: t3,
-                    [v3, v3]: t3,
-                    [v30, v30]: t3,
-                    [v300, x_30]: t3,
-                    [v301, v301]: t3,
-                    [v302, v302]: t3,
-                    [v303, v303]: t3,
-                    [v304, v304]: t3,
-                    [v305, v305]: t3,
-                    [v306, v306]: t3,
-                    [v307, fuel_17]: t2,
-                    [v308, v308]: t2,
-                    [v309, a_28]: t3,
-                    [v31, v31]: t3,
-                    [v310, b_19]: t3,
-                    [v311, v311]: t3,
-                    [v312, x_31]: t3,
-                    [v313, v313]: t3,
-                    [v314, v314]: t3,
-                    [v315, v315]: t3,
-                    [v316, v316]: t3,
-                    [v317, v317]: t3,
-                    [v318, v318]: t3,
-                    [v319, fuel_18]: t2,
-                    [v32, a_2]: t3,
-                    [v320, v320]: t2,
-                    [v321, a_29]: t3,
-                    [v322, b_20]: t3,
-                    [v323, v323]: t3,
-                    [v324, x_32]: t3,
-                    [v325, v325]: t3,
-                    [v326, v326]: t3,
-                    [v327, v327]: t3,
-                    [v328, v328]: t3,
-                    [v329, v329]: t3,
-                    [v33, b_2]: t3,
-                    [v330, v330]: t3,
-                    [v34, v34]: t3,
-                    [v35, a_3]: t3,
-                    [v36, b_3]: t3,
-                    [v37, v37]: t3,
-                    [v38, a_4]: t3,
-                    [v39, b_4]: t3,
-                    [v4, v4]: t0,
-                    [v40, c]: t3,
-                    [v41, v41]: t3,
-                    [v42, v42]: t3,
-                    [v43, v43]: t3,
-                    [v44, a_5]: t3,
-                    [v45, b_5]: t3,
-                    [v46, c_2]: t3,
-                    [v47, v47]: t3,
-                    [v48, v48]: t3,
-                    [v49, v49]: t3,
-                    [v5, v5]: t3,
-                    [v50, a_6]: t3,
-                    [v51, b_6]: t3,
-                    [v52, c_3]: t3,
-                    [v53, v53]: t3,
-                    [v54, v54]: t3,
-                    [v55, v55]: t3,
-                    [v56, a_7]: t3,
-                    [v57, b_7]: t3,
-                    [v58, c_4]: t3,
-                    [v59, v59]: t3,
-                    [v6, v6]: t3,
-                    [v60, v60]: t3,
-                    [v61, v61]: t3,
-                    [v62, a_8]: t3,
-                    [v63, v63]: t0,
-                    [v64, v64]: t3,
-                    [v65, v65]: t3,
-                    [v66, a_9]: t3,
-                    [v67, v67]: t0,
-                    [v68, v68]: t3,
-                    [v69, v69]: t3,
-                    [v7, fuel_2]: t2,
-                    [v70, a_10]: t3,
-                    [v71, v71]: t0,
-                    [v72, v72]: t3,
-                    [v73, v73]: t3,
-                    [v74, a_11]: t3,
-                    [v75, v75]: t0,
-                    [v76, v76]: t3,
-                    [v77, v77]: t3,
-                    [v78, a_12]: t3,
-                    [v79, v79]: t0,
-                    [v8, x_2]: t3,
-                    [v80, v80]: t3,
-                    [v81, v81]: t3,
-                    [v82, a_13]: t3,
-                    [v83, v83]: t0,
-                    [v84, v84]: t3,
-                    [v85, v85]: t3,
-                    [v86, a_14]: t3,
-                    [v87, v87]: t0,
-                    [v88, v88]: t3,
-                    [v89, v89]: t3,
-                    [v9, v9]: t3,
-                    [v90, a_15]: t3,
-                    [v91, v91]: t0,
-                    [v92, v92]: t3,
-                    [v93, v93]: t3,
-                    [v94, a_16]: t3,
-                    [v95, v95]: t0,
-                    [v96, v96]: t3,
-                    [v97, v97]: t3,
-                    [v98, a_17]: t3,
-                    [v99, b_8]: t3,
+                    [v0, qfuel]: t2,
+                    [v1, qx]: t3,
+                    [v10, qv10]: t3,
+                    [v100, qc_5]: t3,
+                    [v101, qv101]: t3,
+                    [v102, qv102]: t3,
+                    [v103, qv103]: t3,
+                    [v104, qv104]: t3,
+                    [v105, qa_18]: t3,
+                    [v106, qb_9]: t3,
+                    [v107, qc_6]: t3,
+                    [v108, qv108]: t3,
+                    [v109, qv109]: t3,
+                    [v11, qv11]: t0,
+                    [v110, qv110]: t3,
+                    [v111, qv111]: t3,
+                    [v112, qa_19]: t3,
+                    [v113, qb_10]: t3,
+                    [v114, qv114]: t3,
+                    [v115, qc_7]: t3,
+                    [v116, qv116]: t3,
+                    [v117, qv117]: t3,
+                    [v118, qv118]: t3,
+                    [v119, qa_20]: t3,
+                    [v12, qv12]: t3,
+                    [v120, qb_11]: t3,
+                    [v121, qv121]: t3,
+                    [v122, qc_8]: t3,
+                    [v123, qv123]: t3,
+                    [v124, qv124]: t3,
+                    [v125, qv125]: t3,
+                    [v126, qa_21]: t3,
+                    [v127, qb_12]: t3,
+                    [v128, qv128]: t3,
+                    [v129, qc_9]: t3,
+                    [v13, qv13]: t3,
+                    [v130, qv130]: t3,
+                    [v131, qv131]: t3,
+                    [v132, qv132]: t3,
+                    [v133, qa_22]: t3,
+                    [v134, qb_13]: t3,
+                    [v135, qv135]: t3,
+                    [v136, qc_10]: t3,
+                    [v137, qv137]: t3,
+                    [v138, qv138]: t3,
+                    [v139, qv139]: t3,
+                    [v14, qa]: t3,
+                    [v140, qx_5]: t3,
+                    [v141, qv141]: t0,
+                    [v142, qv142]: t3,
+                    [v143, qv143]: t3,
+                    [v144, qx_6]: t3,
+                    [v145, qv145]: t0,
+                    [v146, qv146]: t3,
+                    [v147, qv147]: t3,
+                    [v148, qx_7]: t3,
+                    [v149, qv149]: t0,
+                    [v15, qb]: t3,
+                    [v150, qv150]: t3,
+                    [v151, qv151]: t3,
+                    [v152, qx_8]: t3,
+                    [v153, qv153]: t0,
+                    [v154, qv154]: t3,
+                    [v155, qv155]: t3,
+                    [v156, qx_9]: t3,
+                    [v157, qv157]: t0,
+                    [v158, qv158]: t3,
+                    [v159, qv159]: t3,
+                    [v16, qv16]: t3,
+                    [v160, qx_10]: t3,
+                    [v161, qv161]: t0,
+                    [v162, qv162]: t3,
+                    [v163, qv163]: t3,
+                    [v164, qx_11]: t3,
+                    [v165, qa_23]: t3,
+                    [v166, qb_14]: t3,
+                    [v167, qv167]: t3,
+                    [v168, qv168]: t3,
+                    [v169, qv169]: t3,
+                    [v17, qv17]: t0,
+                    [v170, qv170]: t3,
+                    [v171, qx_12]: t3,
+                    [v172, qa_24]: t3,
+                    [v173, qb_15]: t3,
+                    [v174, qv174]: t3,
+                    [v175, qv175]: t3,
+                    [v176, qv176]: t3,
+                    [v177, qv177]: t3,
+                    [v178, qx_13]: t3,
+                    [v179, qa_25]: t3,
+                    [v18, qv18]: t3,
+                    [v180, qb_16]: t3,
+                    [v181, qv181]: t3,
+                    [v182, qv182]: t3,
+                    [v183, qv183]: t3,
+                    [v184, qv184]: t3,
+                    [v185, qv185]: t3,
+                    [v186, qv186]: t3,
+                    [v187, qx_14]: t3,
+                    [v188, qa_26]: t3,
+                    [v189, qb_17]: t3,
+                    [v19, qv19]: t3,
+                    [v190, qv190]: t3,
+                    [v191, qv191]: t3,
+                    [v192, qv192]: t3,
+                    [v193, qv193]: t3,
+                    [v194, qv194]: t3,
+                    [v195, qv195]: t3,
+                    [v196, qx_15]: t3,
+                    [v197, qv197]: t3,
+                    [v198, qv198]: t3,
+                    [v199, qx_16]: t3,
+                    [v2, qv2]: t3,
+                    [v20, qx_3]: t3,
+                    [v200, qv200]: t3,
+                    [v201, qv201]: t3,
+                    [v202, qfuel_3]: t2,
+                    [v203, qv203]: t2,
+                    [v204, qv204]: t0,
+                    [v205, qv205]: t3,
+                    [v206, qx_17]: t3,
+                    [v207, qv207]: t3,
+                    [v208, qfuel_4]: t2,
+                    [v209, qv209]: t2,
+                    [v21, qv21]: t3,
+                    [v210, qv210]: t0,
+                    [v211, qv211]: t3,
+                    [v212, qx_18]: t3,
+                    [v213, qv213]: t3,
+                    [v214, qfuel_5]: t2,
+                    [v215, qv215]: t2,
+                    [v216, qv216]: t0,
+                    [v217, qv217]: t3,
+                    [v218, qx_19]: t3,
+                    [v219, qv219]: t3,
+                    [v22, qv22]: t3,
+                    [v220, qfuel_6]: t2,
+                    [v221, qv221]: t2,
+                    [v222, qv222]: t0,
+                    [v223, qv223]: t3,
+                    [v224, qx_20]: t3,
+                    [v225, qv225]: t3,
+                    [v226, qfuel_7]: t2,
+                    [v227, qv227]: t2,
+                    [v228, qx_21]: t3,
+                    [v229, qv229]: t3,
+                    [v23, qv23]: t0,
+                    [v230, qv230]: t3,
+                    [v231, qfuel_8]: t2,
+                    [v232, qv232]: t2,
+                    [v233, qx_22]: t3,
+                    [v234, qv234]: t3,
+                    [v235, qv235]: t3,
+                    [v236, qfuel_9]: t2,
+                    [v237, qv237]: t2,
+                    [v238, qx_23]: t3,
+                    [v239, qv239]: t3,
+                    [v24, qv24]: t3,
+                    [v240, qv240]: t3,
+                    [v241, qfuel_10]: t2,
+                    [v242, qv242]: t2,
+                    [v243, qf]: t3,
+                    [v244, qg]: t3,
+                    [v245, qv245]: t3,
+                    [v246, qx_24]: t3,
+                    [v247, qv247]: t3,
+                    [v248, qv248]: t3,
+                    [v249, qv249]: t3,
+                    [v25, qv25]: t3,
+                    [v250, qfuel_11]: t2,
+                    [v251, qv251]: t2,
+                    [v252, qf_2]: t3,
+                    [v253, qg_2]: t3,
+                    [v254, qv254]: t3,
+                    [v255, qx_25]: t3,
+                    [v256, qv256]: t3,
+                    [v257, qv257]: t3,
+                    [v258, qv258]: t3,
+                    [v259, qfuel_12]: t2,
+                    [v26, qx_4]: t3,
+                    [v260, qv260]: t2,
+                    [v261, qf_3]: t3,
+                    [v262, qg_3]: t3,
+                    [v263, qv263]: t3,
+                    [v264, qx_26]: t3,
+                    [v265, qv265]: t3,
+                    [v266, qv266]: t3,
+                    [v267, qv267]: t3,
+                    [v268, qfuel_13]: t2,
+                    [v269, qv269]: t2,
+                    [v27, qv27]: t3,
+                    [v270, qf_4]: t3,
+                    [v271, qg_4]: t3,
+                    [v272, qv272]: t3,
+                    [v273, qx_27]: t3,
+                    [v274, qv274]: t3,
+                    [v275, qv275]: t3,
+                    [v276, qv276]: t3,
+                    [v277, qfuel_14]: t2,
+                    [v278, qv278]: t2,
+                    [v279, qf_5]: t3,
+                    [v28, qv28]: t3,
+                    [v280, qg_5]: t3,
+                    [v281, qv281]: t3,
+                    [v282, qx_28]: t3,
+                    [v283, qv283]: t3,
+                    [v284, qv284]: t3,
+                    [v285, qv285]: t3,
+                    [v286, qfuel_15]: t2,
+                    [v287, qv287]: t2,
+                    [v288, qf_6]: t3,
+                    [v289, qg_6]: t3,
+                    [v29, qv29]: t0,
+                    [v290, qv290]: t3,
+                    [v291, qx_29]: t3,
+                    [v292, qv292]: t3,
+                    [v293, qv293]: t3,
+                    [v294, qv294]: t3,
+                    [v295, qfuel_16]: t2,
+                    [v296, qv296]: t2,
+                    [v297, qa_27]: t3,
+                    [v298, qb_18]: t3,
+                    [v299, qv299]: t3,
+                    [v3, qv3]: t3,
+                    [v30, qv30]: t3,
+                    [v300, qx_30]: t3,
+                    [v301, qv301]: t3,
+                    [v302, qv302]: t3,
+                    [v303, qv303]: t3,
+                    [v304, qv304]: t3,
+                    [v305, qv305]: t3,
+                    [v306, qv306]: t3,
+                    [v307, qfuel_17]: t2,
+                    [v308, qv308]: t2,
+                    [v309, qa_28]: t3,
+                    [v31, qv31]: t3,
+                    [v310, qb_19]: t3,
+                    [v311, qv311]: t3,
+                    [v312, qx_31]: t3,
+                    [v313, qv313]: t3,
+                    [v314, qv314]: t3,
+                    [v315, qv315]: t3,
+                    [v316, qv316]: t3,
+                    [v317, qv317]: t3,
+                    [v318, qv318]: t3,
+                    [v319, qfuel_18]: t2,
+                    [v32, qa_2]: t3,
+                    [v320, qv320]: t2,
+                    [v321, qa_29]: t3,
+                    [v322, qb_20]: t3,
+                    [v323, qv323]: t3,
+                    [v324, qx_32]: t3,
+                    [v325, qv325]: t3,
+                    [v326, qv326]: t3,
+                    [v327, qv327]: t3,
+                    [v328, qv328]: t3,
+                    [v329, qv329]: t3,
+                    [v33, qb_2]: t3,
+                    [v330, qv330]: t3,
+                    [v34, qv34]: t3,
+                    [v35, qa_3]: t3,
+                    [v36, qb_3]: t3,
+                    [v37, qv37]: t3,
+                    [v38, qa_4]: t3,
+                    [v39, qb_4]: t3,
+                    [v4, qv4]: t0,
+                    [v40, qc]: t3,
+                    [v41, qv41]: t3,
+                    [v42, qv42]: t3,
+                    [v43, qv43]: t3,
+                    [v44, qa_5]: t3,
+                    [v45, qb_5]: t3,
+                    [v46, qc_2]: t3,
+                    [v47, qv47]: t3,
+                    [v48, qv48]: t3,
+                    [v49, qv49]: t3,
+                    [v5, qv5]: t3,
+                    [v50, qa_6]: t3,
+                    [v51, qb_6]: t3,
+                    [v52, qc_3]: t3,
+                    [v53, qv53]: t3,
+                    [v54, qv54]: t3,
+                    [v55, qv55]: t3,
+                    [v56, qa_7]: t3,
+                    [v57, qb_7]: t3,
+                    [v58, qc_4]: t3,
+                    [v59, qv59]: t3,
+                    [v6, qv6]: t3,
+                    [v60, qv60]: t3,
+                    [v61, qv61]: t3,
+                    [v62, qa_8]: t3,
+                    [v63, qv63]: t0,
+                    [v64, qv64]: t3,
+                    [v65, qv65]: t3,
+                    [v66, qa_9]: t3,
+                    [v67, qv67]: t0,
+                    [v68, qv68]: t3,
+                    [v69, qv69]: t3,
+                    [v7, qfuel_2]: t2,
+                    [v70, qa_10]: t3,
+                    [v71, qv71]: t0,
+                    [v72, qv72]: t3,
+                    [v73, qv73]: t3,
+                    [v74, qa_11]: t3,
+                    [v75, qv75]: t0,
+                    [v76, qv76]: t3,
+                    [v77, qv77]: t3,
+                    [v78, qa_12]: t3,
+                    [v79, qv79]: t0,
+                    [v8, qx_2]: t3,
+                    [v80, qv80]: t3,
+                    [v81, qv81]: t3,
+                    [v82, qa_13]: t3,
+                    [v83, qv83]: t0,
+                    [v84, qv84]: t3,
+                    [v85, qv85]: t3,
+                    [v86, qa_14]: t3,
+                    [v87, qv87]: t0,
+                    [v88, qv88]: t3,
+                    [v89, qv89]: t3,
+                    [v9, qv9]: t3,
+                    [v90, qa_15]: t3,
+                    [v91, qv91]: t0,
+                    [v92, qv92]: t3,
+                    [v93, qv93]: t3,
+                    [v94, qa_16]: t3,
+                    [v95, qv95]: t0,
+                    [v96, qv96]: t3,
+                    [v97, qv97]: t3,
+                    [v98, qa_17]: t3,
+                    [v99, qb_8]: t3,
                 },
                 global_variable_types: {
                     g0: t0,
@@ -21041,627 +21800,638 @@ fn lir_math() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
-                    for (fuel_3, v203) in self.fuel_.iter_new() {
-                        for (v229, x_21, v230) in self.integral_.iter_all_0_to_1_2_3(v203) {
-                            for (f, g) in self.add_.iter_all_2_to_0_1(v229) {
+                    for (qfuel_3, qv203) in self.fuel_.iter_new() {
+                        for (qv229, qx_21, qv230) in self.integral_.iter_all_0_to_1_2_3(qv203) {
+                            for (qf, qg) in self.add_.iter_all_2_to_0_1(qv229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v249,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    g,
-                                    x_21,
+                                let (qv249,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qg,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v248,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    f,
-                                    x_21,
+                                let (qv248,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qf,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_add((v248, v249, v230));
-                                self.delta.insert_add((v249, v248, v230));
+                                self.delta.insert_add((qv248, qv249, qv230));
+                                self.delta.insert_add((qv249, qv248, qv230));
                             }
-                            for (f_4, g_4) in self.sub_.iter_all_2_to_0_1(v229) {
+                            for (qf_4, qg_4) in self.sub_.iter_all_2_to_0_1(qv229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v276,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    g_4,
-                                    x_21,
+                                let (qv276,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qg_4,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v275,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    f_4,
-                                    x_21,
+                                let (qv275,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qf_4,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v275, v276, v230));
+                                self.delta.insert_sub((qv275, qv276, qv230));
                             }
-                            for (a_27, b_18) in self.mul_.iter_all_2_to_0_1(v229) {
+                            for (qa_27, qb_18) in self.mul_.iter_all_2_to_0_1(qv229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v302,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    b_18,
-                                    x_21,
+                                let (qv302,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qb_18,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v303,) =
+                                let (qv303,) =
                                     self.mul_
-                                        .entry_0_1_to_2(a_27, v302, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v302, a_27, v303));
-                                let (v304,) =
+                                        .entry_0_1_to_2(qa_27, qv302, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((qv302, qa_27, qv303));
+                                let (qv304,) =
                                     self.diff_
-                                        .entry_0_1_to_2(x_21, a_27, &mut self.delta, &mut self.uf);
-                                let (v305,) =
+                                        .entry_0_1_to_2(qx_21, qa_27, &mut self.delta, &mut self.uf);
+                                let (qv305,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v302, v304, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v304, v302, v305));
-                                let (v306,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_3,
-                                    v305,
-                                    x_21,
+                                        .entry_0_1_to_2(qv302, qv304, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((qv304, qv302, qv305));
+                                let (qv306,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_3,
+                                    qv305,
+                                    qx_21,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v303, v306, v230));
+                                self.delta.insert_sub((qv303, qv306, qv230));
                             }
-                            if self.cos_.check_0_1(x_21, v229) {
+                            if self.cos_.check_0_1(qx_21, qv229) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x_21, v230));
+                                self.delta.insert_sin((qx_21, qv230));
                             }
                         }
-                        if let v204 = self.global_i64.get(2usize) {
-                            for (v205,) in self.const_.iter_all_0_to_1(v204) {
-                                for (x_17, v207) in self.integral_.iter_all_0_1_to_2_3(v203, v205) {
+                        if let qv204 = self.global_i64.get(2usize) {
+                            for (qv205,) in self.const_.iter_all_0_to_1(qv204) {
+                                for (qx_17, qv207) in self.integral_.iter_all_0_1_to_2_3(qv203, qv205) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x_17, v207);
+                                    self.uf.math_.union(qx_17, qv207);
                                 }
                             }
                         }
                     }
-                    for (x_3, v21, v22) in self.diff_.iter_new() {
-                        for (a_23, b_14) in self.add_.iter_all_2_to_0_1(v21) {
+                    for (qx_3, qv21, qv22) in self.diff_.iter_new() {
+                        for (qa_23, qb_14) in self.add_.iter_all_2_to_0_1(qv21) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v170,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, b_14, &mut self.delta, &mut self.uf);
-                            let (v169,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, a_23, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v169, v170, v22));
-                            self.delta.insert_add((v170, v169, v22));
+                            let (qv170,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_3, qb_14, &mut self.delta, &mut self.uf);
+                            let (qv169,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_3, qa_23, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv169, qv170, qv22));
+                            self.delta.insert_add((qv170, qv169, qv22));
                         }
-                        for (a_25, b_16) in self.mul_.iter_all_2_to_0_1(v21) {
+                        for (qa_25, qb_16) in self.mul_.iter_all_2_to_0_1(qv21) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v183,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, b_16, &mut self.delta, &mut self.uf);
-                            let (v184,) = self
-                                .mul_
-                                .entry_0_1_to_2(a_25, v183, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v183, a_25, v184));
-                            let (v185,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_3, a_25, &mut self.delta, &mut self.uf);
-                            let (v186,) = self
-                                .mul_
-                                .entry_0_1_to_2(b_16, v185, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v184, v186, v22));
-                            self.delta.insert_add((v186, v184, v22));
-                            self.delta.insert_mul((v185, b_16, v186));
+                            let (qv183,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_3, qb_16, &mut self.delta, &mut self.uf);
+                            let (qv184,) =
+                                self.mul_
+                                    .entry_0_1_to_2(qa_25, qv183, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv183, qa_25, qv184));
+                            let (qv185,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_3, qa_25, &mut self.delta, &mut self.uf);
+                            let (qv186,) =
+                                self.mul_
+                                    .entry_0_1_to_2(qb_16, qv185, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv184, qv186, qv22));
+                            self.delta.insert_add((qv186, qv184, qv22));
+                            self.delta.insert_mul((qv185, qb_16, qv186));
                         }
-                        if self.sin_.check_0_1(x_3, v21) {
+                        if self.sin_.check_0_1(qx_3, qv21) {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
-                            self.delta.insert_cos((x_3, v22));
+                            self.delta.insert_cos((qx_3, qv22));
                         }
-                        if self.cos_.check_0_1(x_3, v21) {
+                        if self.cos_.check_0_1(qx_3, qv21) {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
-                            let v23 = self.global_i64.get(0usize);
-                            let (v24,) = self.const_.entry_0_to_1(v23, &mut self.delta, &mut self.uf);
-                            let (v25,) = self.sin_.entry_0_to_1(x_3, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v24, v25, v22));
-                            self.delta.insert_mul((v25, v24, v22));
+                            let qv23 = self.global_i64.get(0usize);
+                            let (qv24,) = self
+                                .const_
+                                .entry_0_to_1(qv23, &mut self.delta, &mut self.uf);
+                            let (qv25,) = self.sin_.entry_0_to_1(qx_3, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv24, qv25, qv22));
+                            self.delta.insert_mul((qv25, qv24, qv22));
                         }
                     }
-                    for (fuel, v2, x, v3) in self.integral_.iter_new() {
-                        if self.sin_.check_0_1(x, v2) {
+                    for (qfuel, qv2, qx, qv3) in self.integral_.iter_new() {
+                        if self.sin_.check_0_1(qx, qv2) {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
-                            let v4 = self.global_i64.get(0usize);
-                            let (v5,) = self.const_.entry_0_to_1(v4, &mut self.delta, &mut self.uf);
-                            let (v6,) = self.cos_.entry_0_to_1(x, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v5, v6, v3));
-                            self.delta.insert_mul((v6, v5, v3));
+                            let qv4 = self.global_i64.get(0usize);
+                            let (qv5,) = self.const_.entry_0_to_1(qv4, &mut self.delta, &mut self.uf);
+                            let (qv6,) = self.cos_.entry_0_to_1(qx, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv5, qv6, qv3));
+                            self.delta.insert_mul((qv6, qv5, qv3));
                         }
-                        if self.cos_.check_0_1(x, v2) {
-                            for (fuel_8,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                        if self.cos_.check_0_1(qx, qv2) {
+                            for (qfuel_8,) in self.fuel_.iter_old_1_to_0(qfuel, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x, v3));
+                                self.delta.insert_sin((qx, qv3));
                             }
                         }
-                        if let v210 = self.global_i64.get(2usize) {
-                            if self.const_.check_0_1(v210, v2) {
-                                for (fuel_4,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
+                        if let qv210 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(qv210, qv2) {
+                                for (qfuel_4,) in self.fuel_.iter_old_1_to_0(qfuel, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x, v3);
+                                    self.uf.math_.union(qx, qv3);
                                 }
                             }
                         }
-                        if self.add_.check_2(v2) {
-                            for (fuel_11,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                for (f_2, g_2) in self.add_.iter_all_2_to_0_1(v2) {
+                        if self.add_.check_2(qv2) {
+                            for (qfuel_11,) in self.fuel_.iter_old_1_to_0(qfuel, self.latest_timestamp) {
+                                for (qf_2, qg_2) in self.add_.iter_all_2_to_0_1(qv2) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v258,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_11,
-                                        g_2,
-                                        x,
+                                    let (qv258,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_11,
+                                        qg_2,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    let (v257,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_11,
-                                        f_2,
-                                        x,
+                                    let (qv257,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_11,
+                                        qf_2,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    self.delta.insert_add((v257, v258, v3));
-                                    self.delta.insert_add((v258, v257, v3));
+                                    self.delta.insert_add((qv257, qv258, qv3));
+                                    self.delta.insert_add((qv258, qv257, qv3));
                                 }
                             }
                         }
-                        if self.sub_.check_2(v2) {
-                            for (fuel_14,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                for (f_5, g_5) in self.sub_.iter_all_2_to_0_1(v2) {
+                        if self.sub_.check_2(qv2) {
+                            for (qfuel_14,) in self.fuel_.iter_old_1_to_0(qfuel, self.latest_timestamp) {
+                                for (qf_5, qg_5) in self.sub_.iter_all_2_to_0_1(qv2) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                    let (v285,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_14,
-                                        g_5,
-                                        x,
+                                    let (qv285,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_14,
+                                        qg_5,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    let (v284,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_14,
-                                        f_5,
-                                        x,
+                                    let (qv284,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_14,
+                                        qf_5,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    self.delta.insert_sub((v284, v285, v3));
+                                    self.delta.insert_sub((qv284, qv285, qv3));
                                 }
                             }
                         }
-                        if self.mul_.check_2(v2) {
-                            for (fuel_17,) in self.fuel_.iter_old_1_to_0(fuel, self.latest_timestamp) {
-                                for (a_28, b_19) in self.mul_.iter_all_2_to_0_1(v2) {
+                        if self.mul_.check_2(qv2) {
+                            for (qfuel_17,) in self.fuel_.iter_old_1_to_0(qfuel, self.latest_timestamp) {
+                                for (qa_28, qb_19) in self.mul_.iter_all_2_to_0_1(qv2) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                    let (v314,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_17,
-                                        b_19,
-                                        x,
+                                    let (qv314,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_17,
+                                        qb_19,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    let (v315,) =
+                                    let (qv315,) =
                                         self.mul_
-                                            .entry_0_1_to_2(a_28, v314, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((v314, a_28, v315));
-                                    let (v316,) =
+                                            .entry_0_1_to_2(qa_28, qv314, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qv314, qa_28, qv315));
+                                    let (qv316,) =
                                         self.diff_
-                                            .entry_0_1_to_2(x, a_28, &mut self.delta, &mut self.uf);
-                                    let (v317,) =
+                                            .entry_0_1_to_2(qx, qa_28, &mut self.delta, &mut self.uf);
+                                    let (qv317,) =
                                         self.mul_
-                                            .entry_0_1_to_2(v314, v316, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_mul((v316, v314, v317));
-                                    let (v318,) = self.integral_.entry_0_1_2_to_3(
-                                        fuel_17,
-                                        v317,
-                                        x,
+                                            .entry_0_1_to_2(qv314, qv316, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_mul((qv316, qv314, qv317));
+                                    let (qv318,) = self.integral_.entry_0_1_2_to_3(
+                                        qfuel_17,
+                                        qv317,
+                                        qx,
                                         &mut self.delta,
                                         &mut self.uf,
                                     );
-                                    self.delta.insert_sub((v315, v318, v3));
+                                    self.delta.insert_sub((qv315, qv318, qv3));
                                 }
                             }
                         }
                     }
-                    for (a_2, b_2, v34) in self.add_.iter_new() {
+                    for (qa_2, qb_2, qv34) in self.add_.iter_new() {
                         {
-                            self.delta.insert_add((a_2, b_2, v34));
-                            self.delta.insert_add((b_2, a_2, v34));
+                            self.delta.insert_add((qa_2, qb_2, qv34));
+                            self.delta.insert_add((qb_2, qa_2, qv34));
                         }
-                        for (x_12, v175) in self.diff_.iter_old_1_to_0_2(v34, self.latest_timestamp) {
+                        for (qx_12, qv175) in self.diff_.iter_old_1_to_0_2(qv34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Add a b ) ) ( Add ( Diff x a ) ( Diff x b ) ) )"]
-                            let (v177,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_12, b_2, &mut self.delta, &mut self.uf);
-                            let (v176,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_12, a_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v176, v177, v175));
-                            self.delta.insert_add((v177, v176, v175));
+                            let (qv177,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_12, qb_2, &mut self.delta, &mut self.uf);
+                            let (qv176,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_12, qa_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv176, qv177, qv175));
+                            self.delta.insert_add((qv177, qv176, qv175));
                         }
-                        for (v260, x_26, v265) in self
+                        for (qv260, qx_26, qv265) in self
                             .integral_
-                            .iter_old_1_to_0_2_3(v34, self.latest_timestamp)
+                            .iter_old_1_to_0_2_3(qv34, self.latest_timestamp)
                         {
-                            for (fuel_12,) in self.fuel_.iter_old_1_to_0(v260, self.latest_timestamp) {
+                            for (qfuel_12,) in self.fuel_.iter_old_1_to_0(qv260, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Add f g ) x ) ( Add ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v267,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_12,
-                                    b_2,
-                                    x_26,
+                                let (qv267,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_12,
+                                    qb_2,
+                                    qx_26,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v266,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_12,
-                                    a_2,
-                                    x_26,
+                                let (qv266,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_12,
+                                    qa_2,
+                                    qx_26,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_add((v266, v267, v265));
-                                self.delta.insert_add((v267, v266, v265));
+                                self.delta.insert_add((qv266, qv267, qv265));
+                                self.delta.insert_add((qv267, qv266, qv265));
                             }
                         }
-                        for (b_4, c) in self.add_.iter_all_2_to_0_1(b_2) {
+                        for (qb_4, qc) in self.add_.iter_all_2_to_0_1(qb_2) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
-                            let (v43,) = self
+                            let (qv43,) = self
                                 .add_
-                                .entry_0_1_to_2(a_2, b_4, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((b_4, a_2, v43));
-                            self.delta.insert_add((c, v43, v34));
-                            self.delta.insert_add((v43, c, v34));
+                                .entry_0_1_to_2(qa_2, qb_4, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qb_4, qa_2, qv43));
+                            self.delta.insert_add((qc, qv43, qv34));
+                            self.delta.insert_add((qv43, qc, qv34));
                         }
-                        for (a_5, v48) in self.add_.iter_old_0_to_1_2(v34, self.latest_timestamp) {
+                        for (qa_5, qv48) in self.add_.iter_old_0_to_1_2(qv34, self.latest_timestamp) {
                             #[doc = "( rewrite ( Add a ( Add b c ) ) ( Add ( Add a b ) c ) )"]
-                            let (v49,) = self
+                            let (qv49,) = self
                                 .add_
-                                .entry_0_1_to_2(a_5, a_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((a_2, a_5, v49));
-                            self.delta.insert_add((b_2, v49, v48));
-                            self.delta.insert_add((v49, b_2, v48));
+                                .entry_0_1_to_2(qa_5, qa_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qa_2, qa_5, qv49));
+                            self.delta.insert_add((qb_2, qv49, qv48));
+                            self.delta.insert_add((qv49, qb_2, qv48));
                         }
-                        for (a_17, v102) in self.mul_.iter_all_0_to_1_2(v34) {
+                        for (qa_17, qv102) in self.mul_.iter_all_0_to_1_2(qv34) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
-                            let (v104,) = self
+                            let (qv104,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_17, b_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((b_2, a_17, v104));
-                            let (v103,) = self
+                                .entry_0_1_to_2(qa_17, qb_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qb_2, qa_17, qv104));
+                            let (qv103,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_17, a_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v103, v104, v102));
-                            self.delta.insert_add((v104, v103, v102));
-                            self.delta.insert_mul((a_2, a_17, v103));
+                                .entry_0_1_to_2(qa_17, qa_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv103, qv104, qv102));
+                            self.delta.insert_add((qv104, qv103, qv102));
+                            self.delta.insert_mul((qa_2, qa_17, qv103));
                         }
-                        if let v63 = self.global_i64.get(1usize) {
-                            if self.const_.check_0_1(v63, b_2) {
+                        if let qv63 = self.global_i64.get(1usize) {
+                            if self.const_.check_0_1(qv63, qb_2) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
-                                self.uf.math_.union(a_2, v34);
+                                self.uf.math_.union(qa_2, qv34);
                             }
                         }
-                        if self.mul_.check_2(a_2) {
-                            for (a_19, c_7) in self.mul_.iter_all_2_to_0_1(b_2) {
-                                for (b_10,) in self.mul_.iter_all_0_2_to_1(a_19, a_2) {
+                        if self.mul_.check_2(qa_2) {
+                            for (qa_19, qc_7) in self.mul_.iter_all_2_to_0_1(qb_2) {
+                                for (qb_10,) in self.mul_.iter_all_0_2_to_1(qa_19, qa_2) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v118,) =
+                                    let (qv118,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_10, c_7, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_add((c_7, b_10, v118));
-                                    self.delta.insert_mul((a_19, v118, v34));
-                                    self.delta.insert_mul((v118, a_19, v34));
+                                            .entry_0_1_to_2(qb_10, qc_7, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_add((qc_7, qb_10, qv118));
+                                    self.delta.insert_mul((qa_19, qv118, qv34));
+                                    self.delta.insert_mul((qv118, qa_19, qv34));
                                 }
                             }
                         }
                     }
-                    for (a, b, v16) in self.sub_.iter_new() {
+                    for (qa, qb, qv16) in self.sub_.iter_new() {
                         {
-                            let v17 = self.global_i64.get(0usize);
-                            let (v18,) = self.const_.entry_0_to_1(v17, &mut self.delta, &mut self.uf);
-                            let (v19,) = self
+                            let qv17 = self.global_i64.get(0usize);
+                            let (qv18,) = self
+                                .const_
+                                .entry_0_to_1(qv17, &mut self.delta, &mut self.uf);
+                            let (qv19,) = self
                                 .mul_
-                                .entry_0_1_to_2(b, v18, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((a, v19, v16));
-                            self.delta.insert_add((v19, a, v16));
-                            self.delta.insert_mul((v18, b, v19));
+                                .entry_0_1_to_2(qb, qv18, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qa, qv19, qv16));
+                            self.delta.insert_add((qv19, qa, qv16));
+                            self.delta.insert_mul((qv18, qb, qv19));
                         }
-                        for (v287, x_29, v292) in self
+                        for (qv287, qx_29, qv292) in self
                             .integral_
-                            .iter_old_1_to_0_2_3(v16, self.latest_timestamp)
+                            .iter_old_1_to_0_2_3(qv16, self.latest_timestamp)
                         {
-                            for (fuel_15,) in self.fuel_.iter_old_1_to_0(v287, self.latest_timestamp) {
+                            for (qfuel_15,) in self.fuel_.iter_old_1_to_0(qv287, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Sub f g ) x ) ( Sub ( Integral fuel f x ) ( Integral fuel g x ) ) )"]
-                                let (v294,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_15,
-                                    b,
-                                    x_29,
+                                let (qv294,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_15,
+                                    qb,
+                                    qx_29,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v293,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_15,
-                                    a,
-                                    x_29,
+                                let (qv293,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_15,
+                                    qa,
+                                    qx_29,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v293, v294, v292));
+                                self.delta.insert_sub((qv293, qv294, qv292));
                             }
                         }
                     }
-                    for (a_3, b_3, v37) in self.mul_.iter_new() {
+                    for (qa_3, qb_3, qv37) in self.mul_.iter_new() {
                         {
-                            self.delta.insert_mul((a_3, b_3, v37));
-                            self.delta.insert_mul((b_3, a_3, v37));
+                            self.delta.insert_mul((qa_3, qb_3, qv37));
+                            self.delta.insert_mul((qb_3, qa_3, qv37));
                         }
-                        for (x_14, v191) in self.diff_.iter_old_1_to_0_2(v37, self.latest_timestamp) {
+                        for (qx_14, qv191) in self.diff_.iter_old_1_to_0_2(qv37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Diff x ( Mul a b ) ) ( Add ( Mul a ( Diff x b ) ) ( Mul b ( Diff x a ) ) ) )"]
-                            let (v192,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_14, b_3, &mut self.delta, &mut self.uf);
-                            let (v193,) = self
+                            let (qv192,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_14, qb_3, &mut self.delta, &mut self.uf);
+                            let (qv193,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_3, v192, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v192, a_3, v193));
-                            let (v194,) = self
-                                .diff_
-                                .entry_0_1_to_2(x_14, a_3, &mut self.delta, &mut self.uf);
-                            let (v195,) = self
+                                .entry_0_1_to_2(qa_3, qv192, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv192, qa_3, qv193));
+                            let (qv194,) =
+                                self.diff_
+                                    .entry_0_1_to_2(qx_14, qa_3, &mut self.delta, &mut self.uf);
+                            let (qv195,) = self
                                 .mul_
-                                .entry_0_1_to_2(b_3, v194, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v193, v195, v191));
-                            self.delta.insert_add((v195, v193, v191));
-                            self.delta.insert_mul((v194, b_3, v195));
+                                .entry_0_1_to_2(qb_3, qv194, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv193, qv195, qv191));
+                            self.delta.insert_add((qv195, qv193, qv191));
+                            self.delta.insert_mul((qv194, qb_3, qv195));
                         }
-                        for (v320, x_32, v325) in self
+                        for (qv320, qx_32, qv325) in self
                             .integral_
-                            .iter_old_1_to_0_2_3(v37, self.latest_timestamp)
+                            .iter_old_1_to_0_2_3(qv37, self.latest_timestamp)
                         {
-                            for (fuel_18,) in self.fuel_.iter_old_1_to_0(v320, self.latest_timestamp) {
+                            for (qfuel_18,) in self.fuel_.iter_old_1_to_0(qv320, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Mul a b ) x ) ( Sub ( Mul a ( Integral fuel b x ) ) ( Integral fuel ( Mul ( Diff x a ) ( Integral fuel b x ) ) x ) ) )"]
-                                let (v326,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_18,
-                                    b_3,
-                                    x_32,
+                                let (qv326,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_18,
+                                    qb_3,
+                                    qx_32,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                let (v327,) =
+                                let (qv327,) =
                                     self.mul_
-                                        .entry_0_1_to_2(a_3, v326, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v326, a_3, v327));
-                                let (v328,) =
+                                        .entry_0_1_to_2(qa_3, qv326, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((qv326, qa_3, qv327));
+                                let (qv328,) =
                                     self.diff_
-                                        .entry_0_1_to_2(x_32, a_3, &mut self.delta, &mut self.uf);
-                                let (v329,) =
+                                        .entry_0_1_to_2(qx_32, qa_3, &mut self.delta, &mut self.uf);
+                                let (qv329,) =
                                     self.mul_
-                                        .entry_0_1_to_2(v326, v328, &mut self.delta, &mut self.uf);
-                                self.delta.insert_mul((v328, v326, v329));
-                                let (v330,) = self.integral_.entry_0_1_2_to_3(
-                                    fuel_18,
-                                    v329,
-                                    x_32,
+                                        .entry_0_1_to_2(qv326, qv328, &mut self.delta, &mut self.uf);
+                                self.delta.insert_mul((qv328, qv326, qv329));
+                                let (qv330,) = self.integral_.entry_0_1_2_to_3(
+                                    qfuel_18,
+                                    qv329,
+                                    qx_32,
                                     &mut self.delta,
                                     &mut self.uf,
                                 );
-                                self.delta.insert_sub((v327, v330, v325));
+                                self.delta.insert_sub((qv327, qv330, qv325));
                             }
                         }
-                        for (b_9, c_6) in self.add_.iter_old_2_to_0_1(b_3, self.latest_timestamp) {
+                        for (qb_9, qc_6) in self.add_.iter_old_2_to_0_1(qb_3, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Add b c ) ) ( Add ( Mul a b ) ( Mul a c ) ) )"]
-                            let (v111,) = self
+                            let (qv111,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_3, c_6, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((c_6, a_3, v111));
-                            let (v110,) = self
+                                .entry_0_1_to_2(qa_3, qc_6, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qc_6, qa_3, qv111));
+                            let (qv110,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_3, b_9, &mut self.delta, &mut self.uf);
-                            self.delta.insert_add((v110, v111, v37));
-                            self.delta.insert_add((v111, v110, v37));
-                            self.delta.insert_mul((b_9, a_3, v110));
+                                .entry_0_1_to_2(qa_3, qb_9, &mut self.delta, &mut self.uf);
+                            self.delta.insert_add((qv110, qv111, qv37));
+                            self.delta.insert_add((qv111, qv110, qv37));
+                            self.delta.insert_mul((qb_9, qa_3, qv110));
                         }
-                        for (b_6, c_3) in self.mul_.iter_all_2_to_0_1(b_3) {
+                        for (qb_6, qc_3) in self.mul_.iter_all_2_to_0_1(qb_3) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
-                            let (v55,) = self
+                            let (qv55,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_3, b_6, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((b_6, a_3, v55));
-                            self.delta.insert_mul((c_3, v55, v37));
-                            self.delta.insert_mul((v55, c_3, v37));
+                                .entry_0_1_to_2(qa_3, qb_6, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qb_6, qa_3, qv55));
+                            self.delta.insert_mul((qc_3, qv55, qv37));
+                            self.delta.insert_mul((qv55, qc_3, qv37));
                         }
-                        for (a_7, v60) in self.mul_.iter_old_0_to_1_2(v37, self.latest_timestamp) {
+                        for (qa_7, qv60) in self.mul_.iter_old_0_to_1_2(qv37, self.latest_timestamp) {
                             #[doc = "( rewrite ( Mul a ( Mul b c ) ) ( Mul ( Mul a b ) c ) )"]
-                            let (v61,) = self
+                            let (qv61,) = self
                                 .mul_
-                                .entry_0_1_to_2(a_7, a_3, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((a_3, a_7, v61));
-                            self.delta.insert_mul((b_3, v61, v60));
-                            self.delta.insert_mul((v61, b_3, v60));
+                                .entry_0_1_to_2(qa_7, qa_3, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qa_3, qa_7, qv61));
+                            self.delta.insert_mul((qb_3, qv61, qv60));
+                            self.delta.insert_mul((qv61, qb_3, qv60));
                         }
-                        if let v75 = self.global_i64.get(1usize) {
-                            if self.const_.check_0_1(v75, b_3) {
+                        if let qv75 = self.global_i64.get(1usize) {
+                            if self.const_.check_0_1(qv75, qb_3) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(b_3, v37);
+                                self.uf.math_.union(qb_3, qv37);
                             }
                         }
-                        if let v87 = self.global_i64.get(2usize) {
-                            if self.const_.check_0_1(v87, b_3) {
+                        if let qv87 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(qv87, qb_3) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
-                                self.uf.math_.union(a_3, v37);
+                                self.uf.math_.union(qa_3, qv37);
                             }
                         }
-                        if self.mul_.check_0(a_3) {
-                            for (v123, v124) in self.add_.iter_old_0_to_1_2(v37, self.latest_timestamp) {
-                                for (c_8,) in self.mul_.iter_all_0_2_to_1(a_3, v123) {
+                        if self.mul_.check_0(qa_3) {
+                            for (qv123, qv124) in self.add_.iter_old_0_to_1_2(qv37, self.latest_timestamp) {
+                                for (qc_8,) in self.mul_.iter_all_0_2_to_1(qa_3, qv123) {
                                     #[doc = "( rewrite ( Add ( Mul a b ) ( Mul a c ) ) ( Mul a ( Add b c ) ) )"]
-                                    let (v125,) =
+                                    let (qv125,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_3, c_8, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_add((c_8, b_3, v125));
-                                    self.delta.insert_mul((a_3, v125, v124));
-                                    self.delta.insert_mul((v125, a_3, v124));
+                                            .entry_0_1_to_2(qb_3, qc_8, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_add((qc_8, qb_3, qv125));
+                                    self.delta.insert_mul((qa_3, qv125, qv124));
+                                    self.delta.insert_mul((qv125, qa_3, qv124));
                                 }
                             }
                         }
-                        if self.pow_.check_2(a_3) {
-                            for (a_21, c_9) in self.pow_.iter_all_2_to_0_1(b_3) {
-                                for (b_12,) in self.pow_.iter_all_0_2_to_1(a_21, a_3) {
+                        if self.pow_.check_2(qa_3) {
+                            for (qa_21, qc_9) in self.pow_.iter_all_2_to_0_1(qb_3) {
+                                for (qb_12,) in self.pow_.iter_all_0_2_to_1(qa_21, qa_3) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
-                                    let (v132,) =
+                                    let (qv132,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_12, c_9, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_add((c_9, b_12, v132));
-                                    self.delta.insert_pow((a_21, v132, v37));
+                                            .entry_0_1_to_2(qb_12, qc_9, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_add((qc_9, qb_12, qv132));
+                                    self.delta.insert_pow((qa_21, qv132, qv37));
                                 }
                             }
                         }
                     }
-                    for (a_22, b_13, v135) in self.pow_.iter_new() {
-                        if let v141 = self.global_i64.get(2usize) {
-                            if self.const_.check_0_1(v141, b_13) {
+                    for (qa_22, qb_13, qv135) in self.pow_.iter_new() {
+                        if let qv141 = self.global_i64.get(2usize) {
+                            if self.const_.check_0_1(qv141, qb_13) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                self.uf.math_.union(a_22, v135);
+                                self.uf.math_.union(qa_22, qv135);
                             }
                         }
-                        if let v153 = self.global_i64.get(3usize) {
-                            if self.const_.check_0_1(v153, b_13) {
+                        if let qv153 = self.global_i64.get(3usize) {
+                            if self.const_.check_0_1(qv153, qb_13) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((a_22, a_22, v135));
+                                self.delta.insert_mul((qa_22, qa_22, qv135));
                             }
                         }
-                        if self.pow_.check_0(a_22) {
-                            for (v137, v138) in self.mul_.iter_old_0_to_1_2(v135, self.latest_timestamp) {
-                                for (c_10,) in self.pow_.iter_all_0_2_to_1(a_22, v137) {
+                        if self.pow_.check_0(qa_22) {
+                            for (qv137, qv138) in self.mul_.iter_old_0_to_1_2(qv135, self.latest_timestamp) {
+                                for (qc_10,) in self.pow_.iter_all_0_2_to_1(qa_22, qv137) {
                                     #[doc = "( rewrite ( Mul ( Pow a b ) ( Pow a c ) ) ( Pow a ( Add b c ) ) )"]
-                                    let (v139,) =
+                                    let (qv139,) =
                                         self.add_
-                                            .entry_0_1_to_2(b_13, c_10, &mut self.delta, &mut self.uf);
-                                    self.delta.insert_add((c_10, b_13, v139));
-                                    self.delta.insert_pow((a_22, v139, v138));
+                                            .entry_0_1_to_2(qb_13, qc_10, &mut self.delta, &mut self.uf);
+                                    self.delta.insert_add((qc_10, qb_13, qv139));
+                                    self.delta.insert_pow((qa_22, qv139, qv138));
                                 }
                             }
                         }
                     }
-                    for (x_2, v9) in self.sin_.iter_new() {
-                        for (v201,) in self.diff_.iter_old_0_1_to_2(x_2, v9, self.latest_timestamp) {
+                    for (qx_2, qv9) in self.sin_.iter_new() {
+                        for (qv201,) in self
+                            .diff_
+                            .iter_old_0_1_to_2(qx_2, qv9, self.latest_timestamp)
+                        {
                             #[doc = "( rewrite ( Diff x ( Sin x ) ) ( Cos x ) )"]
-                            self.delta.insert_cos((x_2, v201));
+                            self.delta.insert_cos((qx_2, qv201));
                         }
-                        for (fuel_2, v10) in self
-                            .integral_
-                            .iter_old_1_2_to_0_3(v9, x_2, self.latest_timestamp)
+                        for (qfuel_2, qv10) in
+                            self.integral_
+                                .iter_old_1_2_to_0_3(qv9, qx_2, self.latest_timestamp)
                         {
                             #[doc = "( rewrite ( Integral fuel ( Sin x ) x ) ( Mul ( Const -1 ) ( Cos x ) ) )"]
-                            let v11 = self.global_i64.get(0usize);
-                            let (v12,) = self.const_.entry_0_to_1(v11, &mut self.delta, &mut self.uf);
-                            let (v13,) = self.cos_.entry_0_to_1(x_2, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v12, v13, v10));
-                            self.delta.insert_mul((v13, v12, v10));
+                            let qv11 = self.global_i64.get(0usize);
+                            let (qv12,) = self
+                                .const_
+                                .entry_0_to_1(qv11, &mut self.delta, &mut self.uf);
+                            let (qv13,) = self.cos_.entry_0_to_1(qx_2, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv12, qv13, qv10));
+                            self.delta.insert_mul((qv13, qv12, qv10));
                         }
                     }
-                    for (x_4, v27) in self.cos_.iter_new() {
-                        for (v28,) in self
+                    for (qx_4, qv27) in self.cos_.iter_new() {
+                        for (qv28,) in self
                             .diff_
-                            .iter_old_0_1_to_2(x_4, v27, self.latest_timestamp)
+                            .iter_old_0_1_to_2(qx_4, qv27, self.latest_timestamp)
                         {
                             #[doc = "( rewrite ( Diff x ( Cos x ) ) ( Mul ( Const -1 ) ( Sin x ) ) )"]
-                            let v29 = self.global_i64.get(0usize);
-                            let (v30,) = self.const_.entry_0_to_1(v29, &mut self.delta, &mut self.uf);
-                            let (v31,) = self.sin_.entry_0_to_1(x_4, &mut self.delta, &mut self.uf);
-                            self.delta.insert_mul((v30, v31, v28));
-                            self.delta.insert_mul((v31, v30, v28));
+                            let qv29 = self.global_i64.get(0usize);
+                            let (qv30,) = self
+                                .const_
+                                .entry_0_to_1(qv29, &mut self.delta, &mut self.uf);
+                            let (qv31,) = self.sin_.entry_0_to_1(qx_4, &mut self.delta, &mut self.uf);
+                            self.delta.insert_mul((qv30, qv31, qv28));
+                            self.delta.insert_mul((qv31, qv30, qv28));
                         }
-                        for (v237, v240) in self
-                            .integral_
-                            .iter_old_1_2_to_0_3(v27, x_4, self.latest_timestamp)
+                        for (qv237, qv240) in
+                            self.integral_
+                                .iter_old_1_2_to_0_3(qv27, qx_4, self.latest_timestamp)
                         {
-                            for (fuel_9,) in self.fuel_.iter_old_1_to_0(v237, self.latest_timestamp) {
+                            for (qfuel_9,) in self.fuel_.iter_old_1_to_0(qv237, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Cos x ) x ) ( Sin x ) )"]
-                                self.delta.insert_sin((x_4, v240));
+                                self.delta.insert_sin((qx_4, qv240));
                             }
                         }
                     }
-                    for (v67, v68) in self.const_.iter_new() {
-                        if v67 == self.global_i64.get(1usize) {
-                            for (a_9, v69) in self.add_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                    for (qv67, qv68) in self.const_.iter_new() {
+                        if qv67 == self.global_i64.get(1usize) {
+                            for (qa_9, qv69) in self.add_.iter_old_0_to_1_2(qv68, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
-                                self.uf.math_.union(a_9, v69);
+                                self.uf.math_.union(qa_9, qv69);
                             }
-                            for (a_12, v81) in self.mul_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                            for (qa_12, qv81) in self.mul_.iter_old_0_to_1_2(qv68, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(v68, v81);
+                                self.uf.math_.union(qv68, qv81);
                             }
                         }
-                        if v67 == self.global_i64.get(2usize) {
-                            for (v215, x_19, v219) in self
+                        if qv67 == self.global_i64.get(2usize) {
+                            for (qv215, qx_19, qv219) in self
                                 .integral_
-                                .iter_old_1_to_0_2_3(v68, self.latest_timestamp)
+                                .iter_old_1_to_0_2_3(qv68, self.latest_timestamp)
                             {
-                                for (fuel_5,) in self.fuel_.iter_old_1_to_0(v215, self.latest_timestamp) {
+                                for (qfuel_5,) in self.fuel_.iter_old_1_to_0(qv215, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x_19, v219);
+                                    self.uf.math_.union(qx_19, qv219);
                                 }
                             }
-                            for (a_15, v93) in self.mul_.iter_old_0_to_1_2(v68, self.latest_timestamp) {
+                            for (qa_15, qv93) in self.mul_.iter_old_0_to_1_2(qv68, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
-                                self.uf.math_.union(a_15, v93);
+                                self.uf.math_.union(qa_15, qv93);
                             }
-                            for (x_6, v147) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
+                            for (qx_6, qv147) in self.pow_.iter_old_1_to_0_2(qv68, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                self.uf.math_.union(x_6, v147);
+                                self.uf.math_.union(qx_6, qv147);
                             }
                         }
-                        if v67 == self.global_i64.get(3usize) {
-                            for (x_9, v159) in self.pow_.iter_old_1_to_0_2(v68, self.latest_timestamp) {
+                        if qv67 == self.global_i64.get(3usize) {
+                            for (qx_9, qv159) in self.pow_.iter_old_1_to_0_2(qv68, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x_9, x_9, v159));
+                                self.delta.insert_mul((qx_9, qx_9, qv159));
                             }
                         }
                     }
-                    if let Some(v71) = self.global_i64.get_new(1usize) {
-                        for (v72,) in self.const_.iter_old_0_to_1(v71, self.latest_timestamp) {
-                            for (a_10, v73) in self.add_.iter_old_0_to_1_2(v72, self.latest_timestamp) {
+                    if let Some(qv71) = self.global_i64.get_new(1usize) {
+                        for (qv72,) in self.const_.iter_old_0_to_1(qv71, self.latest_timestamp) {
+                            for (qa_10, qv73) in self.add_.iter_old_0_to_1_2(qv72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Add a ( Const 0 ) ) a )"]
-                                self.uf.math_.union(a_10, v73);
+                                self.uf.math_.union(qa_10, qv73);
                             }
-                            for (a_13, v85) in self.mul_.iter_old_0_to_1_2(v72, self.latest_timestamp) {
+                            for (qa_13, qv85) in self.mul_.iter_old_0_to_1_2(qv72, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 0 ) ) ( Const 0 ) )"]
-                                self.uf.math_.union(v72, v85);
+                                self.uf.math_.union(qv72, qv85);
                             }
                         }
                     }
-                    if let Some(v95) = self.global_i64.get_new(2usize) {
-                        for (v96,) in self.const_.iter_old_0_to_1(v95, self.latest_timestamp) {
-                            for (v221, x_20, v225) in self
+                    if let Some(qv95) = self.global_i64.get_new(2usize) {
+                        for (qv96,) in self.const_.iter_old_0_to_1(qv95, self.latest_timestamp) {
+                            for (qv221, qx_20, qv225) in self
                                 .integral_
-                                .iter_old_1_to_0_2_3(v96, self.latest_timestamp)
+                                .iter_old_1_to_0_2_3(qv96, self.latest_timestamp)
                             {
-                                for (fuel_6,) in self.fuel_.iter_old_1_to_0(v221, self.latest_timestamp) {
+                                for (qfuel_6,) in self.fuel_.iter_old_1_to_0(qv221, self.latest_timestamp) {
                                     #[doc = "( rewrite ( Integral ( Fuel fuel ) ( Const 1 ) x ) x )"]
-                                    self.uf.math_.union(x_20, v225);
+                                    self.uf.math_.union(qx_20, qv225);
                                 }
                             }
-                            for (a_16, v97) in self.mul_.iter_old_0_to_1_2(v96, self.latest_timestamp) {
+                            for (qa_16, qv97) in self.mul_.iter_old_0_to_1_2(qv96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Mul a ( Const 1 ) ) a )"]
-                                self.uf.math_.union(a_16, v97);
+                                self.uf.math_.union(qa_16, qv97);
                             }
-                            for (x_7, v151) in self.pow_.iter_old_1_to_0_2(v96, self.latest_timestamp) {
+                            for (qx_7, qv151) in self.pow_.iter_old_1_to_0_2(qv96, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 1 ) ) x )"]
-                                self.uf.math_.union(x_7, v151);
+                                self.uf.math_.union(qx_7, qv151);
                             }
                         }
                     }
-                    if let Some(v161) = self.global_i64.get_new(3usize) {
-                        for (v162,) in self.const_.iter_old_0_to_1(v161, self.latest_timestamp) {
-                            for (x_10, v163) in self.pow_.iter_old_1_to_0_2(v162, self.latest_timestamp) {
+                    if let Some(qv161) = self.global_i64.get_new(3usize) {
+                        for (qv162,) in self.const_.iter_old_0_to_1(qv161, self.latest_timestamp) {
+                            for (qx_10, qv163) in self.pow_.iter_old_1_to_0_2(qv162, self.latest_timestamp) {
                                 #[doc = "( rewrite ( Pow x ( Const 2 ) ) ( Mul x x ) )"]
-                                self.delta.insert_mul((x_10, x_10, v163));
+                                self.delta.insert_mul((qx_10, qx_10, qv163));
                             }
                         }
                     }

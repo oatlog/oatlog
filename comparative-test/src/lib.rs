@@ -314,19 +314,9 @@ egglog_test!(allcorrect, birewrite, expect![[r#"
     Lit: 6
 "#]], r#"(include "comparative-test/egglog-testsuite/birewrite.egg")"#);
 egglog_test!(zrocorrect, bitwise, expect![], r#"(include "comparative-test/egglog-testsuite/bitwise.egg")"#);
-egglog_test!(nogenerate, bool_, expect![[r#"
-    comparative-test/egglog-testsuite/bool.egg: type bool is not defined
-    bool
-
-    comparative-test/egglog-testsuite/bool.egg: while parsing this toplevel expression
-    ( function F ( i64 ) bool :no-merge )
-
-    comparative-test/egglog-testsuite/bool.egg: while reading comparative-test/egglog-testsuite/bool.egg
-    ( include "comparative-test/egglog-testsuite/bool.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/bool.egg" )
-
+egglog_test!(allcorrect, bool_, expect![[r#"
+    F: 1
+    R: 1
 "#]], r#"(include "comparative-test/egglog-testsuite/bool.egg")"#);// bool not implemented
 egglog_test!(nogenerate, calc, expect![[r#"
     comparative-test/egglog-testsuite/calc.egg: not implemented yet

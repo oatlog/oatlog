@@ -221,13 +221,29 @@ pub(crate) fn runtime_primitive_functions() -> proc_macro2::TokenStream {
         fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a < b).then_some(()).into_iter() }
 
         #[prim_func(name = ">=", id = "i64_gte", index = [0, 1], fd = true)]
-        fn i64_gt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a >= b).then_some(()).into_iter() }
+        fn i64_gte01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a >= b).then_some(()).into_iter() }
 
         #[prim_func(name = "<=", id = "i64_lte", index = [0, 1], fd = true)]
-        fn i64_lt01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a <= b).then_some(()).into_iter() }
+        fn i64_lte01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a <= b).then_some(()).into_iter() }
 
         #[prim_func(name = "!=", id = "i64_ne", index = [0, 1], fd = true)]
         fn i64_ne01(a: i64, b: i64) -> impl Iterator<Item = ()> { (a != b).then_some(()).into_iter() }
+
+        #[prim_func(name = "not", id = "bool_not", index = [0, 1], fd = true)]
+        fn bool_not01(a: bool) -> impl Iterator<Item = (bool,)> { once((!a,)) }
+
+        #[prim_func(name = "and", id = "bool_and", index = [0, 1, 2], fd = true)]
+        fn bool_and01(a: bool, b: bool) -> impl Iterator<Item = (bool,)> { once((a && b,)) }
+
+        #[prim_func(name = "or", id = "bool_or", index = [0, 1, 2], fd = true)]
+        fn bool_or01(a: bool, b: bool) -> impl Iterator<Item = (bool,)> { once((a || b,)) }
+
+        #[prim_func(name = "xor", id = "bool_xor", index = [0, 1, 2], fd = true)]
+        fn bool_xor01(a: bool, b: bool) -> impl Iterator<Item = (bool,)> { once((a ^ b,)) }
+
+        #[prim_func(name = "=>", id = "bool_implies", index = [0, 1, 2], fd = true)]
+        fn bool_implies01(a: bool, b: bool) -> impl Iterator<Item = (bool,)> { once((!a || b,)) }
+
     }
 }
 
@@ -393,6 +409,9 @@ mod tests {
 
             #[prim_func(name = "==", id = "i64_eq", index = [1, 0], fd = true)]
             fn i64_eq10(b: i64) -> impl Iterator<Item = (i64,)> { once((b,)) }
+
+
+
         };
 
         let parsed = parse_prim_funcs(prim_funcs, |x| {

@@ -4,6 +4,7 @@
 //! Pre codegen.
 
 use crate::{
+    frontend::sexp::OrdF64,
     ids::{ColumnId, GlobalId, IndexId, RelationId, TypeId, VariableId},
     typed_vec::TVec,
 };
@@ -235,6 +236,12 @@ impl GlobalCompute {
     pub(crate) fn new_i64(x: i64) -> Self {
         Self::Literal(Literal::I64(x))
     }
+    pub(crate) fn new_bool(x: bool) -> Self {
+        Self::Literal(Literal::Bool(x))
+    }
+    pub(crate) fn new_f64(x: OrdF64) -> Self {
+        Self::Literal(Literal::F64(x))
+    }
     pub(crate) fn new_string(s: String, intern: &mut crate::runtime::StringIntern) -> Self {
         Self::Literal(Literal::String(intern.intern(s)))
     }
@@ -254,6 +261,8 @@ impl Default for GlobalCompute {
 pub(crate) enum Literal {
     I64(i64),
     String(crate::runtime::IString),
+    Bool(bool),
+    F64(OrdF64),
 }
 impl Default for Literal {
     fn default() -> Self {

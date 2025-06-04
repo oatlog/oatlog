@@ -974,6 +974,7 @@ dependencies = [
  "criterion",
  "egglog",
  "oatlog",
+ "regex",
 ]
 
 [[package]]

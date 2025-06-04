@@ -151,6 +151,8 @@ struct LangFunction {
     name: Str,
     inputs: TVec<ColumnId, TypeId>,
 
+    insert_only: bool,
+
     /// Relations are represented as functions returning `Unit`.
     output: TypeId,
 }
@@ -173,11 +175,13 @@ impl LangFunction {
         }
         true
     }
-    fn new(name: Str, inputs: &[TypeId], output: Option<TypeId>) -> Self {
+    fn new(name: Str, inputs: &[TypeId], output: Option<TypeId>, insert_only: bool) -> Self {
+        // insert only = (function)
         Self {
             name,
             inputs: inputs.to_owned().into(),
             output: output.unwrap_or(TYPE_UNIT),
+            insert_only,
         }
     }
 }
@@ -242,13 +246,13 @@ const BUILTIN_UNIT: &str = "()"; // TODO: "()" -> "unit" to avoid fixup in backe
 
 pub(crate) const TYPE_UNIT: TypeId = TypeId(0);
 
-const BUILTIN_SORTS: [(&str, &str, TypeId); 3] = [
+const BUILTIN_SORTS: [(&str, &str, TypeId); 5] = [
     (BUILTIN_UNIT, "std::primitive::unit", TYPE_UNIT),
     (BUILTIN_I64, "std::primitive::i64", TypeId(1)),
-    // (BUILTIN_F64, "std::primitive::f64"),
+    (BUILTIN_F64, "OrdF64", TypeId(2)),
     // TODO: bool seems to work fine in tests.
-    // (BUILTIN_BOOL, "std::primitive::bool"),
-    (BUILTIN_STRING, "runtime::IString", TypeId(2)),
+    (BUILTIN_BOOL, "std::primitive::bool", TypeId(3)),
+    (BUILTIN_STRING, "runtime::IString", TypeId(4)),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -779,13 +783,12 @@ impl Parser {
                         ComputeMethod::Literal(Literal::String(x)) => {
                             lir::GlobalCompute::new_string((*x).to_owned(), &mut self.interner)
                         }
+                        ComputeMethod::Literal(Literal::F64(x)) => lir::GlobalCompute::new_f64(x),
+                        ComputeMethod::Literal(Literal::Bool(x)) => lir::GlobalCompute::new_bool(x),
                         ComputeMethod::Function { function, args } => {
                             lir::GlobalCompute::new_call(function, &args)
                         }
-
-                        ComputeMethod::Literal(
-                            Literal::F64(_) | Literal::Bool(_) | Literal::Unit,
-                        ) => {
+                        ComputeMethod::Literal(Literal::Unit) => {
                             panic!("only literal ints and strings are implemented for globals")
                         }
                     },
@@ -811,6 +814,7 @@ impl Parser {
                     inputs.iter().copied().chain(output).collect();
                 let num_columns = columns.len();
 
+                let mut insert_only = false;
                 let relation_id = self.hir_relations.push(hir::Relation::table(
                     *name,
                     columns,
@@ -823,6 +827,7 @@ impl Parser {
                             output,
                             merge: None,
                         } => {
+                            insert_only = true;
                             if self.types[output].can_unify() {
                                 // eqsort type => unification
                                 // hir::ImplicitRule::new_unify(inputs.len())
@@ -837,6 +842,7 @@ impl Parser {
                             output,
                             merge: Some(expr),
                         } => {
+                            insert_only = true;
                             register_span!(expr.span);
                             match &*expr {
                                 Expr::Literal(..) => return err!("invalid lattice"),
@@ -920,8 +926,10 @@ impl Parser {
                     },
                 ));
 
-                self.lang_relations
-                    .insert(relation_id, LangFunction::new(name, &inputs, output));
+                self.lang_relations.insert(
+                    relation_id,
+                    LangFunction::new(name, &inputs, output, insert_only),
+                );
 
                 self.function_possible_ids
                     .entry(name)
@@ -959,7 +967,7 @@ impl Parser {
                     0 => {
                         let inputs = &columns.inner();
 
-                        let lang_function = LangFunction::new(name, inputs, None);
+                        let lang_function = LangFunction::new(name, inputs, None, false);
                         let ident = ident.leak();
 
                         let relation_id = self
@@ -981,7 +989,7 @@ impl Parser {
                         let inputs = &columns.inner()[0..columns.len() - 1];
                         let output = *columns.inner().last().unwrap();
 
-                        let lang_function = LangFunction::new(name, inputs, Some(output));
+                        let lang_function = LangFunction::new(name, inputs, Some(output), false);
                         let ident = ident.leak();
 
                         let relation_id = self.hir_relations.push(hir::Relation::primitive(
@@ -1566,7 +1574,12 @@ mod compile_rule {
                     } else {
                         args.push(ret);
                         // to test without entry: matches!(parser.relations_hir_and_func[relation].0.ty, hir::RelationTy::Global { .. })
-                        (relation, args, true)
+                        let is_entry_ok = parser
+                            .lang_relations
+                            .get(&relation)
+                            .map(|x| !x.insert_only)
+                            .unwrap_or(true);
+                        (relation, args, is_entry_ok)
                     }
                 })
                 .collect(),

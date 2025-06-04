@@ -65,6 +65,9 @@ opt-level = 3
 [profile.test.package.rand_chacha]
 opt-level = 3
 
+[profile.dev.package.oatlog-core]
+opt-level = 3
+
 #########
 # LINTS #
 #########

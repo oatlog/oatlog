@@ -138,7 +138,7 @@ impl SexpSpan {
                             literal(Literal::I64(first.parse::<i64>().unwrap()))
                         }
                         _ if first.parse::<f64>().is_ok()
-                            && !matches!(first, "infinity" | "INFINITY") =>
+                            && !matches!(first, "infinity" | "INFINITY" | "Infinity") =>
                         {
                             literal(Literal::F64(OrdF64(first.parse::<f64>().unwrap())))
                         }

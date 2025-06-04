@@ -159,7 +159,9 @@ fn remove_variable_collisions(s: &mut [lir::VariableData]) {
     let mut used: BTreeSet<String> = BTreeSet::new();
 
     for s in s {
-        let base = s.name;
+        // to handle variable names like "__42" that would get turned into literals.
+        let base = format!("q{}", s.name).leak();
+        s.name = base;
         if used.insert(base.to_string()) {
             continue;
         }

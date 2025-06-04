@@ -347,9 +347,9 @@ fn update_with_category(
 
                             quote! {
                                 let old_val = *#val_y;
-                                let new_val = #ident(*#val_y, *#val_x).next().unwrap();
+                                let (new_val,) = #ident(*#val_y, #val_x).next().unwrap();
                                 *#val_y = new_val;
-                                *#val_x = new_val;
+                                #val_x = new_val;
                                 let changed = changed | (old_val != new_val);
                             }
                         },
@@ -515,8 +515,14 @@ fn update_with_category(
 
                             let row_ident = format_ident!("RowSort{bit_pattern}");
 
-                            quote! {
-                                #row_ident :: sort ( &mut self.all );
+                            if bit_pattern.chars().any(|c| c == '1') {
+                                quote! {
+                                    #row_ident :: sort ( &mut self.all );
+                                }
+                            } else {
+                                // ???
+                                // this happens in eggcc benchmark for some reason.
+                                quote! {}
                             }
                         } else {
                             quote! {

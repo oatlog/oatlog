@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 egglog.workspace = true
 oatlog.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

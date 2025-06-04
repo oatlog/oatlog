@@ -326,6 +326,12 @@ fn codegen_globals_and_initial(
         assigned_indices: &TVec<GlobalId, usize>,
     ) -> TokenStream {
         match compute {
+            GlobalCompute::Literal(Literal::F64(crate::frontend::sexp::OrdF64(x))) => {
+                quote! { OrdF64(#x) }
+            }
+            GlobalCompute::Literal(Literal::Bool(x)) => {
+                quote! { #x }
+            }
             GlobalCompute::Literal(Literal::I64(x)) => {
                 quote! { #x }
             }

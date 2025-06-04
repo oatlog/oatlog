@@ -106,6 +106,7 @@ fn main() {
             output,
             relaxed_compat,
         } => {
+            tracing::trace!("compiling...");
             ret.push_str(&oatlog::compile_str(&input, !relaxed_compat));
             use std::io::Write as _;
             match output {
@@ -143,6 +144,7 @@ fn init_logging() {
                 tracing_subscriber::FmtSubscriber::builder()
                     .with_max_level(tracing::Level::TRACE)
                     .with_timer(UptimeMilliseconds(Instant::now()))
+                    .with_writer(std::io::stderr)
                     .finish(),
             ),
     )

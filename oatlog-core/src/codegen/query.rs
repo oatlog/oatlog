@@ -34,7 +34,7 @@ impl CodegenRuleTrieCtx<'_> {
         self.variables_bound[x]
     }
     fn bind_var(&mut self, x: &VariableId) {
-        assert!(!self.variables_bound[x]);
+        assert!(!self.variables_bound[x], "output var already bound?");
         self.variables_bound[x] = true;
         self.variable_bindings.push(*x);
     }
@@ -125,6 +125,9 @@ impl CodegenRuleTrieCtx<'_> {
         let old_variables_bound = self.variable_bindings.len();
 
         let premise = self.codegen_premise(premise);
+        if let Some(meta) = meta {
+            tracing::trace!("meta = {meta}");
+        }
         let meta = meta.into_iter();
         let actions = actions
             .iter()

@@ -1,15 +1,124 @@
 use std::time::{Duration, Instant};
 
+// #[allow(non_snake_case)]
+// #[allow(irrefutable_let_patterns)]
+// #[allow(unsafe_code)]
+// #[allow(unused)]
+// mod precompiled_eggcc;
+
+use std::collections::BTreeMap;
+
 fn main() {
-    // mod math {
-    //     oatlog::compile_egraph_strict!(r#"(include "oatlog-bench/input/math.egg")"#);
-    // }
-    // let mut theory = math::Theory::new();
-    // for _ in 0..12 {
-    //     theory.step();
-    // }
+    /*
+    #[rustfmt::skip]
+    mod math {
+        // oatlog::compile_egraph_strict!(r#"(include "oatlog-bench/input/eggcc_raytrace_benchmark.egglog")"#);
+
+        pub use crate::precompiled_eggcc::*;
+
+    }
+    let mut theory = math::Theory::new();
+    let start = std::time::Instant::now();
+    for step in 0..12 {
+        theory.step();
+        dbg!(theory.get_relation_entry_count());
+        dbg!(step);
+        println!("step={step}, elapsed={:?}", start.elapsed());
+    }
+    */
+
+    /*
+    {
+        let mut egglog = egglog::EGraph::default();
+        egglog
+            .parse_and_run_program(
+                None,
+                r#"(include "input/eggcc_raytrace_benchmark.egglog")"#,
+            )
+            .unwrap();
+        let mut theory = precompiled_eggcc::Theory::new();
+
+        for i in 0..10 {
+            println!("step: {i}:");
+            theory.step();
+            egglog.parse_and_run_program(None, "(run 1)").unwrap();
+
+            compare_egglog_oatlog(&mut egglog, theory.get_relation_entry_count());
+        }
+
+        println!("done with 10 steps, waiting 5 secs and starting benchmark");
+        std::thread::sleep(std::time::Duration::from_secs(5));
+    }
+
+    {
+        let mut egglog = egglog::EGraph::default();
+        egglog
+            .parse_and_run_program(
+                None,
+                r#"(include "input/eggcc_raytrace_benchmark.egglog")"#,
+            )
+            .unwrap();
+        let mut theory = precompiled_eggcc::Theory::new();
+
+        let start = std::time::Instant::now();
+        for i in 0..100 {
+            theory.step();
+            println!("step oatlog {i}: {:?}", start.elapsed());
+        }
+
+        println!("done with oatlog bench, waiting 5 secs and starting egglog benchmark");
+        std::thread::sleep(std::time::Duration::from_secs(5));
+
+        let start = std::time::Instant::now();
+        for i in 0..100 {
+            egglog.parse_and_run_program(None, "(run 1)").unwrap();
+            println!("step egglog {i}: {:?}", start.elapsed());
+        }
+    }
+    */
+
     // std::hint::black_box(theory);
-    record_timings();
+    // record_timings();
+}
+
+fn compare_egglog_oatlog(
+    egglog: &mut egglog::EGraph,
+    oatlog_counts: BTreeMap<&'static str, usize>,
+) -> bool {
+    static EGGLOG_COUNT_REGEX: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"(.*): ([0-9]+)").unwrap());
+    let egglog_counts: BTreeMap<_, _> = egglog
+        .parse_and_run_program(None, "(print-size)")
+        .unwrap()
+        .into_iter()
+        .flat_map(|msg| {
+            msg.lines()
+                .map(|msg| {
+                    let caps = EGGLOG_COUNT_REGEX.captures(msg.trim()).unwrap();
+                    let relation: String = caps.get(1).unwrap().as_str().to_owned();
+                    let count: usize = caps.get(2).unwrap().as_str().parse().unwrap();
+                    (relation, count)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let mut any_mismatch = false;
+    let mismatch_msgs: String = oatlog_counts
+        .into_iter()
+        .filter(|(relation, count)| (*count != egglog_counts[*relation]))
+        .map(|(relation, count)| {
+            any_mismatch = true;
+            format!(
+                "{relation}: {} (egglog) != {count} (oatlog)\n",
+                egglog_counts[relation]
+            )
+        })
+        .collect();
+    if any_mismatch {
+        println!("MISMATCH FOUND!\n{mismatch_msgs}");
+    }
+    any_mismatch
 }
 
 fn record_timings() {
