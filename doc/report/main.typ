@@ -421,7 +421,7 @@ performance improvements.
 
 = Background <chapter_background>
 
-This background introduces relevant concepts to understand Oatlog and its implementation.
+This chapter introduces relevant concepts to understand Oatlog and its implementation.
 @section_group_egraphs introduces e-graphs at a conceptual level and @section_background_practice
 explains how e-graphs can be implemented and are used in practice.
 @section_background_relational_databases then shows how e-graphs can be implemented as relational
@@ -569,19 +569,19 @@ of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
 
 === E-graphs <section_background_egraphs>
 
-E-graphs are at their core a solution to the duplication illustrated in
-@fig_background_dag_duplicated, that identical usages of syntactically different inputs result in
+E-graphs are, at their core, a solution to the node duplication illustrated in
+@fig_background_dag_duplicated, where identical usages of syntactically different inputs result in
 duplicated storage within an expression DAG. E-graphs do this not by representing functions
 #footnote[There is an e-graph variant called slotted e-graphs @slotted_egraph which deduplicate data
 using functions.], but by grouping syntactically different, but semantically equal expressions into
 the same equivalence class.
 
-An initial expression mutated through local rewrites is in fact exactly the special case of
-syntactically different but semantically identical subexpressions being used identically. If a
-subexpression $x dot 2$ is nondestructively rewritten to $x << 1$ in an expression DAG, all
-downstream usages must be duplicated. The pre- and post-rewrite expressions are different this is
-the best we can do without a something function-like. However, when rewrites maintain equality, such
-as here where $x dot 2 == x << 1$, we can deduplicate our expressions in an e-graph.
+An initial expression mutated through local rewrites is exactly the special case of syntactically
+different but semantically identical subexpressions being used identically. If a subexpression $x
+dot 2$ is nondestructively rewritten to $x << 1$ in an expression DAG, all downstream usages must be
+duplicated. However, since $x dot 2$ and $x << 1$ through the act of rewriting are considered equal,
+e-graphs let downstream usages refer to their joint equivalence class and do not need to be
+duplicated.
 
 #figure(
   fletcher.diagram(
@@ -644,8 +644,8 @@ its usage sites.
 Compared to expression DAGs, e-graphs can achieve exponential compression. An example of this is the
 expression $f(f(...(f(x))...))$ where each $f$ is either $x arrow x dot 2$ or $x arrow x << 1$,
 which has $2^n$ top-level nodes in an expression DAG yet requires linear space as an e-graph. This
-example is of course synthetic but in general e-graphs achieve compression exponential in the number
-of nested rewrites.
+example is synthetic but in general e-graphs achieve compression exponential in the number of nested
+rewrites.
 
 E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
 nodes and e-classes equivalence classes of nodes. This is representation that motivates the e-class
@@ -722,10 +722,11 @@ representation.
 
 == Equality saturation in practice <section_background_practice>
 
-While e-graph engines like Oatlog contain significant complexity in order to support many kinds of
-rewrite rules and achieve good performance, both asymptotically and in terms of constant factors, a
-similar computation can be described in only about 100 lines of code. This section will present and
-explain such a snippet, simultaneously concretizing the steps involved in equality saturation.
+E-graph engines such as egglog @egglog or this thesis' Oatlog contain significant complexity in
+order to support many kinds of rewrite rules and achieve good performance, both asymptotically and
+in terms of constant factors. A similar computation can however be described in only about a hundred
+lines of code. This section will present and explain such a snippet, simultaneously concretizing the
+steps involved in equality saturation.
 
 The operations that can be performed on an e-graph, expressed in the language of its bipartite
 representation shown in @fig_background_bipartite_egraph, are
@@ -761,9 +762,9 @@ structure called union-find or disjoint-sets @unionfindoriginal.
 `find(a) == find(b)`. Conceptually, the union-find can be seen as a forest of rooted trees, with
 every tree being an equivalence class with its root being a representative. Every node `x` stores a
 pointer to its parent in `self.parents[x]`, with the root pointing to itself, which guarantees that
-the root can be found by chasing the pointers. Expressed as an analogy, if we has a set of people
-and each person pointed to an arbitrary person who is taller than them, we could find the root (i.e.
-the tallest) person by following where people point until the root is found.
+the root can be found by chasing the pointers. Expressed as an analogy, given a set of people with
+each person pointing towards an arbitrary person who is taller than them, we can find the root (i.e.
+the tallest) person by recursively following where people point.
 
 To assert that two variables `a` and `b` are equal and hence merging their equivalence classes, we
 assign the root of one to point towards the root of the other. Continuing the analogy, we find the
@@ -806,9 +807,9 @@ in @fig_background_practice_uf merges in arbitrary order.
 
 === E-graph representation and canonicalization
 
-Let us now decide how to store the e-graph in memory. Clearly this representation should be informed
-by what queries and mutations we want to accelerate, but let us first focus on finding something
-that is compact and to some extent natural. This decision can be seen as deciding how to store the
+Let us now decide how to store the e-graph in memory. Clearly the representation should be informed
+by the queries and mutations that will be applied to it, but let us first focus on finding something
+that is compact and in some sense natural. This decision can be seen as deciding how to store the
 edges of the bipartite graph from @fig_background_bipartite_egraph. There are two kinds of edges
 
 + Edges from e-node to e-class, denoting membership.
@@ -821,7 +822,7 @@ On the other hand, e-classes may have an arbitrary number of ingoing and outgoin
 representation of the graph is therefore to store all edges as going from e-node to e-class, or in
 more concrete terms to let e-classes be numerical ids and e-nodes be tuples of their input and
 output e-class ids. The statement $x_1 + x_2 = x_3$ can be represented with an e-node tuple $(+, 1,
-2, 3)$
+2, 3)$.
 
 Representing e-classes with e-class ids additionally means that e-class `union()` can be tracked
 with a union-find data structure as previously described in @section_background_practice_union_find.
@@ -836,8 +837,9 @@ inputs to output.
 
 @fig_background_practice_canonicalization combines these insights to represent an e-graph as a pair
 of `uf: UnionFind` and `enodes: HashMap<(Op, EClass, EClass), EClass>`. It also shows how e-class
-ids can be canonicalized after a batch of `union()` operations, requiring a loop to a fixed point
-due to functional dependencies possibly triggering a `union()` cascade.
+ids can be canonicalized after a batch of `union()` operations, requiring looping until a fixed
+point is reached due to functional dependencies possibly triggering a cascade of `union()`
+operations.
 
 #figure(
   {
@@ -859,15 +861,15 @@ particular, we consider commutativity of addition, $a+b=c => b+a=c$, commutativi
 $a dot b=c => b dot a=c$, and distributivity, $(a+b) dot c = d => a dot c + b dot c = d$.
 
 @fig_background_practice_apply_rules implements this, for simplicity in a hard-coded manner. This is
-unlike a generic e-graph engine which must be able to handle arbitrary rules by interpreting or
+unlike a generic e-graph engine, which must be able to handle arbitrary rules by interpreting or
 compiling them rather than relying on them being hand-written.
 
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
 matching specific patterns in the existing structure. If this was the only effect of the rules then
 `canonicalize()` would never need to be run since `self.enodes` would never contain any uprooted
 e-class. However, e-node insertions on already existing e-node inputs result in `union()`
-operations, making a future call to `canonicalize()` necessary to restore the invariant that
-`self.enodes` contain only root e-classes.
+operations. These break the invariant that `self.enodes` contain only root e-classes, requiring a
+future call to `canonicalize()` to restore the invariant.
 
 This implementation does reach a fixed point in the sense that it builds a semantically complete
 e-graph, but from an implementation perspective it continues to allocate new e-classes with `make()`
@@ -895,9 +897,9 @@ uses its e-class if present, only otherwise falling back to `make()`.
 @fig_background_practice_full displays the full program from which we have seen snippets of in
 previous sections, showcasing the entire EqSat workflow in a single example. It is a condensed
 example, having only a handful of rewrite rules and few operators in addition to being an
-unsophisticated implementation, but is conceptually similar to the real thing.
+unsophisticated implementation, but is conceptually similar to real e-graph engines.
 
-An expression language, i.e. a set of operators, together with a set of rewrite rules is called a
+An expression language, i.e. a set of operators, together with a set of rewrite rules, is called a
 theory. In the EqSat workflow, a user creates an initial e-graph by declaring variables and
 inserting e-nodes relating them, then doing some rounds of rewrites by calling `apply_rules()` and
 `canonicalize()`, then finally observing the e-graph. Sometimes rewrites will have been applied to a
@@ -921,7 +923,8 @@ acceptable.
 - For costs that are per-node-sums in an expression DAG, optimal extraction can be done in
   exponential time using integer linear programming. Extraction in this cost model is also possible
   in linear time for e-graphs of bounded treewidth @fastextract.
-- Finally, for arbitrary cost functions approximate solutions can be found using various heuristics.
+- Finally, for arbitrary cost functions approximate solutions can be found using various heuristics
+  @egggym @extraction_gradient_descent.
 
 While extraction is an important part of equality saturation, Oatlog does not implement any
 extraction. Extraction is largely independent functionality from the building of the e-graph, so
@@ -1158,19 +1161,21 @@ Functional dependencies, such as all operators uniquely determining their output
 addition uniquely determining any input from the other input and the output, correspond in database
 terminology to primary keys on the input columns.
 
-What about e-matching? The pattern $(a dot b)+(a dot c)$ for which we described recursive e-matching
-in @fig_background_recursive_ematching_example corresponds to the relational (SQL) query
+#figure(
+  ```sql
+  SELECT mul_ab.lhs AS a, mul_ab.rhs AS b, mul_ac.rhs AS c
+  FROM add
+  JOIN mul AS mul_ab ON mul_ab.res = add.lhs
+  JOIN mul AS mul_ac ON mul_ac.res = add.rhs
+  WHERE mul_ab.lhs = mul_ac.lhs
+  ```,
+  caption: [The pattern $(a dot b)+(a dot c)$ expressed as a SQL query.],
+) <fig_background_relational_sql>
 
-```sql
-SELECT mul_ab.lhs AS a, mul_ab.rhs AS b, mul_ac.rhs AS c
-FROM add
-JOIN mul AS mul_ab ON mul_ab.res = add.lhs
-JOIN mul AS mul_ac ON mul_ac.res = add.rhs
-WHERE mul_ab.lhs = mul_ac.lhs
-```
-
-i.e. a query on the form of iterating the root of the pattern and then adjoining tables for its
-subpatterns. The pattern can also be written in compact syntax as
+What about e-matching? The pattern for which we described recursive e-matching in
+@fig_background_recursive_ematching_example corresponds to the relational (SQL) query in
+@fig_background_relational_sql, i.e. a query on the form of iterating the root of the pattern and
+then adjoining tables for its subpatterns. The pattern can also be written in compact syntax as
 
 $"Add"("ab", "ac", "d") join "Add"("a", "b", "ab") join "Add"("a", "c", "ac")$
 
@@ -1264,17 +1269,20 @@ $
 $
 
 One way to implement this is to store separate relations for `old` and `new`, implementing the query
-$#`all`_A join #`new`_B join #`old`_C$ as
+$#`all`_A join #`new`_B join #`old`_C$ as in @fig_background_seminaive_1.
 
-```rust
-for _ in b_new(..) {
-    for _ in c_old(..) {
-        for _ in concat(a_new(..), a_old(..)) {
-            ..
-        }
-    }
-}
-```
+#figure(
+  ```rust
+  for _ in b_new(..) {
+      for _ in c_old(..) {
+          for _ in concat(a_new(..), a_old(..)) {
+              ..
+          }
+      }
+  }
+  ```,
+  caption: [Implementing a conjunctive query using nested loops.],
+) <fig_background_seminaive_1>
 
 When using semi-naive evaluation it is often optimal to start the query plan at the `new` relation
 since the first relation in the query plan is iterated in its entirety and the `new` relation is
@@ -1306,16 +1314,21 @@ and therefore get by with indexes only on `all`.
 We pay a cost in that we duplicate any tuples created by joining `new` from multiple relations. This
 duplication can be mitigated by annotating tuples with timestamps and eagerly filtering out such
 tuples after every join. The query $#`all`_A join #`new`_B join #`old`_C$ can now be implemented as
+in @fig_background_seminaive_2.
 
-```rust
-for _ in b_new(..) {
-    for _ in c_all(..).filter(is_old) {
-        for _ in a_all(..) {
-            ..
-        }
-    }
-}
-```
+#figure(
+  ```rust
+  for _ in b_new(..) {
+      for _ in c_all(..).filter(is_old) {
+          for _ in a_all(..) {
+              ..
+          }
+      }
+  }
+  ```,
+  caption: [Implementing a conjunctive query using nested loops, filtering out `old` from `all` using
+    timestamps.],
+) <fig_background_seminaive_2>
 
 === Worst-case optimal join <section_background_wcoj>
 
@@ -1552,8 +1565,6 @@ iteration be a superset of egglog's e-graph in the same step. When comparing Oat
 will use the relaxed mode for saturating benchmarks and the strict mode for non-saturating
 benchmarks.
 
-Oatlog's practical use is limited due to not supporting extraction, without which it aside from
-being a e-graph implementation case study is limited to verifying identifies.
 @appendix_example_quadratic_formula shows a full example of using Oatlog to verify an identity
 similar to the quadratic formula, including the egglog theory and the Rust usage code.
 
@@ -1570,9 +1581,9 @@ program through a few different IRs, before embedding it in an arbitrary Rust pr
 
 === Egglog AST
 
-Egglog code is parsed first as S-expressions and then into an AST. The AST includes span information
-so that it can provide reasonable errors, and also supports shrinking of egglog code into minimal
-misbehaving examples when debugging.
+Egglog code is parsed first as S-expressions and then into an abstract syntax tree (AST). The AST
+includes span information so that it can provide reasonable errors, and also supports shrinking of
+egglog code into minimal misbehaving examples when debugging.
 
 === HIR, high-level IR
 
@@ -1872,11 +1883,11 @@ join the atoms in a premise.
 Oatlog query plans only generic joins as described in @section_background_wcoj. Generic join is
 worst-case optimal given identically sized relations, but for relations of different sizes one
 should prefer to join smaller relations first. Oatlog statically query-plans at compile-time since
-that requires less engineering effort and provides greater ABI freedom in code generation compared
-to run-time dynamic query planning. We are therefore very limited in terms of what relation size
-information is known when query planning. Oatlog makes the following assumptions
-- `new` is smaller than `old` is smaller than `all`.
-- Functional dependency may cause some joins to produce at most a single element.
+that requires less engineering effort and provides greater freedom in terms of memory representation
+compared to run-time dynamic query planning. We are therefore very limited in terms of what relation
+size information is known when query planning. Oatlog makes the following assumptions
+- `new` is smaller than `old` and `old` is smaller than `all`.
+- Functional dependencies may cause some joins to produce at most a single element.
 - Relations corresponding to global variables contain exactly one element.
 
 Generic join is usually formulated as selecting an order in which to determine variables, but
@@ -2028,7 +2039,7 @@ tables, with rows larger than $12$ bytes, in which case indirect indexes are sen
 Indexes can be stored in multiple conceptually different ways. Egglog @egglog uses trie indexes that
 for a relation with columns $(A, B, C)$ behave like `HashMap<A, HashMap<B, C>>`. In order to reduce
 indirection, but also somewhat arbitrarily, Oatlog instead uses single `HashMap`s for all indexes.
-In this model, indexes come in the two types: FD (functional dependency) indexes, which store at
+In this model, indexes come in the two types: functional dependency (FD) indexes, which store at
 most one row per key, and non-FD indexes which may store any number of rows per key. An example of
 the former is `HashMap<(A, B), C>` and for the latter `HashMap<A, Vec<(B, C)>>`.
 
@@ -2173,9 +2184,10 @@ structure is amortized and becomes faster than point updates.
 
 In practice, Oatlog splits the canonicalization phase into computing the functional dependency fixed
 point using only FD indexes, then recreating all non-FD indexes. This relaxation of non-FD index
-consistency means those indexes are updated fewer times, which by itself is more efficient while
-also unlocking using a sorted list within the non-FD indexes, which is faster than having many small
-vectors or a dynamic BTree.
+consistency means those indexes are updated fewer times, which by itself is more efficient.
+Additionally, rebuilding non-FD indexes less often increases the viability of using a sorted list
+rather than many small vectors or individually allocated BTree nodes, significantly reducing memory
+fragmentation.
 
 Concretely, canonicalization is as shown in @fig_impl_codegen_canonicalization_top implemented on
 top the three functions `update_begin`, `update` and `update_finalize`.
@@ -2293,11 +2305,12 @@ The full code from which we in these sections have shown snippets as available i
 
 We evaluate Oatlog in two aspects: its compatibility with and its speedup relative to egglog. The
 compatibility can in turn be divided into correctness and completeness, both of which are evaluated
-using egglog's test suite. We find that, while Oatlog creates identical e-graphs, a large fraction
-of egglog programs require features that Oatlog does not support. Oatlog can therefore not replace
-egglog in most use-cases in the near term.
+using egglog's test suite. A large fraction of egglog programs require features that Oatlog does not
+support, but most such features can reasonably be implemented within Oatlog's architecture. Bridging
+this gap would allow Oatlog to displace egglog in many use-cases that embed e-graphs into
+applications.
 
-In performance terms, Oatlog achieves order of magnitude speedups for small e-graphs, gradually
+In performance terms, Oatlog achieves order-of-magnitude speedups for small e-graphs, gradually
 shrinking to a 2x speedup at $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes.
 
 == Egglog language support and correctness
@@ -2440,10 +2453,13 @@ performing very similarly to egglog over $10^7$ e-nodes.
 
 == Performance discussion
 
-It would have be useful if we at this point could present a clear explanation to why Oatlog is
-faster than egglog and why the difference diminishes for large e-graphs. Unfortunately we cannot,
-mostly because we lack a deep understanding of egglog's implementation details. Oatlog and egglog
-has some similarities, such as both
+Oatlog's performance in comparison to egglog raises questions around why Oatlog is faster and why
+the difference diminishes for large e-graphs. Answering this comprehensively is difficult and would
+require detailed consideration of both Oatlog's and egglog's implementation details. Instead, we
+will highlight some of their similarities and differences, before arguing that the convergence may
+be associated with both being bottlenecked by L3 cache misses for large e-graphs.
+
+Oatlog and egglog has some similarities, such as both
 
 - storing and filtering explicit timestamps,
 - using hashmaps for indexes,
@@ -2485,9 +2501,7 @@ but there are also differences, such as Oatlog
     i7-12700H CPU.],
 ) <fig_eval_discuss_stat>
 
-In the absence of a deep comparison of implementation details between Oatlog and egglog, let us
-instead identify and discuss the performance bottlenecks within Oatlog. With the command
-`perf stat -ddd` we can read a few very relevant performance counters, shown in
+With the command `perf stat -ddd` we can read a few relevant performance counters, shown in
 @fig_eval_discuss_stat. We can see that there is very little instruction parallelism, with only
 about 1 instruction completed per cycle. There are quite many branches but the mispredict rate is
 low.
@@ -2498,14 +2512,14 @@ other hand, if the same computer has its memory benchmarked using
 `sysbench memory --threads=1 --memory-access-mode=rnd --memory-block-size=8 --memory-total-size=1G run`,
 it achieves only 12.4M random accesses per second.
 
-This somewhat indicates that Oatlog for large e-graphs is bottlenecked by L3 cache misses, although
-this data cannot distinguish between e.g. spending 100% of the time serving L3 cache misses
-sequentially or spending 50% of the time serving L3 cache misses in parallel pairs. From the
-perspective of how Oatlog works, being bottlenecked by RAM random access is largely expected. In
-flamegraphs of `math`, 12 steps, there is a roughly equal split of samples attributable to sorting,
-hashmap writes, hashmap reads and miscellaneous. With the size of the hashmaps generally being equal
-to the number of e-nodes in a relation, these lookups are essentially always L3 cache misses for
-sufficiently large e-graphs.
+This may indicate that Oatlog, for large e-graphs, is bottlenecked by L3 cache misses, although the
+data cannot distinguish between e.g. spending 100% of the time serving L3 cache misses sequentially
+or spending 50% of the time serving L3 cache misses in parallel pairs. From the perspective of how
+Oatlog works, being bottlenecked by RAM random access is largely expected. In flamegraphs of `math`,
+12 steps, there is a roughly equal split of samples attributable to sorting, hashmap writes, hashmap
+reads and miscellaneous. With the size of the hashmaps generally being equal to the number of
+e-nodes in a relation, these lookups are essentially always L3 cache misses for sufficiently
+large e-graphs.
 
 #figure(
   placement: auto,
@@ -2643,14 +2657,14 @@ Oatlog is implemented as a procedural Rust macro, effectively compiling EqSat th
 program. This is different from egglog, in that Oatlog is more focused on being embeddable and is
 compiled ahead-of-time rather than being interpreted. We find that this has two large consequences.
 
-The first of these is that at the cost of a multiple-second compilation time, Oatlog does not
+The first consequence is that at the cost of a multiple-second compilation time, Oatlog does not
 experience hundreds of microseconds of overhead for theory initialization and every EqSat step. This
 makes Oatlog more suitable for latency-critical or massively parallel use of many small e-graphs,
 which one can find in per-function or per-basic-block optimization within a compiler. However, the
 difference is likely to be less inherent for large e-graphs, where the interpreter's overhead is
 amortized over the data plane.
 
-The second advantage of an ahead-of-time architecture lies in improving prototypability and
+The second consequence of an ahead-of-time architecture lies in improving prototypability and
 debuggability driven by reading and modifying the Rust code generated by the e-graph compiler. This
 aspect simplifies performance engineering for Oatlog, as one can easily separate the problems of
 determinining what efficient codegen looks like and how to modify to compiler to generate such code,
@@ -2670,10 +2684,9 @@ programs, as illustrated by egglog's test suite. This is a consequence of perfor
 taken precedence over compatibility work -- allowing us to demonstrate a large speedup over the
 previous state of the art within the limited scope of a master's thesis.
 
-We cannot pinpoint precisely why Oatlog is faster than egglog nor can we recommend the changes to
-egglog that would most effectively bridge the gap. This is largely due to us not having looked into
-this, particularly due to us not having a deep understanding of egglog's implementation details.
-Addressing this could be valuable future work.
+We cannot pinpoint precisely why Oatlog is faster than egglog nor can we recommend changes to egglog
+that would effectively bridge the gap. This is largely due to our limited understanding of egglog's
+implementation details and addressing it could be valuable future work.
 
 In particular, one large difference in implementation details between Oatlog and egglog is the
 choice of flat vs trie indexes. Flat indexes -- effectively `HashMap<(A, B), C>` -- require fewer
