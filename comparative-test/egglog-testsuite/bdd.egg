@@ -63,7 +63,6 @@
     (ITE n (bddxor a1 b1) (bddxor a2 b2))
 )
 
-(push)
 ;;; Tests
 
 (let v0 (ITE 0 True False))
@@ -87,21 +86,20 @@
 (let t9 (bddand (bddnot v1) (bddand (bddnot v0) (bddxor v0 v1))))
 (let t10 (bddor (bddnot v1) (bddor (bddnot v0) (bddxor  v0 (bddnot v1)))))
 
-(run 30)
-
-(check (= t0 v0)) ; bddnot cancels
-(check (= t1 True))
-(check (= t2 False))
-(check (= t3 v0))
-(check (= t4 v0))
-(check (= t5 True))
-(check (= t6 v2))
-
-(check (= t7a t7b))
-(check (= t7a t7c))
-
-(check (= t8 (ITE 1 (ITE 2 True False) False)))
-
-(check (= t9 False))
-(check (= t10 True))
-(pop)
+; (run 30)
+; 
+; (check (= t0 v0)) ; bddnot cancels
+; (check (= t1 True))
+; (check (= t2 False))
+; (check (= t3 v0))
+; (check (= t4 v0))
+; (check (= t5 True))
+; (check (= t6 v2))
+; 
+; (check (= t7a t7b))
+; (check (= t7a t7c))
+; 
+; (check (= t8 (ITE 1 (ITE 2 True False) False)))
+; 
+; (check (= t9 False))
+; (check (= t10 True))

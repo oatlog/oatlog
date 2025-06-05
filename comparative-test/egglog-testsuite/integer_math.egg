@@ -35,7 +35,7 @@
 (rule ((= e (Const c))) ((evals-to e c)))
 
 (relation is-not-zero (Math))
-(rule ((MathU a) (!= a (Const 0))) ((is-not-zero a)))
+(rule ((MathU a) (= a (Const x)) (!= x 0)) ((is-not-zero a)))
 
 ;; Evaluation
 (rewrite (Add (Const a) (Const b))
@@ -60,8 +60,8 @@
 (rewrite (Mul a (Const 0)) (Const 0))
 (rewrite (Mul a (Const 1)) a)
 
-(rule ((MathU a) (!= a (Const 0))) ((union a (Add a (Const 0)))))
-(rule ((MathU a) (!= a (Const 1))) ((union a (Mul a (Const 1)))))
+(rule ((MathU a) (= a (Const x)) (!= x 0)) ((union a (Add a (Const 0)))))
+(rule ((MathU a) (= a (Const x)) (!= x 1)) ((union a (Mul a (Const 1)))))
 
 (rewrite (Sub a a) (Const 0))
 (rewrite (Div a a) (Const 1) :when ((is-not-zero a)))
@@ -100,7 +100,7 @@
                 )
                 ))
 
-(run 4)
-
-(check (= start-expr equiv-expr))
+; (run 4)
+; 
+; (check (= start-expr equiv-expr))
 

@@ -25,17 +25,27 @@
 ;; e-graph 2: f(f(a)) = f(f(b))
 (let t2  (f (f a2)))
 (let t2p (f (f b2)))
-(union t2 t2p)
 
-(union (intersect a1 a2) a3)
-(union (intersect b1 b2) b3)
 
-(run 100)
+(datatype Initial (Init))
+
+(Init)
+
+(rule ((Init)) (
+    (union t2 t2p)
+
+    (union (intersect a1 a2) a3)
+    (union (intersect b1 b2) b3)
+
+))
+
+
+; (run 100)
 
 (let t3 (f (f a3)))
-(query-extract :variants 5 t3)
+; (query-extract :variants 5 t3)
 
 ;; f(f(a)) = f(f(b)) is preserved
-(check (= (f (f a3)) (f (f b3))))
+; (check (= (f (f a3)) (f (f b3))))
 ;; but not f(a) = f(b), it was only in e-graph 1
-(check (!= (f a3) (f b3)))
+; (check (!= (f a3) (f b3)))

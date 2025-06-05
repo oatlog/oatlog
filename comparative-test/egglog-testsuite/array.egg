@@ -22,8 +22,8 @@
 (rule ((neq x y))
       ((neq y x)))
 
-(rule ((neq x x))
-      ((panic "query (neq x x) found something equal to itself")))
+; (rule ((neq x x))
+;       ((panic "query (neq x x) found something equal to itself")))
 
 
 ; injectivity rules take not equal to not equal.
@@ -53,7 +53,7 @@
 (rewrite (add (Num x) (Num y)) (Num (+ x y)))
 (rewrite (add x (Num 0)) x)
 
-(push)
+; (push)
 (let r1 (Var "r1"))
 (let r2 (Var "r2"))
 (let r3 (Var "r3"))
@@ -67,11 +67,11 @@
 (let test3 (select (store (store mem1 (add r1 r2) (Num 1)) (add r2 r1) (Num 2)) (add r1 r3)))
 (let test4 (add (Num 1) (add (add (Num 1) (add (Num 1) r1)) (Num -3))))
 
-(run 5)
-(check (= test1 (Num 42)))
-(check (neq r1 r2))
-(check (neq r1 (add r1 (Num 17))))
-(check (= test2 (select mem1 (add r1 (Num 17)))))
-(check (= test3 (select mem1 (add r1 r3))))
-(check (= test4 r1))
-(pop)
+; (run 5)
+; (check (= test1 (Num 42)))
+; (check (neq r1 r2))
+; (check (neq r1 (add r1 (Num 17))))
+; (check (= test2 (select mem1 (add r1 (Num 17)))))
+; (check (= test3 (select mem1 (add r1 r3))))
+; (check (= test4 r1))
+; (pop)

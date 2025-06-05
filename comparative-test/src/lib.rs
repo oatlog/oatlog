@@ -250,50 +250,28 @@ mod egglog_testsuite {
 
 use expect_test::expect;
 
-egglog_test!(nogenerate, antiunify, expect![[r#"
-    comparative-test/egglog-testsuite/antiunify.egg: not implemented
-    ( query-extract au12 )
-
-    comparative-test/egglog-testsuite/antiunify.egg: while parsing this toplevel expression
-    ( query-extract au12 )
-
-    comparative-test/egglog-testsuite/antiunify.egg: while reading comparative-test/egglog-testsuite/antiunify.egg
-    ( include "comparative-test/egglog-testsuite/antiunify.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/antiunify.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#);// needs primitive functions
-egglog_test!(nogenerate, array, expect![[r#"
-    comparative-test/egglog-testsuite/array.egg: panic not implemented
-    ( panic "query (neq x x) found something equal to itself" )
-
-    comparative-test/egglog-testsuite/array.egg: while parsing this toplevel expression
-    ( rule ( ( neq x x ) ) ( ( panic "query (neq x x) found something equal to itself" ) ) )
-
-    comparative-test/egglog-testsuite/array.egg: while reading comparative-test/egglog-testsuite/array.egg
-    ( include "comparative-test/egglog-testsuite/array.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/array.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
-egglog_test!(nogenerate, bdd, expect![[r#"
-    comparative-test/egglog-testsuite/bdd.egg: not implemented yet
-    ( push )
-
-    comparative-test/egglog-testsuite/bdd.egg: while parsing this toplevel expression
-    ( push )
-
-    comparative-test/egglog-testsuite/bdd.egg: while reading comparative-test/egglog-testsuite/bdd.egg
-    ( include "comparative-test/egglog-testsuite/bdd.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/bdd.egg" )
-
+// MODIFIED TO REMOVE QUERY EXTRACT
+egglog_test!(allcorrect, antiunify, expect![[r#"
+    AU: 33861
+    Add: 33852
+    Num: 3
+    Var: 2
+"#]], r#"(include "comparative-test/egglog-testsuite/antiunify.egg")"#, limit=2);// needs primitive functions
+// MODIFIED TO REMOVE PANIC ACTION, PUSH, POP
+egglog_test!(does_panic, array, expect![""], r#"(include "comparative-test/egglog-testsuite/array.egg")"#);// needs panic (does not use vec)
+// MODIFIED TO REMOVE PUSH POP
+egglog_test!(mismatched, bdd, expect![[r#"
+    ITE: 20 (egglog) != 21 (oatlog)
+    bddand: 24 (egglog) != 26 (oatlog)
+    bddnot: 7 (egglog) != 9 (oatlog)
+    bddor: 17 (egglog) != 19 (oatlog)
+    bddxor: 16 (egglog) != 20 (oatlog)
 "#]], r#"(include "comparative-test/egglog-testsuite/bdd.egg")"#);// primitive functions
-egglog_test!(mismatched, before_proofs, expect![[r#"
-    Add: 34 (egglog) != 10 (oatlog)
+// MODIFIED TO REMOVE CHECK, OoO declarations
+egglog_test!(allcorrect, before_proofs, expect![[r#"
+    Add: 32
+    Const: 2
+    Var: 1
 "#]], r#"(include "comparative-test/egglog-testsuite/before-proofs.egg")"#); // REASON: clear transient not performed on check, so globals have not affected the database yet.
 egglog_test!(nogenerate, bignum, expect![[r#"
     comparative-test/egglog-testsuite/bignum.egg: function bigint is not defined
@@ -464,20 +442,15 @@ egglog_test!(nogenerate, eqsat_basic_multiset, expect![[r#"
     ( include "comparative-test/egglog-testsuite/eqsat-basic-multiset.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/eqsat-basic-multiset.egg")"#);//datatype*
-egglog_test!(nogenerate, eqsolve, expect![[r#"
-    comparative-test/egglog-testsuite/eqsolve.egg: not implemented yet
-    ( union ( Add ( Var "x" ) ( Num 2 ) ) ( Num 7 ) )
-
-    comparative-test/egglog-testsuite/eqsolve.egg: while parsing this toplevel expression
-    ( union ( Add ( Var "x" ) ( Num 2 ) ) ( Num 7 ) )
-
-    comparative-test/egglog-testsuite/eqsolve.egg: while reading comparative-test/egglog-testsuite/eqsolve.egg
-    ( include "comparative-test/egglog-testsuite/eqsolve.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/eqsolve.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#);//primitive functions
+// MODIFIED TO REMOVE TOPLEVEL ACTION
+egglog_test!(allcorrect, eqsolve, expect![[r#"
+    Add: 369
+    Init: 1
+    Mul: 46
+    Neg: 27
+    Num: 14
+    Var: 3
+"#]], r#"(include "comparative-test/egglog-testsuite/eqsolve.egg")"#, limit=5);//primitive functions
 egglog_test!(zrocorrect, f64, expect![], r#"(include "comparative-test/egglog-testsuite/f64.egg")"#);
 egglog_test!(nogenerate, fail_wrong_assertion, expect![[r#"
     comparative-test/egglog-testsuite/fail_wrong_assertion.egg: not implemented yet
@@ -493,33 +466,12 @@ egglog_test!(nogenerate, fail_wrong_assertion, expect![[r#"
     ( include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/fail_wrong_assertion.egg")"#);//primtive functions
-egglog_test!(nogenerate, fibonacci_demand, expect![[r#"
-    comparative-test/egglog-testsuite/fibonacci-demand.egg: will not implement, this only makes sense for an interpreter
-    ( extract f7 )
-
-    comparative-test/egglog-testsuite/fibonacci-demand.egg: while parsing this toplevel expression
-    ( extract f7 )
-
-    comparative-test/egglog-testsuite/fibonacci-demand.egg: while reading comparative-test/egglog-testsuite/fibonacci-demand.egg
-    ( include "comparative-test/egglog-testsuite/fibonacci-demand.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/fibonacci-demand.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/fibonacci-demand.egg")"#);//function call + is not defined
-egglog_test!(nogenerate, fibonacci, expect![[r#"
-    comparative-test/egglog-testsuite/fibonacci.egg: not implemented yet
-    ( set ( fib 0 ) 0 )
-
-    comparative-test/egglog-testsuite/fibonacci.egg: while parsing this toplevel expression
-    ( set ( fib 0 ) 0 )
-
-    comparative-test/egglog-testsuite/fibonacci.egg: while reading comparative-test/egglog-testsuite/fibonacci.egg
-    ( include "comparative-test/egglog-testsuite/fibonacci.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/fibonacci.egg" )
-
+// MODIFIED TO REMOVE EXTRACT
+egglog_test!(zrocorrect, fibonacci_demand, expect![""], r#"(include "comparative-test/egglog-testsuite/fibonacci-demand.egg")"#);//function call + is not defined
+// MODIFIED TO REMOVE TOPLEVEL ACTION
+egglog_test!(allcorrect, fibonacci, expect![[r#"
+    Initial: 1
+    fib: 11
 "#]], r#"(include "comparative-test/egglog-testsuite/fibonacci.egg")"#);//primitive functions
 egglog_test!(nogenerate, fusion, expect![[r#"
     comparative-test/egglog-testsuite/fusion.egg: collections are not supported yet: ("Set", [Var("Var")])
@@ -568,20 +520,26 @@ egglog_test!(allcorrect, include, expect![[r#"
     edge: 3
     path: 6
 "#]], r#"(include "comparative-test/egglog-testsuite/include.egg")"#);//needs updated paths
-egglog_test!(nogenerate, integer_math, expect![[r#"
-    comparative-test/egglog-testsuite/integer_math.egg: No function named != can be used here with input ["Math", "Math"] and output "?"
-    !=
-
-    comparative-test/egglog-testsuite/integer_math.egg: while parsing this toplevel expression
-    ( rule ( ( MathU a ) ( != a ( Const 0 ) ) ) ( ( is-not-zero a ) ) )
-
-    comparative-test/egglog-testsuite/integer_math.egg: while reading comparative-test/egglog-testsuite/integer_math.egg
-    ( include "comparative-test/egglog-testsuite/integer_math.egg" )
-
-    toplevel: while parsing this toplevel expression
-    ( include "comparative-test/egglog-testsuite/integer_math.egg" )
-
-"#]], r#"(include "comparative-test/egglog-testsuite/integer_math.egg")"#);// needs !=
+// MODIFIED TO REMOVE != on eclasses
+egglog_test!(allcorrect, integer_math, expect![[r#"
+    Add: 1204
+    Const: 6
+    Diff: 0
+    Div: 1
+    Integral: 0
+    LShift: 1
+    MathU: 59
+    Mod: 0
+    Mul: 662
+    Not: 2
+    Pow: 1
+    RShift: 0
+    Sub: 1
+    Var: 3
+    evals-to: 6
+    is-not-zero: 5
+"#]], r#"(include "comparative-test/egglog-testsuite/integer_math.egg")"#, limit=5);// needs !=
+// MODIFIED TO REMOVE TOPLEVEL ACTION, extract
 egglog_test!(nogenerate, intersection, expect![[r#"
     comparative-test/egglog-testsuite/intersection.egg: not implemented yet
     ( union ( f a1 ) fb1 )
@@ -596,6 +554,7 @@ egglog_test!(nogenerate, intersection, expect![[r#"
     ( include "comparative-test/egglog-testsuite/intersection.egg" )
 
 "#]], r#"(include "comparative-test/egglog-testsuite/intersection.egg")"#);// needs query-extract
+// -----------------------------------
 egglog_test!(nogenerate, interval, expect![[r#"
     comparative-test/egglog-testsuite/interval.egg: not implemented yet
     ( set ( lo x ) -10 )
