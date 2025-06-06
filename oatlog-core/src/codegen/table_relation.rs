@@ -303,12 +303,29 @@ fn update_with_category(
         .collect_vec()
     };
 
+    let prefetch_cols = |x: Box<dyn Iterator<Item = ColumnId>>| -> TokenStream {
+        x.map(|x| {
+            let ty = &theory.types[rel.columns[x]];
+            let col_ident = ident::column(x);
+            match ty.kind {
+                TypeKind::Symbolic => {
+                    let uf_ident = ident::type_uf(ty);
+                    quote!(uf.#uf_ident.prefetch(#col_ident);)
+                }
+                TypeKind::Primitive { type_path: _ } => {
+                    quote!()
+                }
+            }
+        })
+        .collect()
+    };
+
     let update_begin_impl = match classification {
         EclassToEclass(key_columns, value_columns)
         | EclassToLattice(key_columns, value_columns)
         | PrimitiveToEclass(key_columns, value_columns)
         | PrimitiveToLattice(key_columns, value_columns) => {
-            let columns = rel.columns.enumerate().map(ident::column);
+            let columns = rel.columns.enumerate().map(ident::column).collect_vec();
 
             let field_ident = ident::index_field(&index_to_info[primary_index]);
 
@@ -373,8 +390,59 @@ fn update_with_category(
                 }
             };
 
+            /*
+            let prefetch_impl = {
+                let prefetch_uf = prefetch_cols(Box::new(rel.columns.enumerate()));
+                let key_cols = key_columns.iter().copied().map(ident::column).collect_vec();
+                quote! {
+                    if let Some(&(#(mut #columns,)*)) = insertions.get(i + 100) {
+                        #prefetch_uf
+                        prefetch_map(&self.#field_ident, (#(#key_cols,)*));
+                    }
+                }
+            };
+            */
+
+            let key_cols = key_columns.iter().copied().map(ident::column).collect_vec();
+            let val_cols = value_columns
+                .keys()
+                .copied()
+                .map(ident::column)
+                .collect_vec();
             quote! {
+                /*
+                runtime::reinsert_hashmap(
+                    &mut self.#field_ident,
+                    insertions,
+                    |map, (#(mut #columns,)*), row_timestamp| {
+                        let old_key = (#(#key_cols,)*);
+                        let new_key = (#(#find_keys,)*);
+                        match map.entry(new_key) {
+                             runtime::HashMapEntry::Occupied(mut entry) => #merge_expr,
+                             runtime::HashMapEntry::Vacant(entry) => {
+                                 // we need latest timestamp iff row was canonicalized.
+                                 let old_values = (#(#val_cols,)*);
+                                 let new_values = (#(#find_values,)*);
+
+                                 let timestamp = if old_values == new_values && old_key == new_key {
+                                     latest_timestamp
+                                 } else {
+                                     row_timestamp
+                                 };
+
+                                 let (#(#val_cols,)*) = new_values;
+                                 entry.insert((#(#val_cols,)* row_timestamp,));
+                             }
+                        }
+                    },
+                    |(#(#key_cols,)*), (#(#val_cols,)* timestamp,)| ((#(#columns,)*), timestamp),
+                    latest_timestamp,
+                );
+                */
                 for &(#(mut #columns,)*) in insertions {
+                // for i in 0..insertions.len() {
+                //     let (#(mut #columns,)*) = insertions[i];
+                //     #prefetch_impl
                     match self.#field_ident.entry((#(#find_keys,)*)) {
                          runtime::HashMapEntry::Occupied(mut entry) => #merge_expr,
                          runtime::HashMapEntry::Vacant(entry) => {
@@ -441,7 +509,7 @@ fn update_with_category(
                     .reduce(|a, b| quote! { #a & #b })
                     .unwrap_or(quote! { true });
 
-                let columns = rel.columns.enumerate().map(ident::column);
+                let columns = rel.columns.enumerate().map(ident::column).collect_vec();
 
                 quote! {
                     if #no_fresh_uprooted {
@@ -450,6 +518,14 @@ fn update_with_category(
                     let offset = insertions.len();
                     #(#update_num_uprooted)*
 
+                    /*
+                    runtime::retain_hashmap(
+                        &mut self.#field_ident,
+                        insertions,
+                        |(#(#key_ident,)*), (#(#value_ident,)* _timestamp)| (#(#columns,)*),
+                        |(#(#columns,)*)| #is_root,
+                    );
+                    */
                     self.#field_ident.retain(|&(#(#key_ident,)*),&mut (#(#value_ident,)* _timestamp)| {
                         if #is_root {
                             true
@@ -751,6 +827,7 @@ fn update(
     use itertools::Itertools as _;
 
     return update_with_category(rel, theory, index_to_info);
+    /*
 
     let (reset_num_uprooted_at_latest_retain_impl, update_num_uprooted_at_latest_retain_impl): (
         TokenStream,
@@ -1350,6 +1427,7 @@ fn update(
             });
         }
     }
+    */
 }
 
 /// Generate iter check and entry for a given index.

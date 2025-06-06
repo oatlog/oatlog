@@ -26,12 +26,16 @@ pub use crate::{
         uf::UnionFind,
     },
 };
-pub use hashbrown::{HashMap, hash_map::Entry as HashMapEntry};
+pub use hashbrown_14::{HashMap, hash_map::Entry as HashMapEntry};
 pub use smallvec::SmallVec;
 pub use std::{
     convert::Infallible,
     hash::Hash,
     mem::{swap, take},
+};
+use std::{
+    hash::{BuildHasherDefault, Hasher},
+    mem::replace,
 };
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
@@ -52,8 +56,8 @@ impl Ord for OrdF64 {
         self.0.total_cmp(&other.0)
     }
 }
-impl std::hash::Hash for OrdF64 {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl Hash for OrdF64 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_bits().hash(state);
     }
 }
@@ -67,6 +71,151 @@ impl RelationElement for OrdF64 {
     const MIN_ID: Self = OrdF64(f64::MIN);
 
     const MAX_ID: Self = OrdF64(f64::MAX);
+}
+
+#[inline(always)]
+pub fn prefetch_ptr<T>(ptr: *const T) {
+    use core::arch::x86_64::{_MM_HINT_T0, _mm_prefetch};
+
+    #[cfg(not(target_arch = "x86_64"))]
+    compile_error!("prefetch code assumes a x86 system.");
+
+    // SAFETY: we are on an x86_64 system.
+    // Prefetching out of bounds is safe.
+    unsafe { _mm_prefetch(ptr as *const i8, _MM_HINT_T0) };
+}
+
+#[inline(always)]
+pub fn retain_hashmap<Key: Hash + Copy, Val: Copy, Row: Copy>(
+    map: &mut hashbrown_14::HashMap<Key, Val>,
+    out: &mut Vec<Row>,
+    pack_key_val: impl Fn(Key, Val) -> Row,
+    mut row_is_root: impl FnMut(Row) -> bool,
+) {
+    map.retain(|&key, &mut val| {
+        let row = pack_key_val(key, val);
+        if row_is_root(row) {
+            true
+        } else {
+            out.push(row);
+            false
+        }
+    });
+}
+
+/*
+fn foo(map, insertions) {
+
+
+    if insertions > map.leftover_capacity {
+
+        // we get "free" margin because round to power of 2 AND most insertions probably
+        // don' t do anything.
+        let mut old_map = HashMap::with_capacity(map + insertions);
+        swap(&mut old_map, map);
+
+        // this is *mostly* using memory linearly
+        for x in old_map {
+            map.insert(x);
+        }
+    }
+
+    for x in insertions {
+        map.insert(x);
+    }
+}
+*/
+
+pub fn reinsert_hashmap<Key: Hash + Copy, Val: Copy, Row: Copy>(
+    map: &mut hashbrown_14::HashMap<Key, Val>,
+    insertions: &[Row],
+    mut map_insert: impl FnMut(&mut hashbrown_14::HashMap<Key, Val>, Row, TimeStamp),
+    pack_key_val: impl Fn(Key, Val) -> (Row, TimeStamp),
+    latest_timestamp: TimeStamp,
+) {
+    let needed_capacity = map.len() + insertions.len();
+    let current_capacity = map.capacity();
+
+    // eagerly rehash
+    if needed_capacity > current_capacity {
+        let hasher: BuildHasherDefault<_> = map.hasher().clone();
+
+        let old_map = replace(
+            map,
+            HashMap::with_capacity_and_hasher(needed_capacity, hasher),
+        );
+
+        for (&key, &value) in old_map.iter() {
+            let (row, timestamp) = pack_key_val(key, value);
+            map_insert(map, row, timestamp);
+        }
+    }
+
+    for &row in insertions.iter() {
+        map_insert(map, row, latest_timestamp);
+    }
+}
+
+// insert rhs into lhs
+/*
+fn foo(lhs, rhs, lhs_time, rhs_time, latest) {
+
+    // rhs changed => latest_timestamp
+    // merge => rhs changed
+
+
+}
+*/
+
+#[inline(always)]
+pub fn prefetch_map<K: Hash, V>(map: &hashbrown_14::HashMap<K, V>, key: K) {
+    use std::hash::BuildHasher;
+
+    if map.is_empty() {
+        // required by safety invariant of `RawTable::bucket`.
+        // it's probably still safe on x86 to prefetch out of bounds.
+        return;
+    }
+
+    let hasher = map.hasher();
+    let hash = hasher.hash_one(key);
+    let raw_table = map.raw_table();
+    let bucket_mask = (raw_table.buckets() - 1) as u64;
+    let idx = (hash & bucket_mask) as usize;
+
+    // from hashbrown 0.14 docs
+    // If mem::size_of::<T>() != 0 then return a pointer to the `element` in the `data part` of the table
+    // (we start counting from "0", so that in the expression T[n], the "n" index actually one less than
+    // the "buckets" number of our `RawTable`, i.e. "n = RawTable::buckets() - 1"):
+    //
+    //           `table.bucket(3).as_ptr()` returns a pointer that points here in the `data`
+    //           part of the `RawTable`, i.e. to the start of T3 (see `Bucket::as_ptr`)
+    //                  |
+    //                  |               `base = self.data_end()` points here
+    //                  |               (to the start of CT0 or to the end of T0)
+    //                  v                 v
+    // [Pad], T_n, ..., |T3|, T2, T1, T0, |CT0, CT1, CT2, CT3, ..., CT_n, CTa_0, CTa_1, ..., CTa_m
+    //                     ^                                              \__________  __________/
+    //        `table.bucket(3)` returns a pointer that points                        \/
+    //         here in the `data` part of the `RawTable` (to              additional control bytes
+    //         the end of T3)                                              `m = Group::WIDTH - 1`
+    //
+    // where: T0...T_n  - our stored data;
+    //        CT0...CT_n - control bytes or metadata for `data`;
+    //        CTa_0...CTa_m - additional control bytes (so that the search with loading `Group` bytes from
+    //                        the heap works properly, even if the result of `h1(hash) & self.table.bucket_mask`
+    //                        is equal to `self.table.bucket_mask`). See also `RawTableInner::set_ctrl` function.
+    //
+    // P.S. `h1(hash) & self.table.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+    // of buckets is a power of two, and `self.table.bucket_mask = self.buckets() - 1`.
+
+    // prefetch data
+    prefetch_ptr(unsafe { raw_table.bucket(idx) }.as_ptr());
+
+    let metadata_start = raw_table.data_end().as_ptr() as *const i8;
+
+    // prefetch metadata
+    prefetch_ptr(metadata_start.wrapping_add(idx));
 }
 
 /// semantically a HashMap<Key, Vec<Value>>
