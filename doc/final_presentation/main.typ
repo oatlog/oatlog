@@ -398,7 +398,104 @@ unify = [{lhs, rhs}]
   ),
 )
 
+- merge locally optimal choices.
+
+== Indexes
+
+- Query subset of columns
+- Add(#highlight[3], ?, ?) `$->$` [Add(#highlight[3], 43, 59), Add(#highlight[3], 59, 25), ..]
+
+Add(X, Y, Z):
+
+- (X,Y) -> Z:
+  - has functional dependence
+  - `HashMap<(X, Y), Z>`
+- (Z) -> (X, Y):
+  - no functional dependence
+  - `HashMap<(Z), Vec<(X, Y)>>`
+  - or `HashMap<(Z), &[(X, Y)]>>`
 
 
+// [#hidden(43)],
+// [#hidden(59)],
+// [#hidden(25)],
+// [#hidden(35)],
+// [#hidden(11)],
+// [#hidden(80)],
+// [#hidden(97)],
+// [#hidden(65)],
+// [#hidden(42)],
 
 
+= Canonicalization
+
+== Union-find datastructure
+
+- consider only e-classes
+
+```
+unify = {(17, 4), (13, 18), (18, 4), (20, 10)}
+```
+
+- find representative e-class id.
+
+```
+union-find = {
+  [17, 13, 18] -> 4, 
+  [20] -> 10
+}
+```
+
+== Canonicalizing relations
+
+Add = [(47, 84, 95), (47, 92, 99), (74, 48, 69)]
+
+```
+union-find = {
+  [92] -> 84, 
+}
+```
+
+Add = [(#highlight[47, 84], 95), (#highlight[47, 84], 99), (74, 48, 69)]
+
+$=> $ unify 95, 99
+
+== Canonicalization implementation
+
+#text(
+  18pt,
+```rust
+let mut map: HashMap<(Eclass, Eclass), Eclass> = ..;
+loop {
+    for (x, y, z) in to_insert.drain(..) {
+        match map[(uf.find(x), uf.find(y))] {
+            Some(old_z) => {
+                uf.union(z, old_z);
+            }
+            None => {
+                map[(x, y)] = z;
+            }
+        }
+    }
+    to_insert.extend(map.drain_if(|(x, y), z| {
+        !(uf.is_root(x) && uf.is_root(y) && uf.is_root(z))
+    }))
+    if to_insert.len() == 0 { break; }
+}
+```
+)
+
+== Saturation
+
+```rust
+loop {
+    apply_rules();
+    canonicalize();
+}
+```
+
+= Discussion
+
+== Bounds on performance
+
+Slowest part is constructing indexes, but that cost can be amortized when more rewrite rules are present.
