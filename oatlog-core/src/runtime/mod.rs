@@ -353,6 +353,7 @@ pub trait Relation {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    fn deferred_update(&mut self) {}
 }
 
 relation_element_wrapper_ty!(IString);

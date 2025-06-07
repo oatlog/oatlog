@@ -185,6 +185,9 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                     });
                 });
             }
+            fn deferred_update(&mut self) {
+                #(self.#relation_ident.deferred_update();)*
+            }
         }
     };
 
@@ -247,6 +250,7 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                         {
                             let start = std::time::Instant::now();
                             log_duration!("apply_rules: {}", {
+                                self.deferred_update();
                                 self.apply_rules();
                             });
                             start.elapsed()

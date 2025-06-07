@@ -333,6 +333,7 @@ fn test_edgecase3() {
                 all: Vec<(TypeList, TimeStamp)>,
                 fd_index_: runtime::HashMap<(), (TypeList, TimeStamp)>,
                 type_list_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for TNilRelation {
                 type Row = (TypeList,);
@@ -351,7 +352,7 @@ fn test_edgecase3() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -462,8 +463,14 @@ fn test_edgecase3() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.type_list_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl TNilRelation {
@@ -504,6 +511,7 @@ fn test_edgecase3() {
                 fd_index_0: runtime::HashMap<(TypeList,), (std::primitive::i64, TimeStamp)>,
                 type_list_num_uprooted_at_latest_retain: usize,
                 i64_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for TypeListLengthRelation {
                 type Row = (TypeList, std::primitive::i64);
@@ -522,7 +530,7 @@ fn test_edgecase3() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -643,8 +651,14 @@ fn test_edgecase3() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.type_list_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl TypeListLengthRelation {
@@ -745,6 +759,7 @@ fn test_edgecase3() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -851,6 +866,10 @@ fn test_edgecase3() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.t_nil_.deferred_update();
+                    self.type_list_length_.deferred_update();
                 }
             }
             impl EclassProvider<TypeList> for Theory {
@@ -1154,6 +1173,7 @@ fn test_primitive_in_premise() {
                 nofd_index_: runtime::IndexedSortedList<(), (std::primitive::i64, Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -1172,7 +1192,7 @@ fn test_primitive_in_premise() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -1294,6 +1314,13 @@ fn test_primitive_in_premise() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| ());
@@ -1306,8 +1333,7 @@ fn test_primitive_in_premise() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl ConstRelation {
@@ -1414,6 +1440,7 @@ fn test_primitive_in_premise() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -1538,6 +1565,9 @@ fn test_primitive_in_premise() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.const_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -2503,6 +2533,7 @@ fn regression_tir2() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -2521,7 +2552,7 @@ fn regression_tir2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2654,8 +2685,14 @@ fn regression_tir2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl MulRelation {
@@ -2704,6 +2741,7 @@ fn regression_tir2() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
@@ -2722,7 +2760,7 @@ fn regression_tir2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -2855,6 +2893,13 @@ fn regression_tir2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort010::sort(&mut self.all);
@@ -2867,8 +2912,7 @@ fn regression_tir2() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl PowRelation {
@@ -2936,6 +2980,7 @@ fn regression_tir2() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -2954,7 +2999,7 @@ fn regression_tir2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3076,8 +3121,14 @@ fn regression_tir2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -3208,6 +3259,7 @@ fn regression_tir2() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -3340,6 +3392,11 @@ fn regression_tir2() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.mul_.deferred_update();
+                    self.pow_.deferred_update();
+                    self.const_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -3493,6 +3550,7 @@ fn regression_tir1() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
@@ -3511,7 +3569,7 @@ fn regression_tir1() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3644,8 +3702,14 @@ fn regression_tir1() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl SubRelation {
@@ -3694,6 +3758,7 @@ fn regression_tir1() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -3712,7 +3777,7 @@ fn regression_tir1() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -3834,8 +3899,14 @@ fn regression_tir1() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -3933,6 +4004,7 @@ fn regression_tir1() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -4034,6 +4106,10 @@ fn regression_tir1() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.sub_.deferred_update();
+                    self.const_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -5048,6 +5124,7 @@ fn codegen_constant_propagation() {
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -5066,7 +5143,7 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -5199,6 +5276,13 @@ fn codegen_constant_propagation() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -5223,8 +5307,7 @@ fn codegen_constant_propagation() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -5312,6 +5395,7 @@ fn codegen_constant_propagation() {
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -5330,7 +5414,7 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -5463,6 +5547,13 @@ fn codegen_constant_propagation() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -5487,8 +5578,7 @@ fn codegen_constant_propagation() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -5576,6 +5666,7 @@ fn codegen_constant_propagation() {
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (std::primitive::i64, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -5594,7 +5685,7 @@ fn codegen_constant_propagation() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -5716,6 +5807,13 @@ fn codegen_constant_propagation() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
@@ -5728,8 +5826,7 @@ fn codegen_constant_propagation() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl ConstRelation {
@@ -5845,6 +5942,7 @@ fn codegen_constant_propagation() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -6003,6 +6101,11 @@ fn codegen_constant_propagation() {
                         });
                     });
                 }
+                fn deferred_update(&mut self) {
+                    self.add_.deferred_update();
+                    self.mul_.deferred_update();
+                    self.const_.deferred_update();
+                }
             }
             impl EclassProvider<Math> for Theory {
                 fn make(&mut self) -> Math {
@@ -6076,6 +6179,7 @@ fn codegen_commutative() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -6094,7 +6198,7 @@ fn codegen_commutative() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -6227,8 +6331,14 @@ fn codegen_commutative() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl AddRelation {
@@ -6319,6 +6429,7 @@ fn codegen_commutative() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -6393,6 +6504,9 @@ fn codegen_commutative() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.add_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -6521,6 +6635,7 @@ fn regression_entry2() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
@@ -6539,7 +6654,7 @@ fn regression_entry2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -6672,8 +6787,14 @@ fn regression_entry2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl SubRelation {
@@ -6722,6 +6843,7 @@ fn regression_entry2() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -6740,7 +6862,7 @@ fn regression_entry2() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -6862,8 +6984,14 @@ fn regression_entry2() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -6961,6 +7089,7 @@ fn regression_entry2() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -7056,6 +7185,10 @@ fn regression_entry2() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.sub_.deferred_update();
+                    self.const_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -7169,6 +7302,7 @@ fn regression_entry() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for IntegralRelation {
                 type Row = (Math, Math, Math);
@@ -7187,7 +7321,7 @@ fn regression_entry() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -7320,8 +7454,14 @@ fn regression_entry() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl IntegralRelation {
@@ -7369,6 +7509,7 @@ fn regression_entry() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -7387,7 +7528,7 @@ fn regression_entry() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -7520,8 +7661,14 @@ fn regression_entry() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl AddRelation {
@@ -7618,6 +7765,7 @@ fn regression_entry() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -7714,6 +7862,10 @@ fn regression_entry() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.integral_.deferred_update();
+                    self.add_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -7820,6 +7972,7 @@ fn test_bind_variable_multiple_times() {
                 all: Vec<(Foo, Foo, Foo, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Foo, Foo), (Foo, TimeStamp)>,
                 foo_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SameRelation {
                 type Row = (Foo, Foo, Foo);
@@ -7838,7 +7991,7 @@ fn test_bind_variable_multiple_times() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -7971,8 +8124,14 @@ fn test_bind_variable_multiple_times() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.foo_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl SameRelation {
@@ -8057,6 +8216,7 @@ fn test_bind_variable_multiple_times() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -8135,6 +8295,9 @@ fn test_bind_variable_multiple_times() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.same_.deferred_update();
                 }
             }
             impl EclassProvider<Foo> for Theory {
@@ -8324,6 +8487,7 @@ fn codegen_variable_reuse_bug() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -8342,7 +8506,7 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -8475,6 +8639,13 @@ fn codegen_variable_reuse_bug() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort101::sort(&mut self.all);
@@ -8487,8 +8658,7 @@ fn codegen_variable_reuse_bug() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -8554,6 +8724,7 @@ fn codegen_variable_reuse_bug() {
                 all: Vec<(Math, TimeStamp)>,
                 fd_index_: runtime::HashMap<(), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ZeroRelation {
                 type Row = (Math,);
@@ -8572,7 +8743,7 @@ fn codegen_variable_reuse_bug() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -8683,8 +8854,14 @@ fn codegen_variable_reuse_bug() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ZeroRelation {
@@ -8780,6 +8957,7 @@ fn codegen_variable_reuse_bug() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -8886,6 +9064,10 @@ fn codegen_variable_reuse_bug() {
                         });
                     });
                 }
+                fn deferred_update(&mut self) {
+                    self.add_.deferred_update();
+                    self.zero_.deferred_update();
+                }
             }
             impl EclassProvider<Math> for Theory {
                 fn make(&mut self) -> Math {
@@ -8961,6 +9143,7 @@ fn initial_exprs() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -8979,7 +9162,7 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -9112,8 +9295,14 @@ fn initial_exprs() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl AddRelation {
@@ -9161,6 +9350,7 @@ fn initial_exprs() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -9179,7 +9369,7 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -9312,8 +9502,14 @@ fn initial_exprs() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl MulRelation {
@@ -9362,6 +9558,7 @@ fn initial_exprs() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -9380,7 +9577,7 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -9502,8 +9699,14 @@ fn initial_exprs() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -9550,6 +9753,7 @@ fn initial_exprs() {
                 fd_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
@@ -9568,7 +9772,7 @@ fn initial_exprs() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -9690,8 +9894,14 @@ fn initial_exprs() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl VarRelation {
@@ -9844,6 +10054,7 @@ fn initial_exprs() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -9965,6 +10176,12 @@ fn initial_exprs() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.add_.deferred_update();
+                    self.mul_.deferred_update();
+                    self.const_.deferred_update();
+                    self.var_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -10252,6 +10469,7 @@ fn codegen_bug1() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -10307,6 +10525,7 @@ fn codegen_bug1() {
                         });
                     });
                 }
+                fn deferred_update(&mut self) {}
             }
             impl std::ops::Deref for Theory {
                 type Target = Delta;
@@ -10384,6 +10603,7 @@ fn initial() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -10439,6 +10659,7 @@ fn initial() {
                         });
                     });
                 }
+                fn deferred_update(&mut self) {}
             }
             impl std::ops::Deref for Theory {
                 type Target = Delta;
@@ -10578,6 +10799,7 @@ fn test_primitives_simple() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -10596,7 +10818,7 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -10729,6 +10951,13 @@ fn test_primitives_simple() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort010::sort(&mut self.all);
@@ -10741,8 +10970,7 @@ fn test_primitives_simple() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -10809,6 +11037,7 @@ fn test_primitives_simple() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -10827,7 +11056,7 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -10960,8 +11189,14 @@ fn test_primitives_simple() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl AddRelation {
@@ -11010,6 +11245,7 @@ fn test_primitives_simple() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -11028,7 +11264,7 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -11150,8 +11386,14 @@ fn test_primitives_simple() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -11203,6 +11445,7 @@ fn test_primitives_simple() {
                 fd_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
@@ -11221,7 +11464,7 @@ fn test_primitives_simple() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -11343,8 +11586,14 @@ fn test_primitives_simple() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl VarRelation {
@@ -11468,6 +11717,7 @@ fn test_primitives_simple() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -11656,6 +11906,12 @@ fn test_primitives_simple() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.mul_.deferred_update();
+                    self.add_.deferred_update();
+                    self.const_.deferred_update();
+                    self.var_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -11883,6 +12139,7 @@ fn triangle_join() {
                 nofd_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for FooRelation {
                 type Row = (Math, Math);
@@ -11901,7 +12158,7 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.nofd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -12010,6 +12267,13 @@ fn triangle_join() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort10::sort(&mut self.all);
@@ -12046,8 +12310,7 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl FooRelation {
@@ -12106,6 +12369,7 @@ fn triangle_join() {
                 nofd_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for BarRelation {
                 type Row = (Math, Math);
@@ -12124,7 +12388,7 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.nofd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -12233,6 +12497,13 @@ fn triangle_join() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort10::sort(&mut self.all);
@@ -12269,8 +12540,7 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl BarRelation {
@@ -12329,6 +12599,7 @@ fn triangle_join() {
                 nofd_index_0_1: runtime::IndexedSortedList<(Math, Math), (TimeStamp,)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for BazRelation {
                 type Row = (Math, Math);
@@ -12347,7 +12618,7 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.nofd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -12456,6 +12727,13 @@ fn triangle_join() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort10::sort(&mut self.all);
@@ -12492,8 +12770,7 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl BazRelation {
@@ -12550,6 +12827,7 @@ fn triangle_join() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 nofd_index_0_1_2: runtime::IndexedSortedList<(Math, Math, Math), (TimeStamp,)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
@@ -12568,7 +12846,7 @@ fn triangle_join() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.nofd_index_0_1_2.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -12689,6 +12967,13 @@ fn triangle_join() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort111::sort(&mut self.all);
@@ -12701,8 +12986,7 @@ fn triangle_join() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl TriangleRelation {
@@ -12798,6 +13082,7 @@ fn triangle_join() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -12946,6 +13231,12 @@ fn triangle_join() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.foo_.deferred_update();
+                    self.bar_.deferred_update();
+                    self.baz_.deferred_update();
+                    self.triangle_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -13181,6 +13472,7 @@ fn edgecase0() {
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -13199,7 +13491,7 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -13332,6 +13624,13 @@ fn edgecase0() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -13368,8 +13667,7 @@ fn edgecase0() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -13475,6 +13773,7 @@ fn edgecase0() {
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -13493,7 +13792,7 @@ fn edgecase0() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -13626,6 +13925,13 @@ fn edgecase0() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -13650,8 +13956,7 @@ fn edgecase0() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -13786,6 +14091,7 @@ fn edgecase0() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -13910,6 +14216,10 @@ fn edgecase0() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.mul_.deferred_update();
+                    self.add_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -14151,6 +14461,7 @@ fn edgecase0_no_egglog_compat() {
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -14169,7 +14480,7 @@ fn edgecase0_no_egglog_compat() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -14302,6 +14613,13 @@ fn edgecase0_no_egglog_compat() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -14338,8 +14656,7 @@ fn edgecase0_no_egglog_compat() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -14444,6 +14761,7 @@ fn edgecase0_no_egglog_compat() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -14462,7 +14780,7 @@ fn edgecase0_no_egglog_compat() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -14595,6 +14913,13 @@ fn edgecase0_no_egglog_compat() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -14607,8 +14932,7 @@ fn edgecase0_no_egglog_compat() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -14724,6 +15048,7 @@ fn edgecase0_no_egglog_compat() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -14847,6 +15172,10 @@ fn edgecase0_no_egglog_compat() {
                         });
                     });
                 }
+                fn deferred_update(&mut self) {
+                    self.mul_.deferred_update();
+                    self.add_.deferred_update();
+                }
             }
             impl EclassProvider<Math> for Theory {
                 fn make(&mut self) -> Math {
@@ -14927,6 +15256,7 @@ fn test_into_codegen() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -14945,7 +15275,7 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -15078,6 +15408,13 @@ fn test_into_codegen() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -15090,8 +15427,7 @@ fn test_into_codegen() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -15159,6 +15495,7 @@ fn test_into_codegen() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -15177,7 +15514,7 @@ fn test_into_codegen() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -15310,6 +15647,13 @@ fn test_into_codegen() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort001::sort(&mut self.all);
@@ -15322,8 +15666,7 @@ fn test_into_codegen() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -15439,6 +15782,7 @@ fn test_into_codegen() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -15547,6 +15891,10 @@ fn test_into_codegen() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.mul_.deferred_update();
+                    self.add_.deferred_update();
                 }
             }
             impl EclassProvider<Math> for Theory {
@@ -17917,6 +18265,7 @@ fn lir_math() {
                 fd_index_0: runtime::HashMap<(FuelUnit,), (FuelUnit, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(FuelUnit,), (FuelUnit, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for FuelRelation {
                 type Row = (FuelUnit, FuelUnit);
@@ -17935,7 +18284,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -18065,6 +18414,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort01::sort(&mut self.all);
@@ -18077,8 +18433,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl FuelRelation {
@@ -18134,6 +18489,7 @@ fn lir_math() {
                 all: Vec<(FuelUnit, TimeStamp)>,
                 fd_index_: runtime::HashMap<(), (FuelUnit, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ZeroFuelRelation {
                 type Row = (FuelUnit,);
@@ -18152,7 +18508,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -18263,8 +18619,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.fuel_unit_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ZeroFuelRelation {
@@ -18305,6 +18667,7 @@ fn lir_math() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for DiffRelation {
                 type Row = (Math, Math, Math);
@@ -18323,7 +18686,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -18456,6 +18819,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort010::sort(&mut self.all);
@@ -18468,8 +18838,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl DiffRelation {
@@ -18541,6 +18910,7 @@ fn lir_math() {
                 nofd_index_1_2: runtime::IndexedSortedList<(Math, Math), (FuelUnit, Math, TimeStamp)>,
                 fuel_unit_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for IntegralRelation {
                 type Row = (FuelUnit, Math, Math, Math);
@@ -18559,7 +18929,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1_2.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -18711,6 +19081,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 self.all
@@ -18763,9 +19141,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl IntegralRelation {
@@ -18914,6 +19290,7 @@ fn lir_math() {
                 nofd_index_0: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
@@ -18932,7 +19309,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -19065,6 +19442,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -19089,8 +19473,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl AddRelation {
@@ -19177,6 +19560,7 @@ fn lir_math() {
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
@@ -19195,7 +19579,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -19328,6 +19712,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort001::sort(&mut self.all);
@@ -19340,8 +19731,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl SubRelation {
@@ -19411,6 +19801,7 @@ fn lir_math() {
                 nofd_index_0_2: runtime::IndexedSortedList<(Math, Math), (Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
@@ -19429,7 +19820,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -19562,6 +19953,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -19598,8 +19996,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl MulRelation {
@@ -19703,6 +20100,7 @@ fn lir_math() {
                 all: Vec<(Math, Math, Math, TimeStamp)>,
                 fd_index_0_1: runtime::HashMap<(Math, Math), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for DivRelation {
                 type Row = (Math, Math, Math);
@@ -19721,7 +20119,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -19854,8 +20252,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl DivRelation {
@@ -19907,6 +20311,7 @@ fn lir_math() {
                 nofd_index_1: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 nofd_index_2: runtime::IndexedSortedList<(Math,), (Math, Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
@@ -19925,7 +20330,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0_1.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -20058,6 +20463,13 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
+                        self.math_num_uprooted_at_latest_retain = 0;
+                    });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
                         log_duration!("reconstruct index: {}", {
                             log_duration!("reconstruct sort: {}", {
                                 RowSort100::sort(&mut self.all);
@@ -20106,8 +20518,7 @@ fn lir_math() {
                                 );
                             }
                         });
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                    }
                 }
             }
             impl PowRelation {
@@ -20230,6 +20641,7 @@ fn lir_math() {
                 all: Vec<(Math, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for LnRelation {
                 type Row = (Math, Math);
@@ -20248,7 +20660,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -20378,8 +20790,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl LnRelation {
@@ -20420,6 +20838,7 @@ fn lir_math() {
                 all: Vec<(Math, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SqrtRelation {
                 type Row = (Math, Math);
@@ -20438,7 +20857,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -20568,8 +20987,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl SqrtRelation {
@@ -20610,6 +21035,7 @@ fn lir_math() {
                 all: Vec<(Math, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for SinRelation {
                 type Row = (Math, Math);
@@ -20628,7 +21054,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -20758,8 +21184,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl SinRelation {
@@ -20805,6 +21237,7 @@ fn lir_math() {
                 all: Vec<(Math, Math, TimeStamp)>,
                 fd_index_0: runtime::HashMap<(Math,), (Math, TimeStamp)>,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for CosRelation {
                 type Row = (Math, Math);
@@ -20823,7 +21256,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -20953,8 +21386,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl CosRelation {
@@ -21001,6 +21440,7 @@ fn lir_math() {
                 fd_index_0: runtime::HashMap<(std::primitive::i64,), (Math, TimeStamp)>,
                 i64_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
@@ -21019,7 +21459,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -21141,8 +21581,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl ConstRelation {
@@ -21194,6 +21640,7 @@ fn lir_math() {
                 fd_index_0: runtime::HashMap<(runtime::IString,), (Math, TimeStamp)>,
                 string_num_uprooted_at_latest_retain: usize,
                 math_num_uprooted_at_latest_retain: usize,
+                deferred: bool,
             }
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
@@ -21212,7 +21659,7 @@ fn lir_math() {
                     self.new.iter().copied()
                 }
                 fn len(&self) -> usize {
-                    self.fd_index_0.len()
+                    self.all.len()
                 }
                 fn emit_graphviz(&self, buf: &mut String) {
                     use std::fmt::Write;
@@ -21334,8 +21781,14 @@ fn lir_math() {
                                 "all does not have duplicate timestamps"
                             );
                         }
+                        self.deferred = true;
                         self.math_num_uprooted_at_latest_retain = 0;
                     });
+                }
+                fn deferred_update(&mut self) {
+                    if self.deferred {
+                        self.deferred = false;
+                    }
                 }
             }
             impl VarRelation {
@@ -21786,6 +22239,7 @@ fn lir_math() {
                             {
                                 let start = std::time::Instant::now();
                                 log_duration!("apply_rules: {}", {
+                                    self.deferred_update();
                                     self.apply_rules();
                                 });
                                 start.elapsed()
@@ -22707,6 +23161,23 @@ fn lir_math() {
                             self.uf.reset_num_uprooted();
                         });
                     });
+                }
+                fn deferred_update(&mut self) {
+                    self.fuel_.deferred_update();
+                    self.zero_fuel_.deferred_update();
+                    self.diff_.deferred_update();
+                    self.integral_.deferred_update();
+                    self.add_.deferred_update();
+                    self.sub_.deferred_update();
+                    self.mul_.deferred_update();
+                    self.div_.deferred_update();
+                    self.pow_.deferred_update();
+                    self.ln_.deferred_update();
+                    self.sqrt_.deferred_update();
+                    self.sin_.deferred_update();
+                    self.cos_.deferred_update();
+                    self.const_.deferred_update();
+                    self.var_.deferred_update();
                 }
             }
             impl EclassProvider<FuelUnit> for Theory {

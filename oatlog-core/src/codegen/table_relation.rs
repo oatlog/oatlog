@@ -76,12 +76,6 @@ pub(crate) fn codegen_table_relation(
         }
     };
 
-    let relation_len = {
-        let index = &index_to_info[IndexId(0)];
-        let field = ident::index_field(index);
-        quote! { self.#field.len() }
-    };
-
     let index_fields = index_to_info
         .iter()
         .map(|index_info| match &index_info {
@@ -140,6 +134,7 @@ pub(crate) fn codegen_table_relation(
             all: Vec<(#(#col_ty,)* TimeStamp,)>,
             #(#index_fields,)*
             #(#uf_num_uprooted_at_latest_retain: usize,)*
+            deferred: bool,
         }
         impl Relation for #rel_ty {
             type Row = (#(#col_ty,)*);
@@ -160,7 +155,7 @@ pub(crate) fn codegen_table_relation(
                 self.new.iter().copied()
             }
             fn len(&self) -> usize {
-                #relation_len
+                self.all.len()
             }
             #emit_graphviz_impl
             #update_impl
@@ -224,7 +219,7 @@ fn update_with_category(
 
     let is_symbolic = |x: ColumnId| theory.types[rel.columns[x]].kind == TypeKind::Symbolic;
 
-    let (primary_index, classification): (IndexId, PrimaryCategory) = {
+    let (primary_index, classification): (IndexId, PrimaryCategory<'_>) = {
         let mut fd_indexes: Vec<(
             IndexId,
             &BTreeSet<ColumnId>,
@@ -633,7 +628,7 @@ fn update_with_category(
         }).collect()
         };
 
-    let update_finalize_impl = {
+    let (update_finalize_impl, deferred_update_impl) = {
         let reset_num_uprooted_at_latest_retain_impl: TokenStream = rel
             .columns
             .iter()
@@ -749,51 +744,58 @@ fn update_with_category(
             }
         };
 
-        quote! {
-            assert!(self.new.is_empty());
+        (
+            quote! {
+                assert!(self.new.is_empty());
 
-            log_duration!("fill new and all: {}", {
-                #prepare_new_and_all_impl
-                insertions.clear();
-            });
-
-            #[cfg(debug_assertions)]
-            {
-                self.new.iter().for_each(|&(#(#columns,)*)| {
-                    assert_eq!((#(#columns,)*), (#(#cols_find,)*), "new is canonical");
+                log_duration!("fill new and all: {}", {
+                    #prepare_new_and_all_impl
+                    insertions.clear();
                 });
 
-                let mut new = self.new.clone();
-                new.sort();
-                new.dedup();
-                assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                #[cfg(debug_assertions)]
+                {
+                    self.new.iter().for_each(|&(#(#columns,)*)| {
+                        assert_eq!((#(#columns,)*), (#(#cols_find,)*), "new is canonical");
+                    });
+
+                    let mut new = self.new.clone();
+                    new.sort();
+                    new.dedup();
+                    assert_eq!(new.len(), self.new.len(), "new only has unique elements");
 
 
-                self.all.iter().for_each(|&(#(#columns,)* _timestamp)| {
-                    assert_eq!((#(#columns,)*), (#(#cols_find,)*), "all is canonical");
-                });
+                    self.all.iter().for_each(|&(#(#columns,)* _timestamp)| {
+                        assert_eq!((#(#columns,)*), (#(#cols_find,)*), "all is canonical");
+                    });
 
-                let mut all_: Vec<_> = self.all.clone();
-                all_.sort();
-                all_.dedup();
-                assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                    let mut all_: Vec<_> = self.all.clone();
+                    all_.sort();
+                    all_.dedup();
+                    assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
 
-                let mut all_: Vec<_> = self.all.iter().map(|&(#(#columns,)* _timestamp)| (#(#columns,)*)).collect();
+                    let mut all_: Vec<_> = self.all.iter().map(|&(#(#columns,)* _timestamp)| (#(#columns,)*)).collect();
 
-                all_.sort();
-                all_.dedup();
-                assert_eq!(all_.len(), self.all.len(), "all does not have duplicate timestamps");
-            }
+                    all_.sort();
+                    all_.dedup();
+                    assert_eq!(all_.len(), self.all.len(), "all does not have duplicate timestamps");
+                }
 
-            // At this point we know that there is no overlap between old and new because of
-            // filtering
-            //
-            // We also know that new only contains root e-classes.
+                // At this point we know that there is no overlap between old and new because of
+                // filtering
+                //
+                // We also know that new only contains root e-classes.
+                self.deferred = true;
 
-            #indexes_reconstruct_impl
+                // to run eagerly:
+                // self.deferred_update();
 
-            #reset_num_uprooted_at_latest_retain_impl
-        }
+                #reset_num_uprooted_at_latest_retain_impl
+            },
+            quote! {
+                #indexes_reconstruct_impl
+            },
+        )
     };
 
     let relation_name = ident::rel_get(rel).to_string();
@@ -815,6 +817,12 @@ fn update_with_category(
             log_duration!("update_finalize {}: {}", #relation_name, {
                 #update_finalize_impl
             });
+        }
+        fn deferred_update(&mut self) {
+            if self.deferred {
+                self.deferred = false;
+                #deferred_update_impl
+            }
         }
     }
 }
