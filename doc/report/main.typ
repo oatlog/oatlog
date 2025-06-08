@@ -283,6 +283,7 @@ by eliding e-classes consisting of a single e-node.
     fletcher.diagram(
       spacing: 2.2em,
       node-stroke: 1pt,
+      node-shape: circle,
       {
         let (A0, A1) = ((0, 0), (1, 0))
         let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))

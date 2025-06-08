@@ -2,6 +2,8 @@
 #import themes.university: *
 #import "@preview/fletcher:0.5.7" as fletcher: node, edge
 
+#set raw(syntaxes: "../report/egglog.sublime-syntax")
+
 #let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 20pt)[TODO: #msg]]
 }
@@ -11,12 +13,13 @@
 //#set text(font: "New Computer Modern")
 #set text(font: "New Computer Modern Sans")
 
+#let title = [Oatlog]
+#let subtitle = [A high-performance e-graph engine]
 #show: university-theme.with(
   config-common(enable-frozen-states-and-counters: false),
   config-info(
-    title: [Oatlog],
-    //subtitle: [Implementing a high-performance relational e-graph engine],
-    subtitle: [A high-performance e-graph engine],
+    title: title,
+    subtitle: subtitle,
     author: [Loke Gustafsson #h(3em) Erik Magnusson],
     date: datetime.today().display("[month repr:long] [day padding:none], [year]"),
     institution: [
@@ -24,195 +27,246 @@
       Chalmers University of Technology
     ],
   ),
+  footer-b: [#title: #subtitle],
 )
 
 #title-slide()
 
 /*
-- mention title
+TITEL
 
-- compiler optimizations have phase ordering problem
-  - show tree of possible rewrites like eqsat paper
-- e-graphs do not forget
-  - show e-graph that merge before/after rewrite.
-  - show why a DAG is not good enough
-  - show image of program as expression,
-    - it is well established that programs can be represented as expressions.
-- equality saturation
-  - apply rewrites
-  - extract optimal expression
-- oatlog is a fast e-graph engine.
-- rewrites are pattern -> pattern
+PHASE ORDERING
+visa behov av fler-stegs-optimering (midpoint)
+visa linjegraf RGB
+visa behov av bra lokalt beslut (midpoint)
+visa linjeträd RGB (noncommutative, temporally local choices, exponentially large space)
+llvm kaos, verkligt problem
+visa likhetsträd
+visa equality saturation (bygga + global extraction (vet framtiden))
+parentes om att program kan vara mathematical expressions/grafer, krävs här
 
-- pattern matching is a join
-  - to optimize pattern matching, we need query planning and indexes
+EGRAPHS
+expression tree från rapporten
+expression dag från rapporten (syntactic merge)
+e-graph från rapporten (semantic merge)
+(ej nämna funktionsabstraktion om ingen frågar)
+animering av (x*2)/2-egraph, ett steg i taget, uppenbart kommutativa omskrivningar. Färger inkl legend. Visa före och efter sammanslagning av e-klasser
+Samma exempel fast i egglog. Ergonomiskt språk, lätt att implementera en optimering! Peka på rewrite och visa "pattern", "inserts", "merge".
 
-(- semi-naive)
+DATABASE
+Visa top-down e-match på distributiva lagen. Långsamt! Visa snabbare variant. Icke-seminaivt exempel. Hur kan detta hittas automatiskt? Råkar vara databas query planning
+Visa databas, tabell och join
+Join impl visa kod
+Semi-naiv, både algebra och kvadrat-bild
 
-- oatlog takes in egglog DSL and emits code for relations
-  - arrow from egglog to rust code
-  - egglog is an existing e-graph engine that we compare against
+RESULTAT
+Kort historik, egglog språk och motor. Vi är kompilator, egglog är interpreter.
+Visa tabell, stora speedups för små, små speedups för stora. EJ läskig figur
+Varför? Oatlog query planning ahead of time, mer case-bash. Och konstantfaktor-fokus
 
-- evaluation
-  - we are correct when comparing with egglog with features we support
-  - lots of green in this benchmark table.
+DEMO
 
-- implementation (skip if limited time)
-  - hir optimizations
-  - semi-naive
-  - query planning/tir
-    - greedily select "smallest" join and try to merge large parts of rules
-  - something about indexes
-  (- alternate between canonicalization and apply rules (union-find))
+CONCLUSION
+- möjligheter inuti kompilatorer, bevisbarhet, enkelhet
+- potentiellt snabbare kompilering / bättre kompilering men det är spekulativt
+- "otroligt mycket lättare sätt att skriva kompilator på"
+- eggcc finns och använder egglog, så oatlog är drop-in
 
+- oatlog blir snabbare hela tiden, från en vecka sen rentav. Massa potential för vidare implementationsförbättring
 
-- performance discussion/future work
-  - limited by memory throughput
-    - need fewer indexes (or more complex rules)
-    - use invariant permutation in indexes
+OPPOSITION
 
+BONUS SLIDES
+- trie query planning
+- invariant permutations
+- various constant factor things
 */
 
 = Phase ordering problem
 
-== Compiler optimzations
+== Interleaved optimizations
 
-- Dead code elimination
-- Constant folding
-- Loop-invariant code motion
-- ...
-- (many more)
-
-== Traditional compiler passes
-
-#{
-  let (A2, A3) = ((2, 0), (3, 0))
-  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
-  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
-  let (E2, E3) = ((2, 4), (3, 4))
-  let (R, G, B) = (red, green, blue)
-  align(
-    center,
-    diagram(
-      spacing: (3em, 1em),
-      node-stroke: 1pt,
-      node(C0, ""),
-      node(C1, ""),
-      node(C2, ""),
-      node(C3, ""),
-      edge(C0, C1, "->", stroke: R),
-      edge(C1, C2, "->", stroke: G),
-      edge(C2, C3, "->", stroke: B),
-      pause,
-      node(A2, ""),
-      node(A3, ""),
-      node(B1, ""),
-      node(D1, ""),
-      node(E2, ""),
-      node(E3, ""),
-      edge(C0, B1, "->", stroke: G),
-      edge(B1, A2, "->", stroke: B),
-      edge(A2, A3, "->", stroke: R),
-      edge(C0, D1, "->", stroke: B),
-      edge(D1, E2, "->", stroke: G),
-      edge(E2, E3, "->", stroke: R),
-      pause,
-      node(B2, ""),
-      node(B3, ""),
-      node(D2, ""),
-      node(D3, ""),
-      edge(B1, B2, "->", stroke: R),
-      edge(B2, B3, "->", stroke: B),
-      edge(D1, D2, "->", stroke: R),
-      edge(D2, D3, "->", stroke: G),
-    ),
-  )
-}
-
-#pause
-- Order dependent
-- Exponential possibilities
-- Local heuristics
-
-== Also problem in practice
-
-#box(
-  height: 70%,
-  figure(
-    grid(
-      columns: (2.5em, 6em, 2em),
-      [], columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt"))))), [],
-    ),
-    caption: [LLVM passes used in rustc],
-  ),
-)
-
-== Peephole optimization to our rescue?
-
-#v(1em)
-#grid(
-  columns: (11fr, 15fr, 10fr),
-  gutter: 1em,
-  [
-    #uncover("2-")[
-      ```c
+#slide(
+  repeat: 6,
+  self => [
+    #let (uncover, only, alternatives) = utils.methods(self)
+    #alternatives[```c
       mem[0] = 1
       a = mem[0] + 2
       mem[3] = 4
       return mem[a] + 5
-      ```
-    ]
-    #uncover("4-")[
-      Local rewrites to fixpoint
+      ```][```c
 
-      Optimizations are
-      - fused
-      - incremental
-      - algebraic
-    ]
+      a = 1 + 2
+      mem[3] = 4
+      return mem[a] + 5
+      ```][```c
+
+
+      mem[3] = 4
+      return mem[3] + 5
+      ```][```c
+
+
+
+      return 4 + 5
+      ```][```c
+
+
+
+      return 9
+      ```][```c
+      mem[0] = 1
+      a = mem[0] + 2
+      mem[3] = 4
+      return mem[a] + 5
+      ```]
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+    #pause
+    #place(
+      center + horizon,
+      dx: 6em,
+      stack(
+        spacing: 1em,
+        {
+          let (C0, C1, C2, C3, C4) = ((0, 2), (1, 2), (2, 2), (3, 2), (4, 2))
+          let (R, G) = (red, green)
+          diagram(
+            spacing: (3em, 1em),
+            node-stroke: 1pt,
+            node(C0, ""),
+            node(C1, ""),
+            node(C2, ""),
+            node(C3, ""),
+            node(C4, ""),
+            edge(C0, C1, "->", stroke: R),
+            edge(C1, C2, "->", stroke: G),
+            edge(C2, C3, "->", stroke: R),
+            edge(C3, C4, "->", stroke: G),
+          )
+        },
+        [
+          #box(rect(fill: red, width: 14pt, height: 14pt)) Store-to-load forwarding\
+          #box(rect(fill: green, width: 14pt, height: 14pt)) Constant folding
+        ],
+      ),
+    )
   ],
-  uncover(
-    "3-",
-    figure(
-      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
-      caption: [Peephole-able IR],
-    ),
-  ),
-  image("../figures/passes_vs_peepholes.svg", height: 93%),
 )
 
-== Peepholes aren't quite sufficent...
-
-#v(1em)
-Optimization to fixpoint *almost* solves the phase ordering problem.
-
-#pause
-
-But rewrites don't commute!
+== Order-dependent optimizations
 
 ```rust
 // input
 (x * 2) / 2
+
 // strength reduced
 (x << 1) / 2
-// reassociated and constant folded
+
+// reassociated
 x * (2 / 2)
+// constant folded
 x
 ```
+#place(
+  center + horizon,
+  dx: 6em,
+  stack(
+    spacing: 1em,
+    {
+      let A1 = (1, 0)
+      let B0 = (0, 0.5)
+      let (C1, C2) = ((1, 1), (2, 1))
+      let (R, G, B) = (red, green, blue)
+      diagram(
+        spacing: (3em, 1em),
+        node-stroke: 1pt,
+        node(A1, ""),
+        node(B0, ""),
+        node(C1, ""),
+        node(C2, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
+        edge(B0, A1, "->", stroke: R),
+        edge(B0, C1, "->", stroke: G),
+        edge(C1, C2, "->", stroke: B),
+      )
+    },
+    [
+      #box(rect(fill: red, width: 14pt, height: 14pt)) Strength reduction\
+      #box(rect(fill: green, width: 14pt, height: 14pt)) Reassociation\
+      #box(rect(fill: blue, width: 14pt, height: 14pt)) Constant folding
+    ],
+  ),
+)
 
-#pause
+== Traditional compilation passes
 
-Rewriting is destructive. We need a way to not forget previous and alternative representations of
-the program.
+#{
+  let (A2, A3) = ((2, 0), (3, 0))
+  let (B1, B2) = ((1, 1), (2, 1))
+  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
+  let (E2, E3) = ((2, 4), (3, 4))
+  let (R, G, B) = (red, green, blue)
+  align(
+    center,
+    diagram(
+      spacing: (3em, 1em),
+      node-stroke: 1pt,
+      node(C0, ""),
+      node(C1, ""),
+      node(C2, ""),
+      node(C3, ""),
+      edge(C0, C1, "->", stroke: R),
+      edge(C1, C2, "->", stroke: G),
+      edge(C2, C3, "->", stroke: B),
+      pause,
+      node(A2, ""),
+      node(A3, ""),
+      node(B1, ""),
+      node(D1, ""),
+      node(E2, ""),
+      node(E3, ""),
+      edge(C0, B1, "->", stroke: G),
+      edge(B1, A2, "->", stroke: B),
+      edge(A2, A3, "->", stroke: R),
+      edge(C0, D1, "->", stroke: B),
+      edge(D1, E2, "->", stroke: G),
+      edge(E2, E3, "->", stroke: R),
+      node(B2, ""),
+      node(D2, ""),
+      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
+      edge(B1, B2, "->", stroke: R),
+      edge(B2, A3, "->", stroke: B),
+      edge(D1, D2, "->", stroke: R),
+      edge(D2, D3, "->", stroke: G),
+    ),
+  )
+}
 
-= E-graphs do not forget
+- Order dependent
+- Local choices
+- Exponential possibilities
+
+== Not just theoretical..
+
+#place(
+  center,
+  stack(
+    spacing: 1em,
+    [],
+    box(width: 30%, height: 70%, columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt")))))),
+    [LLVM passes used in rustc],
+  ),
+)
 
 == Equality saturation
 
 #{
   let (A2, A3) = ((2, 0), (3, 0))
-  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
+  let (B1, B2) = ((1, 1), (2, 1))
   let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
   let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
   let (E2, E3) = ((2, 4), (3, 4))
@@ -242,11 +296,10 @@ the program.
       edge(D1, E2, "->", stroke: G),
       edge(E2, E3, "->", stroke: R),
       node(B2, ""),
-      node(B3, ""),
       node(D2, ""),
-      node(D3, ""),
+      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
       edge(B1, B2, "->", stroke: R),
-      edge(B2, B3, "->", stroke: B),
+      edge(B2, A3, "->", stroke: B),
       edge(D1, D2, "->", stroke: R),
       edge(D2, D3, "->", stroke: G),
     ),
@@ -257,7 +310,7 @@ the program.
 
 #{
   let (A2, A3) = ((2, 0), (3, 0))
-  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
+  let (B1, B2) = ((1, 1), (2, 1))
   let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
   let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
   let (E2, E3) = ((2, 4), (3, 4))
@@ -287,11 +340,10 @@ the program.
       edge(D1, E2, "=", stroke: G),
       edge(E2, E3, "=", stroke: R),
       node(B2, ""),
-      node(B3, ""),
       node(D2, ""),
-      node(D3, ""),
+      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
       edge(B1, B2, "=", stroke: R),
-      edge(B2, B3, "=", stroke: B),
+      edge(B2, A3, "=", stroke: B),
       edge(D1, D2, "=", stroke: R),
       edge(D2, D3, "=", stroke: G),
     ),
@@ -301,108 +353,553 @@ the program.
 Equalities!
 #pause
 Workflow:
-+ Initial program
-+ Find equalities (multiple rounds)
-+ Select one using global profitability heuristic
-
-== Programs as expressions
-
-#v(1em)
 #grid(
-  columns: (1fr, 1fr),
-  gutter: 0.5em,
+  gutter: 0pt,
+  columns: (3fr, 2fr),
   [
-
-    ```c
-    mem[0] = 1
-    a = mem[0] + 2
-    mem[3] = 4
-    return mem[a] + 5
-    ```
-    #uncover("2-", [(Don't worry too much about the details)])
+    + Initial program
+    + Find equalities (multiple rounds)
+    + Select one, using *global* heuristic
   ],
-  uncover(
-    "2-",
-    figure(
-      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
-      caption: [Expression-based IR],
-    ),
+  [
+    #pause
+    - #strike[Order dependent]
+    - #strike[Local choices]
+    - Exponential possibilities? #place(right, dy: 10pt, text(size: 20pt)[(will revisit)])
+  ],
+)
+
+
+= E-graphs
+
+== Expression trees
+
+Representing $((a+b) dot 2) dot ((a+b)+2)$ as
+
+#place(
+  center + horizon,
+  fletcher.diagram(
+    spacing: (3em, 2em),
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1, A2, A3) = ((0, 0), (1, 0), (2, 0), (3, 0))
+      let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
+      let (C0, C1) = ((0.5, 2), (2.5, 2))
+      let D = (1.5, 3)
+      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+      node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+      node(A3, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+      edge(A0, B0, "->")
+      edge(A1, B0, "->")
+      edge(A2, B2, "->")
+      edge(A3, B2, "->")
+      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      node(B3, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+      edge(B0, C0, "->")
+      edge(B1, C0, "->")
+      edge(B2, C1, "->")
+      edge(B3, C1, "->")
+      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      edge(C0, D, "->")
+      edge(C1, D, "->")
+      node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+    },
   ),
 )
 
+== Expression DAGs (directed acyclic graphs)
+
+#place(
+  center + horizon,
+  [#grid(
+      columns: (1fr, 1fr),
+      fletcher.diagram(
+        spacing: (3em, 2em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        {
+          let (A0, A1, A2, A3) = ((0, 0), (1, 0), (2, 0), (3, 0))
+          let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
+          let (C0, C1) = ((0.5, 2), (2.5, 2))
+          let D = (1.5, 3)
+          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+          node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+          node(A3, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+          edge(A0, B0, "->")
+          edge(A1, B0, "->")
+          edge(A2, B2, "->")
+          edge(A3, B2, "->")
+          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          node(B3, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+          edge(B0, C0, "->")
+          edge(B1, C0, "->")
+          edge(B2, C1, "->")
+          edge(B3, C1, "->")
+          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          edge(C0, D, "->")
+          edge(C1, D, "->")
+          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+        },
+      ),
+      fletcher.diagram(
+        spacing: (3em, 2em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        {
+          let (A0, A1) = ((0, 0), (1, 0))
+          let (B0, B1) = ((0, 1), (1, 1))
+          let (C0, C1) = ((0, 2), (1, 2))
+          let D = (0.5, 3)
+          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+          edge(A0, B0, "->")
+          edge(A1, B0, "->")
+          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+          edge(B0, C0, "->")
+          edge(B1, C0, "->")
+          edge(B0, C1, "->")
+          edge(B1, C1, "->")
+          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          edge(C0, D, "->")
+          edge(C1, D, "->")
+          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+        },
+      ),
+    )
+    Expression DAG $<==>$ merge *syntactically* identical subexpressions.
+  ],
+)
+
+== Duplication remains..
+
+A DAG represents
+$(2+(a xor b)) dot (2 dot (a xor b))$\
+#h(5.95em) and $(2+(a+b)) dot (2 dot (a+b))$ as
+
+#align(
+  center,
+  fletcher.diagram(
+    spacing: (3em, 2em),
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1) = ((2, 0), (3, 0))
+      let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
+      let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+      let (D0, D1) = ((0.5, 3), (2.5, 3))
+      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+      edge(A0, B0, "->")
+      edge(A1, B0, "->")
+      edge(A0, B1, "->")
+      edge(A1, B1, "->")
+      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$))
+      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+      edge(B0, C0, "->")
+      edge(B0, C1, "->")
+      edge(B1, C2, "->")
+      edge(B1, C3, "->")
+      edge(B2, C0, "->")
+      edge(B2, C1, "->")
+      edge(B2, C2, "->")
+      edge(B2, C3, "->")
+      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+      node(C3, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+      edge(C0, D0, "->")
+      edge(C1, D0, "->")
+      edge(C2, D1, "->")
+      edge(C3, D1, "->")
+      node(D0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+      node(D1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+    },
+  ),
+)
+
+Duplicated usages!
+
 == E-graphs
 
-[figure of e-graph]
-[figure of equivalent DAG(s)]
+E-graphs save us if $a + b = a xor b$
 
-- Expression DAG = merge *syntactically* identical expressions.
-- E-graph = merge *semantically* identical expressions.
+#place(
+  center + horizon,
+  [#grid(
+      columns: (1fr, 1fr),
+      fletcher.diagram(
+        spacing: (3em, 2em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        {
+          let (A0, A1) = ((2, 0), (3, 0))
+          let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
+          let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+          let (D0, D1) = ((0.5, 3), (2.5, 3))
+          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+          edge(A0, B0, "->")
+          edge(A1, B0, "->")
+          edge(A0, B1, "->")
+          edge(A1, B1, "->")
+          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$))
+          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
+          edge(B0, C0, "->")
+          edge(B0, C1, "->")
+          edge(B1, C2, "->")
+          edge(B1, C3, "->")
+          edge(B2, C0, "->")
+          edge(B2, C1, "->")
+          edge(B2, C2, "->")
+          edge(B2, C3, "->")
+          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+          node(C3, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
+          edge(C0, D0, "->")
+          edge(C1, D0, "->")
+          edge(C2, D1, "->")
+          edge(C3, D1, "->")
+          node(D0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+          node(D1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
+        },
+      ),
+      fletcher.diagram(
+        spacing: (1em, 1.2em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        {
+          let (A0, A1) = ((0, 0), (1, 0))
+          let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
+          let (C0, C1) = ((0.75, 2), (1.75, 2))
+          let D = (1.25, 3)
+          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+          node(enclose: (A0,), shape: square, width: 1.6em, height: 1.5em)
+          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+          node(enclose: (A1,), shape: square, width: 1.6em, height: 1.6em)
+          edge(A0, <xor>, "->")
+          edge(A1, <xor>, "->")
+          edge(A0, <plus>, "->")
+          edge(A1, <plus>, "->")
+          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$), name: <xor>)
+          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <plus>)
+          node(enclose: (B0, B1), shape: square, name: <either>, width: 5em, height: 1.6em)
+          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), name: <two>)
+          node(enclose: (B2,), shape: square, width: 1.6em, height: 1.6em)
+          edge(<either>, <mul>, "->")
+          edge(<either>, <add>, "->")
+          edge(B2, <mul>, "->")
+          edge(B2, <add>, "->")
+          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <mul>)
+          node(enclose: (C0,), shape: square, width: 1.6em, height: 1.6em)
+          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <add>)
+          node(enclose: (C1,), shape: square, width: 1.6em, height: 1.6em)
+          edge(C0, <top>, "->")
+          edge(C1, <top>, "->")
+          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <top>)
+          node(enclose: (D,), shape: square, width: 1.6em, height: 1.6em)
+        },
+      ),
+    )
+    E-graph $<==>$ merge *semantically* identical subexpressions.
+    #place(center + bottom, dy: 1.3em, text(size: 20pt)[(EqSat is all about finding equal subprograms!)])
+  ],
+)
 
-== E-graph walkthrough
+== E-graphs cont.
 
-#slide(
-  repeat: 4,
-  self => [
-    #let (uncover, only, alternatives) = utils.methods(self)
+#box(baseline: -24.2pt, ellipse(inset: (x: -14pt, y: -20pt), outset: (x: 0pt, y: 40pt), [Computations]))
+(called e-nodes) take
+#box(outset: (x: 4pt, top: 6pt, bottom: 10pt), stroke: black, [values])
+(e-classes), not other computations, as input
 
+#place(
+  center + horizon,
+  fletcher.diagram(
+    spacing: (1em, 1.2em),
+    node-stroke: 1pt,
+    node-shape: circle,
+    {
+      let (A0, A1) = ((0, 0), (1, 0))
+      let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
+      let (C0, C1) = ((0.75, 2), (1.75, 2))
+      let D = (1.25, 3)
+      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
+      node(enclose: (A0,), shape: square, width: 1.6em, height: 1.5em)
+      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
+      node(enclose: (A1,), shape: square, width: 1.6em, height: 1.6em)
+      edge(A0, <xor>, "->")
+      edge(A1, <xor>, "->")
+      edge(A0, <plus>, "->")
+      edge(A1, <plus>, "->")
+      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$), name: <xor>)
+      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <plus>)
+      node(enclose: (B0, B1), shape: square, name: <either>, width: 5em, height: 1.6em)
+      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), name: <two>)
+      node(enclose: (B2,), shape: square, width: 1.6em, height: 1.6em)
+      edge(<either>, <mul>, "->")
+      edge(<either>, <add>, "->")
+      edge(B2, <mul>, "->")
+      edge(B2, <add>, "->")
+      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <mul>)
+      node(enclose: (C0,), shape: square, width: 1.6em, height: 1.6em)
+      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <add>)
+      node(enclose: (C1,), shape: square, width: 1.6em, height: 1.6em)
+      edge(C0, <top>, "->")
+      edge(C1, <top>, "->")
+      node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <top>)
+      node(enclose: (D,), shape: square, width: 1.6em, height: 1.6em)
+    },
+  ),
+)
+
+== Equality saturation using e-graphs
+
+#{
+  let (A0, A1, A2) = ((0, 0), (0, 1), (0, 2))
+  let (B0, B1, B2) = ((1, 0), (1, 1), (1, 2))
+  let (C0, C1, C2) = ((2, 0), (2, 1), (2, 2))
+  let (D0, D1) = ((3, 0.5), (3, 1.5))
+  let (E0, E1) = ((4, 0.5), (4, 1.5))
+  let F = (5, 1)
+  let (s1, s2, s3, s4, s5) = (black, red, green, blue, fuchsia)
+  let bb(color) = box(rect(fill: color, width: 14pt, height: 14pt))
+  [
+    #uncover(
+      "1-",
+      [#bb(s1) #box(```rust
+        (x * 2) / 2
+        ```)],
+    ) \
     #uncover(
       "2-",
-      [
-        #box(outset: (x: 6pt, top: 6pt, bottom: 10pt), stroke: black, [Computations]) (called
-        e-nodes) take #box(baseline: -10.8pt, ellipse(inset: (x: -20pt, y: -10pt), outset: (x: 0pt,
-        y: 30pt), [equivalence classes])) (e-classes), not other computations as input
-      ],
+      [#bb(s2) #box(```rust
+        (x << 1) / 2
+        ```)],
+    ) \
+    #uncover(
+      "3-",
+      [#bb(s3) #box(```rust
+        x * (2 / 2)
+        ```)],
+    ) \
+    #uncover(
+      "4-",
+      [#bb(s4) #box(```rust
+        x * 1
+        ```)],
+    ) \
+    #uncover(
+      "5-",
+      [#bb(s5) #box(```rust
+        x
+        ```)],
     )
+    #place(
+      center + horizon,
+      diagram(
+        spacing: (3em, 1.5em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), stroke: s1),
+        node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $x$), stroke: s1),
+        edge(A0, B0, "->", stroke: s1),
+        edge(A1, B1, "->", stroke: s1),
+        node(B0, " ", shape: rect, stroke: s1),
+        node(B1, " ", shape: rect, stroke: s1),
+        edge(B0, C1, "->", stroke: s1),
+        edge(B1, C1, "->", stroke: s1),
+        node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), stroke: s1),
+        edge(C1, D1, "->", stroke: s1),
+        node(D1, " ", shape: rect, stroke: s1),
+        edge(D1, E1, "->", stroke: s1),
+        edge(B0, E1, "->", bend: 5deg),
+        node(E1, "" + place(bottom, dx: 6pt, dy: 4pt, $div$), stroke: s1),
+        edge(E1, F, "->"),
+        node(F, " ", shape: rect),
+        pause,
 
-    #grid(
-      columns: (1fr, 3fr),
-      [
-        ```rust
-        (x * 2) / 2
-        ```
-        #image("../figures/egraph_example0.svg")
-      ],
-      alternatives[][
-        #image("../figures/egraph_example1.svg")
-      ][
-        #image("../figures/egraph_example2.svg")
-      ][
-        #image("../figures/egraph_example3.svg")
-      ],
-    )
-  ],
-)
+        node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $1$), stroke: s2),
+        edge(A2, B2, "->", stroke: s2),
+        node(B2, " ", shape: rect, stroke: s2),
+        edge(B1, C2, "->", stroke: s2),
+        edge(B2, C2, "->", stroke: s2),
+        node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $<<$), stroke: s2),
+        edge(C2, D1, "->", stroke: s2),
+        pause,
 
-== E-graphs walkthrough cont.
+        edge(B0, C0, "->", bend: 30deg, stroke: s3),
+        edge(B0, C0, "->", bend: -30deg, stroke: s3),
+        node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $div$), stroke: s3),
+        edge(C0, D0, "->", stroke: s3),
+        node(D0, " ", shape: rect, stroke: s3),
+        edge(B1, E0, "->", bend: 30deg, stroke: s3),
+        edge(D0, E0, "->", stroke: s3),
+        node(E0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), stroke: s3),
+        edge(E0, F, "->", stroke: s3),
+        pause,
 
-#grid(
-  columns: (1fr, 1fr),
+        edge(B2, D0, "--", bend: -10deg, stroke: s4),
+        pause,
+
+        edge(B1, F, "--", bend: 70deg, stroke: s5),
+      ),
+    )]
+}
+
+== E-class merging
+
+#{
+  let (A0, A1, A2) = ((0, 0), (0, 1), (0, 2))
+  let (B0, B1, B2) = ((1, 0), (1, 1), (1, 2))
+  let (C0, C1, C2) = ((2, 0), (2, 1), (2, 2))
+  let (D0, D1) = ((3, 0.5), (3, 1.5))
+  let (E0, E1) = ((4, 0.5), (4, 1.5))
+  let F = (5, 1)
+  let (s1, s2, s3, s4, s5) = (black, red, green, blue, fuchsia)
+  let bb(color) = box(rect(fill: color, width: 14pt, height: 14pt))
   [
-    - Apply rewrites to fixpoint
-    - Adding e-nodes and e-classes
-    - Merging e-classes
+    #bb(s1) #box(```rust
+    (x * 2) / 2
+    ```) \
+    #bb(s2) #box(```rust
+    (x << 1) / 2
+    ```) \
+    #bb(s3) #box(```rust
+    x * (2 / 2)
+    ```) \
+    #bb(s4) #box(```rust
+    x * 1
+    ```) \
+    #bb(s5) #box(```rust
+    x
+    ```)
 
-    #uncover("2-")[
-      Extraction:
-      - Mapping e-class to arbitrary input e-node recovers a representation of the program
-    ]
+    #place(
+      center + horizon,
+      dx: -40.2pt,
+      dy: 24pt,
+      diagram(
+        spacing: (3em, 1.5em),
+        node-stroke: 1pt,
+        node-shape: circle,
+        node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), stroke: s1),
+        node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $x$), stroke: s1),
+        edge(A0, B0, "->", stroke: s1),
+        edge(A1, B1, "->", stroke: s1),
+        node(B0, " ", shape: rect, stroke: s1),
+        node(B1, " ", shape: rect, stroke: s1),
+        edge(B0, C1, "->", stroke: s1),
+        edge(B1, C1, "->", stroke: s1),
+        node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), stroke: s1),
+        edge(C1, D1, "->", stroke: s1),
+        node(D1, " ", shape: rect, stroke: s1),
+        edge(D1, E1, "->", stroke: s1),
+        edge(B0, E1, "->", bend: 5deg),
+        node(E1, "" + place(bottom, dx: 6pt, dy: 4pt, $div$), stroke: s1),
+        edge(E1, B1, "->"),
 
-    #uncover(3)[
-      E-graph engines generic over
-      - term language
-      - rewrite rules
-    ]
-  ],
-  image("../figures/egraph_example3.svg"),
+        node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $1$), stroke: s2),
+        edge(A2, B2, "->", stroke: s2),
+        node(B2, " ", shape: rect, stroke: s2),
+        edge(B1, C2, "->", stroke: s2),
+        edge(B2, C2, "->", stroke: s2),
+        node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $<<$), stroke: s2),
+        edge(C2, D1, "->", stroke: s2),
+
+        edge(B0, C0, "->", bend: 30deg, stroke: s3),
+        edge(B0, C0, "->", bend: -30deg, stroke: s3),
+        node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $div$), stroke: s3),
+        edge(C0, B2, "->", stroke: s3),
+        edge(B1, E0, "->", bend: 30deg, stroke: s3),
+        edge(B2, E0, "->", stroke: s3),
+        node(E0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), stroke: s3),
+        edge(E0, B1, "->", stroke: s3),
+      ),
+    )]
+}
+
+== Equality saturation using the egglog language
+
+#{
+  let (s1, s2, s3, s4, s5) = (black, red, green, blue, fuchsia)
+  let bb(color) = box(rect(fill: color, width: 14pt, height: 14pt))
+  [
+    #bb(s1) #box(```rust
+    (x * 2) / 2
+    ```) \
+    #bb(s2) #box(```rust
+    (x << 1) / 2
+    ```) \
+    #bb(s3) #box(```rust
+    x * (2 / 2)
+    ```) \
+    #bb(s4) #box(```rust
+    x * 1
+    ```) \
+    #bb(s5) #box(```rust
+    x
+    ```)
+  ]
+}
+#place(
+  center + horizon,
+  dx: 3em,
+  text(
+    size: 20pt,
+    ```egglog
+    (datatype Math
+      (Mul Math Math)
+      (Div Math Math)
+      (LeftShift Math Math)
+      (Var String)
+      (Const i64)
+    )
+    (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
+    (rewrite (Div (Mul a b) c) (Mul a (Div b c)))
+    (rewrite (Div (Const a) (Const b)) (/ a b))
+    (rewrite (Mul a (Const 1)) a)
+
+    (let x (Var "x"))
+    (let e (Div (Mul x (Const 2)) (Const 2)))
+    (run 10)
+    (query-extract e) ; Outputs `(Var "x")`
+    ```,
+  ),
 )
 
-= Rewrites
+== Equality saturation using e-graphs, conclusion
 
-== Rewrites
+Phase ordering problems:
+- #strike[Order dependent]
+- #strike[Local choices]
+- Exponential possiblities? (reduced through semantic deduplication)
 
-// Rewrites assert that some pattern is
+#pause
+Bonus!
+- high-level
+  - prototypable
+  - suitable for formal reasoning
 
-[figure of rewrites as trees to trees]
+= E-graphs as databases
+
+== #TODO[Show good and bad pattern impl. Is query planning!]
+
+#TODO[Show top-down e-match of distributive law. Slow! Show fast variant (using semi-join). (Avoid
+semi-naive in example.) How can this be found automatically? Relational query planning!]
 
 == Oops, patterns are actually database joins
 
@@ -572,7 +1069,7 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
 
 == Semi-naive evaluation
 
-[kvadratkompletering istället?]
+#TODO[Square figure also or instead?]
 
 - Avoid re-discovering #highlight[old join results]
 
@@ -584,7 +1081,14 @@ $
 &#highlight[($"Mul"_"old" join "Add"_"old"$)]\
 $
 
-= Oatlog
+= Our contribution
+
+== Short history and problem statement
+
+- egg exists
+- egglog is both the name of an existing e-graph engine and a language
+- be compatible
+- be faster
 
 == Oatlog
 
@@ -594,13 +1098,6 @@ $
 
 [figure of egglog DSL -> rust code]
 
-- egglog is both the name of an existing e-graph engine and a language
-
-== Demo (maybe)
-
-[something with extraction would be cool]
-
-= Evaluation
 
 == Correctness
 
@@ -613,11 +1110,11 @@ $
 
 [table with lots of green]
 
-== Benchmarks
+== Demo (maybe)
 
-[table as a graph]
+[something with extraction would be cool]
 
-= Implementation
+= Bonus slides!
 
 == Architecture
 
@@ -780,120 +1277,11 @@ loop {
 }
 ```
 
-= Discussion
-
 == Bounds on performance
 
 Slowest part is constructing indexes, but that cost can be amortized when more rewrite rules are present.
 
-#focus-slide[
-  #align(center, [Bonus slides!])
-]
-
-= Bonus: Phase ordering
-
-== Compilation passes
-
-#slide(
-  repeat: 6,
-  self => [
-    #let (uncover, only, alternatives) = utils.methods(self)
-    #alternatives[```c
-      mem[0] = 1
-      a = mem[0] + 2 // a=3
-      mem[3] = 4
-      return mem[a] + 5 // return 9
-      ```][```c
-
-      a = 1 + 2 // a=3
-      mem[3] = 4
-      return mem[a] + 5 // return 9
-      ```][```c
-
-
-      mem[3] = 4
-      return mem[3] + 5 // return 9
-      ```][```c
-
-
-
-      return 4 + 5 // return 9
-      ```][```c
-
-
-
-      return 9
-      ```][```c
-      mem[0] = 1
-      a = mem[0] + 2 // a=3
-      mem[3] = 4
-      return mem[a] + 5 // return 9
-      ```]
-    + Store-to-load forwarding #pause
-    + Constant folding #pause
-    + Store-to-load forwarding #pause
-    + Constant folding #pause
-  ],
-)
-
-== Compilation pass architecture
-
-#v(1em)
-#grid(
-  columns: (2fr, 1fr, 2fr),
-  [
-    Passes are
-    - one (small) optimization
-    - applied to the entire program
-
-    Structured approach to implementing many optimizations!
-  ],
-  align(center, image("../figures/compilation_passes.svg")),
-  [
-    #pause
-    Passes must be:
-    - interleaved
-    - run multiple times
-
-    #v(1em)
-    ```c
-    mem[0] = 1
-    a = mem[0] + 2
-    mem[3] = 4
-    return mem[a] + 5
-    ```
-  ],
-)
-
-== Phase ordering problem
-// PROBLEM: PASSES HAVE DOWNSIDES
-
-#v(1em)
-#grid(
-  columns: (2fr, 1fr, 2fr),
-  [
-    Run passes
-    - in what order?
-    - how many times?
-
-    Unfortunately
-    - local optimum never guaranteed
-    - whole-program processing adds up, becomes slow
-  ],
-  align(center, image("../figures/compilation_passes.svg")),
-  box(
-    height: 67%,
-    figure(
-      grid(
-        columns: (2.5em, 6em, 2em),
-        [], columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt"))))), [],
-      ),
-      caption: [LLVM passes used in rustc],
-    ),
-  ),
-)
-
-== Peephole optimization to our rescue?
+== Peephole optimization
 
 #v(1em)
 #grid(
@@ -926,27 +1314,3 @@ Slowest part is constructing indexes, but that cost can be amortized when more r
   ),
   image("../figures/passes_vs_peepholes.svg", height: 93%),
 )
-
-== Peepholes aren't quite sufficent...
-
-#v(1em)
-Optimization to fixpoint *almost* solves the phase ordering problem.
-
-#pause
-
-But rewrites don't commute!
-
-```rust
-// input
-(x * 2) / 2
-// strength reduced
-(x << 1) / 2
-// reassociated and constant folded
-x * (2 / 2)
-x
-```
-
-#pause
-
-Rewriting is destructive. We need a way to not forget previous and alternative representations of
-the program.
