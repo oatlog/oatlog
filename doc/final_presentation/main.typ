@@ -1,10 +1,12 @@
 #import "@preview/touying:0.6.1": *
 #import themes.university: *
-#import "@preview/fletcher:0.5.7" as fletcher: diagram, node, edge
+#import "@preview/fletcher:0.5.7" as fletcher: node, edge
 
 #let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 20pt)[TODO: #msg]]
 }
+
+#let diagram = touying-reducer.with(reduce: fletcher.diagram, cover: fletcher.hide)
 
 //#set text(font: "New Computer Modern")
 #set text(font: "New Computer Modern Sans")
@@ -13,9 +15,10 @@
   config-common(enable-frozen-states-and-counters: false),
   config-info(
     title: [Oatlog],
-    subtitle: [Implementing a high-performance relational e-graph engine],
+    //subtitle: [Implementing a high-performance relational e-graph engine],
+    subtitle: [A high-performance e-graph engine],
     author: [Loke Gustafsson #h(3em) Erik Magnusson],
-    date: datetime.today(),
+    date: datetime.today().display("[month repr:long] [day padding:none], [year]"),
     institution: [
       #image("chalmerslogo.jpg", height: 3em)
       Chalmers University of Technology
@@ -72,34 +75,260 @@
 
 = Phase ordering problem
 
-== Compiler passes
+== Compiler optimzations
 
-[figure of a code snippet being transformed]
+- Dead code elimination
+- Constant folding
+- Loop-invariant code motion
+- ...
+- (many more)
 
-== Phase ordering
+== Traditional compiler passes
 
-[figure of a tree of applied phases]
+#{
+  let (A2, A3) = ((2, 0), (3, 0))
+  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
+  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
+  let (E2, E3) = ((2, 4), (3, 4))
+  let (R, G, B) = (red, green, blue)
+  align(
+    center,
+    diagram(
+      spacing: (3em, 1em),
+      node-stroke: 1pt,
+      node(C0, ""),
+      node(C1, ""),
+      node(C2, ""),
+      node(C3, ""),
+      edge(C0, C1, "->", stroke: R),
+      edge(C1, C2, "->", stroke: G),
+      edge(C2, C3, "->", stroke: B),
+      pause,
+      node(A2, ""),
+      node(A3, ""),
+      node(B1, ""),
+      node(D1, ""),
+      node(E2, ""),
+      node(E3, ""),
+      edge(C0, B1, "->", stroke: G),
+      edge(B1, A2, "->", stroke: B),
+      edge(A2, A3, "->", stroke: R),
+      edge(C0, D1, "->", stroke: B),
+      edge(D1, E2, "->", stroke: G),
+      edge(E2, E3, "->", stroke: R),
+      pause,
+      node(B2, ""),
+      node(B3, ""),
+      node(D2, ""),
+      node(D3, ""),
+      edge(B1, B2, "->", stroke: R),
+      edge(B2, B3, "->", stroke: B),
+      edge(D1, D2, "->", stroke: R),
+      edge(D2, D3, "->", stroke: G),
+    ),
+  )
+}
 
-- only locally optimal :(
-- LLVM has > 100 of passes.
+#pause
+- Order dependent
+- Exponential possibilities
+- Local heuristics
+
+== Also problem in practice
+
+#box(
+  height: 70%,
+  figure(
+    grid(
+      columns: (2.5em, 6em, 2em),
+      [], columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt"))))), [],
+    ),
+    caption: [LLVM passes used in rustc],
+  ),
+)
+
+== Peephole optimization to our rescue?
+
+#v(1em)
+#grid(
+  columns: (11fr, 15fr, 10fr),
+  gutter: 1em,
+  [
+    #uncover("2-")[
+      ```c
+      mem[0] = 1
+      a = mem[0] + 2
+      mem[3] = 4
+      return mem[a] + 5
+      ```
+    ]
+    #uncover("4-")[
+      Local rewrites to fixpoint
+
+      Optimizations are
+      - fused
+      - incremental
+      - algebraic
+    ]
+  ],
+  uncover(
+    "3-",
+    figure(
+      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
+      caption: [Peephole-able IR],
+    ),
+  ),
+  image("../figures/passes_vs_peepholes.svg", height: 93%),
+)
+
+== Peepholes aren't quite sufficent...
+
+#v(1em)
+Optimization to fixpoint *almost* solves the phase ordering problem.
+
+#pause
+
+But rewrites don't commute!
+
+```rust
+// input
+(x * 2) / 2
+// strength reduced
+(x << 1) / 2
+// reassociated and constant folded
+x * (2 / 2)
+x
+```
+
+#pause
+
+Rewriting is destructive. We need a way to not forget previous and alternative representations of
+the program.
 
 = E-graphs do not forget
 
 == Equality saturation
 
-- we know that all of these programs are equivalent
-
-[figure of a tree of equality signs between programs in the same structure as the previous figure]
+#{
+  let (A2, A3) = ((2, 0), (3, 0))
+  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
+  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
+  let (E2, E3) = ((2, 4), (3, 4))
+  let (R, G, B) = (red, green, blue)
+  align(
+    center,
+    diagram(
+      spacing: (3em, 1em),
+      node-stroke: 1pt,
+      node(C0, ""),
+      node(C1, ""),
+      node(C2, ""),
+      node(C3, ""),
+      edge(C0, C1, "->", stroke: R),
+      edge(C1, C2, "->", stroke: G),
+      edge(C2, C3, "->", stroke: B),
+      node(A2, ""),
+      node(A3, ""),
+      node(B1, ""),
+      node(D1, ""),
+      node(E2, ""),
+      node(E3, ""),
+      edge(C0, B1, "->", stroke: G),
+      edge(B1, A2, "->", stroke: B),
+      edge(A2, A3, "->", stroke: R),
+      edge(C0, D1, "->", stroke: B),
+      edge(D1, E2, "->", stroke: G),
+      edge(E2, E3, "->", stroke: R),
+      node(B2, ""),
+      node(B3, ""),
+      node(D2, ""),
+      node(D3, ""),
+      edge(B1, B2, "->", stroke: R),
+      edge(B2, B3, "->", stroke: B),
+      edge(D1, D2, "->", stroke: R),
+      edge(D2, D3, "->", stroke: G),
+    ),
+  )
+}
 
 == Equality saturation
 
-[figure of equality saturation workflow]
+#{
+  let (A2, A3) = ((2, 0), (3, 0))
+  let (B1, B2, B3) = ((1, 1), (2, 1), (3, 1))
+  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
+  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
+  let (E2, E3) = ((2, 4), (3, 4))
+  let (R, G, B) = (red, green, blue)
+  align(
+    center,
+    diagram(
+      spacing: (3em, 1em),
+      node-stroke: 1pt,
+      node(C0, ""),
+      node(C1, ""),
+      node(C2, ""),
+      node(C3, ""),
+      edge(C0, C1, "=", stroke: R),
+      edge(C1, C2, "=", stroke: G),
+      edge(C2, C3, "=", stroke: B),
+      node(A2, ""),
+      node(A3, ""),
+      node(B1, ""),
+      node(D1, ""),
+      node(E2, ""),
+      node(E3, ""),
+      edge(C0, B1, "=", stroke: G),
+      edge(B1, A2, "=", stroke: B),
+      edge(A2, A3, "=", stroke: R),
+      edge(C0, D1, "=", stroke: B),
+      edge(D1, E2, "=", stroke: G),
+      edge(E2, E3, "=", stroke: R),
+      node(B2, ""),
+      node(B3, ""),
+      node(D2, ""),
+      node(D3, ""),
+      edge(B1, B2, "=", stroke: R),
+      edge(B2, B3, "=", stroke: B),
+      edge(D1, D2, "=", stroke: R),
+      edge(D2, D3, "=", stroke: G),
+    ),
+  )
+}
+
+Equalities!
+#pause
+Workflow:
++ Initial program
++ Find equalities (multiple rounds)
++ Select one using global profitability heuristic
 
 == Programs as expressions
 
-[figure of program as an expression]
+#v(1em)
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 0.5em,
+  [
 
-- It works, don't worry about the details (see Sea of Nodes, MLIR etc...).
+    ```c
+    mem[0] = 1
+    a = mem[0] + 2
+    mem[3] = 4
+    return mem[a] + 5
+    ```
+    #uncover("2-", [(Don't worry too much about the details)])
+  ],
+  uncover(
+    "2-",
+    figure(
+      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
+      caption: [Expression-based IR],
+    ),
+  ),
+)
 
 == E-graphs
 
@@ -109,6 +338,63 @@
 - Expression DAG = merge *syntactically* identical expressions.
 - E-graph = merge *semantically* identical expressions.
 
+== E-graph walkthrough
+
+#slide(
+  repeat: 4,
+  self => [
+    #let (uncover, only, alternatives) = utils.methods(self)
+
+    #uncover(
+      "2-",
+      [
+        #box(outset: (x: 6pt, top: 6pt, bottom: 10pt), stroke: black, [Computations]) (called
+        e-nodes) take #box(baseline: -10.8pt, ellipse(inset: (x: -20pt, y: -10pt), outset: (x: 0pt,
+        y: 30pt), [equivalence classes])) (e-classes), not other computations as input
+      ],
+    )
+
+    #grid(
+      columns: (1fr, 3fr),
+      [
+        ```rust
+        (x * 2) / 2
+        ```
+        #image("../figures/egraph_example0.svg")
+      ],
+      alternatives[][
+        #image("../figures/egraph_example1.svg")
+      ][
+        #image("../figures/egraph_example2.svg")
+      ][
+        #image("../figures/egraph_example3.svg")
+      ],
+    )
+  ],
+)
+
+== E-graphs walkthrough cont.
+
+#grid(
+  columns: (1fr, 1fr),
+  [
+    - Apply rewrites to fixpoint
+    - Adding e-nodes and e-classes
+    - Merging e-classes
+
+    #uncover("2-")[
+      Extraction:
+      - Mapping e-class to arbitrary input e-node recovers a representation of the program
+    ]
+
+    #uncover(3)[
+      E-graph engines generic over
+      - term language
+      - rewrite rules
+    ]
+  ],
+  image("../figures/egraph_example3.svg"),
+)
 
 = Rewrites
 
@@ -247,7 +533,7 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
 // [#hidden(64)],
 // [#hidden(85)],
 
-- $=>$ fast e-graph engines are database engines.
+- $=>$ fast e-graph engines are fast database engines.
 
 
 == Database join implementation
@@ -441,7 +727,7 @@ unify = {(17, 4), (13, 18), (18, 4), (20, 10)}
 
 ```
 union-find = {
-  [17, 13, 18] -> 4, 
+  [17, 13, 18] -> 4,
   [20] -> 10
 }
 ```
@@ -452,7 +738,7 @@ Add = [(47, 84, 95), (47, 92, 99), (74, 48, 69)]
 
 ```
 union-find = {
-  [92] -> 84, 
+  [92] -> 84,
 }
 ```
 
@@ -464,25 +750,25 @@ $=> $ unify 95, 99
 
 #text(
   18pt,
-```rust
-let mut map: HashMap<(Eclass, Eclass), Eclass> = ..;
-loop {
-    for (x, y, z) in to_insert.drain(..) {
-        match map[(uf.find(x), uf.find(y))] {
-            Some(old_z) => {
-                uf.union(z, old_z);
-            }
-            None => {
-                map[(x, y)] = z;
-            }
-        }
-    }
-    to_insert.extend(map.drain_if(|(x, y), z| {
-        !(uf.is_root(x) && uf.is_root(y) && uf.is_root(z))
-    }))
-    if to_insert.len() == 0 { break; }
-}
-```
+  ```rust
+  let mut map: HashMap<(Eclass, Eclass), Eclass> = ..;
+  loop {
+      for (x, y, z) in to_insert.drain(..) {
+          match map[(uf.find(x), uf.find(y))] {
+              Some(old_z) => {
+                  uf.union(z, old_z);
+              }
+              None => {
+                  map[(x, y)] = z;
+              }
+          }
+      }
+      to_insert.extend(map.drain_if(|(x, y), z| {
+          !(uf.is_root(x) && uf.is_root(y) && uf.is_root(z))
+      }))
+      if to_insert.len() == 0 { break; }
+  }
+  ```,
 )
 
 == Saturation
@@ -499,3 +785,168 @@ loop {
 == Bounds on performance
 
 Slowest part is constructing indexes, but that cost can be amortized when more rewrite rules are present.
+
+#focus-slide[
+  #align(center, [Bonus slides!])
+]
+
+= Bonus: Phase ordering
+
+== Compilation passes
+
+#slide(
+  repeat: 6,
+  self => [
+    #let (uncover, only, alternatives) = utils.methods(self)
+    #alternatives[```c
+      mem[0] = 1
+      a = mem[0] + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```][```c
+
+      a = 1 + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```][```c
+
+
+      mem[3] = 4
+      return mem[3] + 5 // return 9
+      ```][```c
+
+
+
+      return 4 + 5 // return 9
+      ```][```c
+
+
+
+      return 9
+      ```][```c
+      mem[0] = 1
+      a = mem[0] + 2 // a=3
+      mem[3] = 4
+      return mem[a] + 5 // return 9
+      ```]
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+    + Store-to-load forwarding #pause
+    + Constant folding #pause
+  ],
+)
+
+== Compilation pass architecture
+
+#v(1em)
+#grid(
+  columns: (2fr, 1fr, 2fr),
+  [
+    Passes are
+    - one (small) optimization
+    - applied to the entire program
+
+    Structured approach to implementing many optimizations!
+  ],
+  align(center, image("../figures/compilation_passes.svg")),
+  [
+    #pause
+    Passes must be:
+    - interleaved
+    - run multiple times
+
+    #v(1em)
+    ```c
+    mem[0] = 1
+    a = mem[0] + 2
+    mem[3] = 4
+    return mem[a] + 5
+    ```
+  ],
+)
+
+== Phase ordering problem
+// PROBLEM: PASSES HAVE DOWNSIDES
+
+#v(1em)
+#grid(
+  columns: (2fr, 1fr, 2fr),
+  [
+    Run passes
+    - in what order?
+    - how many times?
+
+    Unfortunately
+    - local optimum never guaranteed
+    - whole-program processing adds up, becomes slow
+  ],
+  align(center, image("../figures/compilation_passes.svg")),
+  box(
+    height: 67%,
+    figure(
+      grid(
+        columns: (2.5em, 6em, 2em),
+        [], columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt"))))), [],
+      ),
+      caption: [LLVM passes used in rustc],
+    ),
+  ),
+)
+
+== Peephole optimization to our rescue?
+
+#v(1em)
+#grid(
+  columns: (11fr, 15fr, 10fr),
+  gutter: 1em,
+  [
+    #uncover("2-")[
+      ```c
+      mem[0] = 1
+      a = mem[0] + 2
+      mem[3] = 4
+      return mem[a] + 5
+      ```
+    ]
+    #uncover("4-")[
+      Local rewrites to fixpoint
+
+      Optimizations are
+      - fused
+      - incremental
+      - algebraic
+    ]
+  ],
+  uncover(
+    "3-",
+    figure(
+      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
+      caption: [Peephole-able IR],
+    ),
+  ),
+  image("../figures/passes_vs_peepholes.svg", height: 93%),
+)
+
+== Peepholes aren't quite sufficent...
+
+#v(1em)
+Optimization to fixpoint *almost* solves the phase ordering problem.
+
+#pause
+
+But rewrites don't commute!
+
+```rust
+// input
+(x * 2) / 2
+// strength reduced
+(x << 1) / 2
+// reassociated and constant folded
+x * (2 / 2)
+x
+```
+
+#pause
+
+Rewriting is destructive. We need a way to not forget previous and alternative representations of
+the program.
