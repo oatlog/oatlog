@@ -126,6 +126,64 @@ pub(crate) fn codegen_table_relation(
         .map(|ty| ident::type_ty(&theory.types[ty]))
         .collect_vec();
 
+    let extract_impl = {
+        let mut implementation = quote!();
+
+        loop {
+            // let col_ty = rel
+            //     .columns
+            //     .iter()
+            //     .map(|ty| ident::type_ty(&theory.types[ty]))
+            //     .collect_vec();
+
+            let RelationKind::Table { index_to_info } = &rel.kind else {
+                break;
+            };
+
+            for info in index_to_info {
+                let IndexInfo::Fd {
+                    key_columns,
+                    value_columns,
+                    generate_check_value_subsets,
+                } = info
+                else {
+                    continue;
+                };
+
+                if value_columns.len() != 1 {
+                    continue;
+                }
+
+                let value_columns: Vec<ColumnId> = value_columns.iter().map(|x| *x.0).collect();
+
+                let &[out_col] = value_columns.as_slice() else {
+                    continue;
+                };
+
+                let is_symbolic =
+                    |x: ColumnId| theory.types[rel.columns[x]].kind == TypeKind::Symbolic;
+                if !is_symbolic(out_col) {
+                    continue;
+                }
+                let index_ident = ident::index_field(info);
+                let rel_ty = ident::rel_enode_ty(rel);
+
+                let key_idents = key_columns.iter().copied().map(ident::column).collect_vec();
+
+                implementation = quote! {
+                    fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                        for (&(#(#key_idents,)*), &(value, _timestamp,)) in self.#index_ident.iter() {
+                            out.push((Enode::#rel_ty(#(#key_idents.into(),)*), value.into()))
+                        }
+                    }
+                };
+                break;
+            }
+
+            break;
+        }
+        implementation
+    };
     quote! {
         #[derive(Debug, Default)]
         struct #rel_ty {
@@ -139,6 +197,8 @@ pub(crate) fn codegen_table_relation(
         impl Relation for #rel_ty {
             type Row = (#(#col_ty,)*);
             type Unification = Unification;
+            type Enode = Enode;
+            type Eclass = Eclass;
 
             const COST: u32 = #cost;
 
@@ -159,6 +219,7 @@ pub(crate) fn codegen_table_relation(
             }
             #emit_graphviz_impl
             #update_impl
+            #extract_impl
         }
         impl #rel_ty {
             #query_functions

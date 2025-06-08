@@ -15,7 +15,7 @@ pub trait RelationElement: Copy + Eq + Ord + Default + Hash + std::fmt::Debug {
 /// Essentially an object that "the engine" controls.
 ///
 /// * Must only be produced from a [`UnionFind`]
-pub trait Eclass: RelationElement {
+pub trait EclassRepr: RelationElement {
     fn new(value: u32) -> Self;
     fn inner(self) -> u32;
 }
@@ -35,7 +35,7 @@ impl RelationElement for bool {
 }
 
 /// To avoid many functions with a type suffix: `make_math`, `make_data`, ...
-pub trait EclassProvider<T: Eclass> {
+pub trait EclassProvider<T: EclassRepr> {
     fn make(&mut self) -> T;
     fn find(&mut self, t: T) -> T;
     fn union(&mut self, a: T, b: T);
@@ -65,7 +65,7 @@ macro_rules! relation_element_wrapper_ty {
 
             impl std::fmt::Display for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                    self.0.fmt(f)
+                    <u32 as std::fmt::Debug>::fmt(&self.0, f)
                 }
             }
         )*
@@ -79,7 +79,7 @@ macro_rules! eclass_wrapper_ty {
     ($($(#[$($tt:tt)*])* $name:ident),*) => {
         relation_element_wrapper_ty!($($(#[$($tt)*])* $name),*);
         $(
-            impl Eclass for $name {
+            impl EclassRepr for $name {
                 fn new(value: u32) -> Self {
                     Self(value)
                 }

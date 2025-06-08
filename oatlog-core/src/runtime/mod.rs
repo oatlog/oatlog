@@ -10,7 +10,7 @@ mod uf;
 pub use crate::{
     decl_row, eclass_wrapper_ty, log_duration, relation_element_wrapper_ty,
     runtime::{
-        generic::{Eclass, EclassProvider, RelationElement, ReprU32},
+        generic::{EclassProvider, EclassRepr, RelationElement, ReprU32},
         global_vars::GlobalVars,
         index::{
             EclassCtx, GeneralCtx, Index, IndexStatic, RowCtx, SortedVec, SortedVec as IndexImpl,
@@ -34,6 +34,7 @@ pub use std::{
     mem::{swap, take},
 };
 use std::{
+    fmt::Debug,
     hash::{BuildHasherDefault, Hasher},
     mem::replace,
 };
@@ -379,6 +380,8 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
 pub trait Relation {
     type Row;
     type Unification;
+    type Enode;
+    type Eclass;
 
     const COST: u32;
 
@@ -411,6 +414,8 @@ pub trait Relation {
         self.len() == 0
     }
     fn deferred_update(&mut self) {}
+
+    fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {}
 }
 
 relation_element_wrapper_ty!(IString);
@@ -440,4 +445,102 @@ impl StringIntern {
     pub fn lookup(&self, i: IString) -> &str {
         &self.to_string[&i]
     }
+}
+
+pub trait EnodeInputs<Eclass> {
+    fn inputs(self) -> Vec<Eclass>;
+}
+
+pub trait EclassMapExtract<Enode, ExtractExpr>: Sized {
+    fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr>;
+}
+
+/// Perform DAG extraction
+pub fn extract<
+    Enode: EnodeInputs<Eclass> + Copy + Clone + Hash + Eq + Debug + Ord,
+    Eclass: EclassMapExtract<Enode, ExtractExpr> + Copy + Clone + Hash + Eq + Debug,
+    ExtractExpr,
+>(
+    enode_to_eclass: impl Iterator<Item = (Enode, Eclass)>,
+    root: Eclass,
+) -> Option<ExtractExpr> {
+    use std::collections::HashMap;
+    type Map<K, V> = HashMap<K, V>;
+
+    let enode_to_eclass: Map<Enode, Eclass> = enode_to_eclass.collect();
+
+    // how many unprocessed enodes?
+    let mut eclass_in_deg: Map<Eclass, usize> = Map::new();
+
+    // how many unprocessed eclasses?
+    let mut enode_in_deg: Map<Enode, usize> = Map::new();
+
+    let mut eclass_to_enode: Map<Eclass, Vec<Enode>> = Map::new();
+
+    let mut eclass_readers: Map<Eclass, Vec<Enode>> = Map::new();
+    for (&enode, &eclass) in enode_to_eclass.iter() {
+        eclass_to_enode.entry(eclass).or_default().push(enode);
+        *eclass_in_deg.entry(eclass).or_default() += 1;
+
+        let inputs = enode.inputs();
+        for eclass in inputs.iter().copied() {
+            eclass_readers.entry(eclass).or_default().push(enode);
+        }
+
+        *enode_in_deg.entry(enode).or_default() = inputs.len();
+    }
+
+    let mut eclass_queue: Vec<Eclass> = Vec::new();
+    let mut enode_queue: Vec<Enode> = Vec::new();
+
+    for (&enode, &eclass) in enode_to_eclass.iter() {
+        if enode_in_deg[&enode] == 0 {
+            enode_queue.push(enode);
+        }
+    }
+
+    let mut enode_cost: Map<Enode, i64> = Map::new();
+    let mut eclass_cost: Map<Eclass, (i64, Enode)> = Map::new();
+
+    while !(eclass_queue.is_empty() && enode_queue.is_empty()) {
+        while let Some(eclass) = eclass_queue.pop() {
+            let (cost, enode) = eclass_to_enode[&eclass]
+                .iter()
+                .copied()
+                .map(|enode| (enode_cost[&enode], enode))
+                .min()
+                .expect("attempted to extract empty eclass?");
+
+            eclass_cost.insert(eclass, (cost, enode));
+            if let Some(eclass_readers) = eclass_readers.get(&eclass) {
+                for reader_enode in eclass_readers.iter().copied() {
+                    let count = enode_in_deg.entry(reader_enode).or_default();
+                    *count -= 1;
+
+                    if *count == 0 {
+                        enode_queue.push(reader_enode);
+                    }
+                }
+            }
+        }
+        while let Some(enode) = enode_queue.pop() {
+            // cost of the enode itself.
+            let mut cost = 1;
+
+            for input in enode.inputs() {
+                let (eclass_cost, _) = eclass_cost[&input];
+                cost += eclass_cost;
+            }
+            enode_cost.insert(enode, cost);
+
+            let eclass = enode_to_eclass[&enode];
+            let count = eclass_in_deg.entry(eclass).or_default();
+            *count -= 1;
+            if *count == 0 {
+                eclass_queue.push(eclass);
+            }
+        }
+    }
+
+    root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
 }

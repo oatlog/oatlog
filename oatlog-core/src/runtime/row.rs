@@ -1,4 +1,4 @@
-use crate::runtime::{Eclass, RelationElement, ReprU32};
+use crate::runtime::{EclassRepr, RelationElement, ReprU32};
 
 /// Requirements to be used as an element in an index.
 /// Either a tuple or an element in a tuple.
@@ -202,7 +202,7 @@ pub mod mk_rowsort {
 
 macro_rules! radix_sortable_raw_row {
     ($($ty_var:ident),*: $radix_key:ident; $inner:ident => $radix_impl:expr) => {
-        impl<$($ty_var : Eclass),*> $crate::runtime::Radixable<$radix_key> for RadixSortable<($($ty_var,)*)> {
+        impl<$($ty_var : EclassRepr),*> $crate::runtime::Radixable<$radix_key> for RadixSortable<($($ty_var,)*)> {
             type Key = $radix_key;
             fn key(&self) -> Self::Key {
                 let $inner = self.0;
@@ -220,14 +220,14 @@ radix_sortable_raw_row!(T1, T2, T3, T4: u128; s => (u128::from(s.0.inner()) << 9
 macro_rules! decl_row {
     (radix_impl $row_ty:ident ($($repr_ty:ident),*) ($($col_ty:tt $col_i:tt,)*) ($($ii:tt)*) ($($irev:tt)*)) => {};
     (radix_impl $row_ty:ident ($($repr_ty:ident),*) ($($col_ty:tt $col_i:tt,)*) ($($ii:tt)*) ($($irev:tt)*) $radix_key:ident $inner:ident $radix_impl:expr) => {
-        impl<$($repr_ty : Eclass),*> $crate::runtime::Radixable<$radix_key> for $row_ty<$($repr_ty),*> {
+        impl<$($repr_ty : EclassRepr),*> $crate::runtime::Radixable<$radix_key> for $row_ty<$($repr_ty),*> {
             type Key = $radix_key;
             fn key(&self) -> Self::Key {
                 let $inner = self.inner;
                 $radix_impl
             }
         }
-        impl<$($repr_ty : Eclass),*> $crate::runtime::SimdRow for $row_ty<$($repr_ty),*> {
+        impl<$($repr_ty : EclassRepr),*> $crate::runtime::SimdRow for $row_ty<$($repr_ty),*> {
             type RowBlock = ($([$col_ty; 4],)*);
             const INFINITY: Self::RowBlock = ($([$col_ty::MAX_ID; 4],)*);
             fn new_block(rows: [Self; 4]) -> <Self as $crate::runtime::SimdRow>::RowBlock {

@@ -338,6 +338,8 @@ fn test_edgecase3() {
             impl Relation for TNilRelation {
                 type Row = (TypeList,);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 1u32;
                 fn new() -> Self {
                     Self::default()
@@ -472,6 +474,11 @@ fn test_edgecase3() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(), &(value, _timestamp)) in self.fd_index_.iter() {
+                        out.push((Enode::TNil(), value.into()))
+                    }
+                }
             }
             impl TNilRelation {
                 fn iter_all__to_0(&self) -> impl Iterator<Item = (TypeList,)> + use<'_> {
@@ -516,6 +523,8 @@ fn test_edgecase3() {
             impl Relation for TypeListLengthRelation {
                 type Row = (TypeList, std::primitive::i64);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -723,6 +732,43 @@ fn test_edgecase3() {
                     self.type_list_length_.push(x);
                 }
             }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                TNil(),
+                TypeListLength(Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                TypeList(TypeList),
+            }
+            impl Into<Eclass> for TypeList {
+                fn into(self) -> Eclass {
+                    Eclass::TypeList(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                TNil(),
+                TypeListLength(Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::TNil() => vec![],
+                        Enode::TypeListLength(x0) => vec![x0],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::TNil() => ExtractExpr::TNil(),
+                        Enode::TypeListLength(x0) => {
+                            ExtractExpr::TypeListLength(Box::new(x0.map_extract(extract)?))
+                        }
+                    })
+                }
+            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub type_list_: UnionFind<TypeList>,
@@ -811,6 +857,17 @@ fn test_edgecase3() {
                     )]
                     .into_iter()
                     .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.t_nil_.serialize(out);
+                    self.type_list_length_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -1178,6 +1235,8 @@ fn test_primitive_in_premise() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -1335,6 +1394,11 @@ fn test_primitive_in_premise() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -1406,6 +1470,37 @@ fn test_primitive_in_premise() {
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Const(std::primitive::i64),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Const(std::primitive::i64),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Const(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -1527,6 +1622,16 @@ fn test_primitive_in_premise() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.const_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -2538,6 +2643,8 @@ fn regression_tir2() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -2694,6 +2801,11 @@ fn regression_tir2() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -2746,6 +2858,8 @@ fn regression_tir2() {
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -2914,6 +3028,11 @@ fn regression_tir2() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Pow(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl PowRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -2985,6 +3104,8 @@ fn regression_tir2() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -3130,6 +3251,11 @@ fn regression_tir2() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -3198,6 +3324,51 @@ fn regression_tir2() {
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Mul(Eclass, Eclass),
+                Pow(Eclass, Eclass),
+                Const(std::primitive::i64),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Mul(Box<Self>, Box<Self>),
+                Pow(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Pow(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Pow(x0, x1) => ExtractExpr::Pow(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -3329,6 +3500,18 @@ fn regression_tir2() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.mul_.serialize(out);
+                    self.pow_.serialize(out);
+                    self.const_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -3555,6 +3738,8 @@ fn regression_tir1() {
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -3711,6 +3896,11 @@ fn regression_tir1() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Sub(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl SubRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -3763,6 +3953,8 @@ fn regression_tir1() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -3908,6 +4100,11 @@ fn regression_tir1() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -3966,6 +4163,44 @@ fn regression_tir1() {
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Sub(Eclass, Eclass),
+                Const(std::primitive::i64),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Sub(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Sub(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Sub(x0, x1) => ExtractExpr::Sub(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -4056,6 +4291,17 @@ fn regression_tir1() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.sub_.serialize(out);
+                    self.const_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -5129,6 +5375,8 @@ fn codegen_constant_propagation() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -5309,6 +5557,11 @@ fn codegen_constant_propagation() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -5400,6 +5653,8 @@ fn codegen_constant_propagation() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -5580,6 +5835,11 @@ fn codegen_constant_propagation() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -5671,6 +5931,8 @@ fn codegen_constant_propagation() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -5828,6 +6090,11 @@ fn codegen_constant_propagation() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -5906,6 +6173,51 @@ fn codegen_constant_propagation() {
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Add(Eclass, Eclass),
+                Mul(Eclass, Eclass),
+                Const(std::primitive::i64),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Add(Box<Self>, Box<Self>),
+                Mul(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -6040,6 +6352,18 @@ fn codegen_constant_propagation() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.add_.serialize(out);
+                    self.mul_.serialize(out);
+                    self.const_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -6184,6 +6508,8 @@ fn codegen_commutative() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -6340,6 +6666,11 @@ fn codegen_commutative() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -6395,6 +6726,40 @@ fn codegen_commutative() {
                 }
                 pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
                     self.add_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Add(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Add(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -6471,6 +6836,16 @@ fn codegen_commutative() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.add_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -6640,6 +7015,8 @@ fn regression_entry2() {
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -6796,6 +7173,11 @@ fn regression_entry2() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Sub(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl SubRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -6848,6 +7230,8 @@ fn regression_entry2() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -6993,6 +7377,11 @@ fn regression_entry2() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -7051,6 +7440,44 @@ fn regression_entry2() {
                 }
                 pub fn insert_const(&mut self, x: <ConstRelation as Relation>::Row) {
                     self.const_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Sub(Eclass, Eclass),
+                Const(std::primitive::i64),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Sub(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Sub(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Sub(x0, x1) => ExtractExpr::Sub(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -7135,6 +7562,17 @@ fn regression_entry2() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.sub_.serialize(out);
+                    self.const_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -7307,6 +7745,8 @@ fn regression_entry() {
             impl Relation for IntegralRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -7463,6 +7903,11 @@ fn regression_entry() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Integral(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl IntegralRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -7514,6 +7959,8 @@ fn regression_entry() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -7670,6 +8117,11 @@ fn regression_entry() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -7730,6 +8182,47 @@ fn regression_entry() {
                 }
                 pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
                     self.add_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Integral(Eclass, Eclass),
+                Add(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Integral(Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Integral(x0, x1) => vec![x0, x1],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Integral(x0, x1) => ExtractExpr::Integral(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -7813,6 +8306,17 @@ fn regression_entry() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.integral_.serialize(out);
+                    self.add_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -7977,6 +8481,8 @@ fn test_bind_variable_multiple_times() {
             impl Relation for SameRelation {
                 type Row = (Foo, Foo, Foo);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -8133,6 +8639,11 @@ fn test_bind_variable_multiple_times() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Same(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl SameRelation {
                 fn iter_all_0_1_to_2(&self, x0: Foo, x1: Foo) -> impl Iterator<Item = (Foo,)> + use<'_> {
@@ -8182,6 +8693,40 @@ fn test_bind_variable_multiple_times() {
                 }
                 pub fn insert_same(&mut self, x: <SameRelation as Relation>::Row) {
                     self.same_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Same(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Foo(Foo),
+            }
+            impl Into<Eclass> for Foo {
+                fn into(self) -> Eclass {
+                    Eclass::Foo(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Same(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Same(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Same(x0, x1) => ExtractExpr::Same(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -8260,6 +8805,16 @@ fn test_bind_variable_multiple_times() {
                     [("Foo", (self.uf.foo_.len(), self.uf.foo_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.same_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -8492,6 +9047,8 @@ fn codegen_variable_reuse_bug() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -8660,6 +9217,11 @@ fn codegen_variable_reuse_bug() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -8729,6 +9291,8 @@ fn codegen_variable_reuse_bug() {
             impl Relation for ZeroRelation {
                 type Row = (Math,);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 1u32;
                 fn new() -> Self {
                     Self::default()
@@ -8863,6 +9427,11 @@ fn codegen_variable_reuse_bug() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(), &(value, _timestamp)) in self.fd_index_.iter() {
+                        out.push((Enode::Zero(), value.into()))
+                    }
+                }
             }
             impl ZeroRelation {
                 fn iter_all__to_0(&self) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -8915,6 +9484,44 @@ fn codegen_variable_reuse_bug() {
                 }
                 pub fn insert_zero(&mut self, x: <ZeroRelation as Relation>::Row) {
                     self.zero_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Add(Eclass, Eclass),
+                Zero(),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Add(Box<Self>, Box<Self>),
+                Zero(),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                        Enode::Zero() => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Zero() => ExtractExpr::Zero(),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -9015,6 +9622,17 @@ fn codegen_variable_reuse_bug() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.add_.serialize(out);
+                    self.zero_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -9148,6 +9766,8 @@ fn initial_exprs() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -9304,6 +9924,11 @@ fn initial_exprs() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -9355,6 +9980,8 @@ fn initial_exprs() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -9511,6 +10138,11 @@ fn initial_exprs() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -9563,6 +10195,8 @@ fn initial_exprs() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -9708,6 +10342,11 @@ fn initial_exprs() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -9758,6 +10397,8 @@ fn initial_exprs() {
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -9903,6 +10544,11 @@ fn initial_exprs() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Var(x0.into()), value.into()))
+                    }
+                }
             }
             impl VarRelation {
                 fn iter_all_0_to_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -9971,6 +10617,55 @@ fn initial_exprs() {
                 }
                 pub fn insert_var(&mut self, x: <VarRelation as Relation>::Row) {
                     self.var_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Add(Eclass, Eclass),
+                Mul(Eclass, Eclass),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Add(Box<Self>, Box<Self>),
+                Mul(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                        Enode::Var(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                        Enode::Var(x0) => ExtractExpr::Var(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -10101,6 +10796,19 @@ fn initial_exprs() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.add_.serialize(out);
+                    self.mul_.serialize(out);
+                    self.const_.serialize(out);
+                    self.var_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -10443,6 +11151,22 @@ fn codegen_bug1() {
                     has_new_inserts
                 }
             }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {}
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {}
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {}
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {}
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {})
+                }
+            }
             #[derive(Debug, Default)]
             struct Unification {}
             impl Unification {
@@ -10503,6 +11227,14 @@ fn codegen_bug1() {
                 }
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
                     [].into_iter().collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {}
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -10574,6 +11306,22 @@ fn initial() {
                     has_new_inserts
                 }
             }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {}
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {}
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {}
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {}
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {})
+                }
+            }
             #[derive(Debug, Default)]
             struct Unification {}
             impl Unification {
@@ -10637,6 +11385,14 @@ fn initial() {
                 }
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
                     [].into_iter().collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {}
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -10804,6 +11560,8 @@ fn test_primitives_simple() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -10972,6 +11730,11 @@ fn test_primitives_simple() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -11042,6 +11805,8 @@ fn test_primitives_simple() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -11198,6 +11963,11 @@ fn test_primitives_simple() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -11250,6 +12020,8 @@ fn test_primitives_simple() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -11395,6 +12167,11 @@ fn test_primitives_simple() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -11450,6 +12227,8 @@ fn test_primitives_simple() {
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -11595,6 +12374,11 @@ fn test_primitives_simple() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Var(x0.into()), value.into()))
+                    }
+                }
             }
             impl VarRelation {
                 fn iter_all_0_to_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -11663,6 +12447,55 @@ fn test_primitives_simple() {
                 }
                 pub fn insert_var(&mut self, x: <VarRelation as Relation>::Row) {
                     self.var_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Mul(Eclass, Eclass),
+                Add(Eclass, Eclass),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Mul(Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                        Enode::Const(x0) => vec![],
+                        Enode::Var(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                        Enode::Var(x0) => ExtractExpr::Var(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -11831,6 +12664,19 @@ fn test_primitives_simple() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.mul_.serialize(out);
+                    self.add_.serialize(out);
+                    self.const_.serialize(out);
+                    self.var_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -12144,6 +12990,8 @@ fn triangle_join() {
             impl Relation for FooRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -12374,6 +13222,8 @@ fn triangle_join() {
             impl Relation for BarRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -12604,6 +13454,8 @@ fn triangle_join() {
             impl Relation for BazRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -12832,6 +13684,8 @@ fn triangle_join() {
             impl Relation for TriangleRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -13047,6 +13901,29 @@ fn triangle_join() {
                     self.triangle_.push(x);
                 }
             }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {}
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {}
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {}
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {})
+                }
+            }
             #[derive(Debug, Default)]
             struct Unification {
                 pub math_: UnionFind<Math>,
@@ -13160,6 +14037,19 @@ fn triangle_join() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.foo_.serialize(out);
+                    self.bar_.serialize(out);
+                    self.baz_.serialize(out);
+                    self.triangle_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -13477,6 +14367,8 @@ fn edgecase0() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
@@ -13669,6 +14561,11 @@ fn edgecase0() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -13778,6 +14675,8 @@ fn edgecase0() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -13958,6 +14857,11 @@ fn edgecase0() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -14056,6 +14960,47 @@ fn edgecase0() {
                 }
                 pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
                     self.add_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Mul(Eclass, Eclass),
+                Add(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Mul(Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -14172,6 +15117,17 @@ fn edgecase0() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.mul_.serialize(out);
+                    self.add_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -14466,6 +15422,8 @@ fn edgecase0_no_egglog_compat() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
@@ -14658,6 +15616,11 @@ fn edgecase0_no_egglog_compat() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -14766,6 +15729,8 @@ fn edgecase0_no_egglog_compat() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -14934,6 +15899,11 @@ fn edgecase0_no_egglog_compat() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -15013,6 +15983,47 @@ fn edgecase0_no_egglog_compat() {
                 }
                 pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
                     self.add_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Mul(Eclass, Eclass),
+                Add(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Mul(Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -15127,6 +16138,17 @@ fn edgecase0_no_egglog_compat() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.mul_.serialize(out);
+                    self.add_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -15261,6 +16283,8 @@ fn test_into_codegen() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -15429,6 +16453,11 @@ fn test_into_codegen() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -15500,6 +16529,8 @@ fn test_into_codegen() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -15668,6 +16699,11 @@ fn test_into_codegen() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -15747,6 +16783,47 @@ fn test_into_codegen() {
                 }
                 pub fn insert_add(&mut self, x: <AddRelation as Relation>::Row) {
                     self.add_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Mul(Eclass, Eclass),
+                Add(Eclass, Eclass),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                Math(Math),
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Mul(Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -15847,6 +16924,17 @@ fn test_into_codegen() {
                     [("Math", (self.uf.math_.len(), self.uf.math_.num_roots()))]
                         .into_iter()
                         .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.mul_.serialize(out);
+                    self.add_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -18270,6 +19358,8 @@ fn lir_math() {
             impl Relation for FuelRelation {
                 type Row = (FuelUnit, FuelUnit);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 4u32;
                 fn new() -> Self {
                     Self::default()
@@ -18435,6 +19525,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Fuel(x0.into()), value.into()))
+                    }
+                }
             }
             impl FuelRelation {
                 fn iter_all_0_to_1(&self, x0: FuelUnit) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
@@ -18494,6 +19589,8 @@ fn lir_math() {
             impl Relation for ZeroFuelRelation {
                 type Row = (FuelUnit,);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 1u32;
                 fn new() -> Self {
                     Self::default()
@@ -18628,6 +19725,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(), &(value, _timestamp)) in self.fd_index_.iter() {
+                        out.push((Enode::ZeroFuel(), value.into()))
+                    }
+                }
             }
             impl ZeroFuelRelation {
                 fn iter_all__to_0(&self) -> impl Iterator<Item = (FuelUnit,)> + use<'_> {
@@ -18672,6 +19774,8 @@ fn lir_math() {
             impl Relation for DiffRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -18840,6 +19944,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Diff(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl DiffRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -18915,6 +20024,8 @@ fn lir_math() {
             impl Relation for IntegralRelation {
                 type Row = (FuelUnit, Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 20u32;
                 fn new() -> Self {
                     Self::default()
@@ -19143,6 +20254,14 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1, x2), &(value, _timestamp)) in self.fd_index_0_1_2.iter() {
+                        out.push((
+                            Enode::Integral(x0.into(), x1.into(), x2.into()),
+                            value.into(),
+                        ))
+                    }
+                }
             }
             impl IntegralRelation {
                 fn iter_all_0_1_2_to_3(
@@ -19295,6 +20414,8 @@ fn lir_math() {
             impl Relation for AddRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 9u32;
                 fn new() -> Self {
                     Self::default()
@@ -19475,6 +20596,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Add(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl AddRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -19565,6 +20691,8 @@ fn lir_math() {
             impl Relation for SubRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 6u32;
                 fn new() -> Self {
                     Self::default()
@@ -19733,6 +20861,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Sub(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl SubRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -19806,6 +20939,8 @@ fn lir_math() {
             impl Relation for MulRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 12u32;
                 fn new() -> Self {
                     Self::default()
@@ -19998,6 +21133,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Mul(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl MulRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -20105,6 +21245,8 @@ fn lir_math() {
             impl Relation for DivRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 3u32;
                 fn new() -> Self {
                     Self::default()
@@ -20261,6 +21403,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Div(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl DivRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -20316,6 +21463,8 @@ fn lir_math() {
             impl Relation for PowRelation {
                 type Row = (Math, Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 15u32;
                 fn new() -> Self {
                     Self::default()
@@ -20520,6 +21669,11 @@ fn lir_math() {
                         });
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0, x1), &(value, _timestamp)) in self.fd_index_0_1.iter() {
+                        out.push((Enode::Pow(x0.into(), x1.into()), value.into()))
+                    }
+                }
             }
             impl PowRelation {
                 fn iter_all_0_1_to_2(&self, x0: Math, x1: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -20646,6 +21800,8 @@ fn lir_math() {
             impl Relation for LnRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -20799,6 +21955,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Ln(x0.into()), value.into()))
+                    }
+                }
             }
             impl LnRelation {
                 fn iter_all_0_to_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -20843,6 +22004,8 @@ fn lir_math() {
             impl Relation for SqrtRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -20996,6 +22159,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Sqrt(x0.into()), value.into()))
+                    }
+                }
             }
             impl SqrtRelation {
                 fn iter_all_0_to_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -21040,6 +22208,8 @@ fn lir_math() {
             impl Relation for SinRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -21193,6 +22363,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Sin(x0.into()), value.into()))
+                    }
+                }
             }
             impl SinRelation {
                 fn iter_all_0_to_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -21242,6 +22417,8 @@ fn lir_math() {
             impl Relation for CosRelation {
                 type Row = (Math, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -21395,6 +22572,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Cos(x0.into()), value.into()))
+                    }
+                }
             }
             impl CosRelation {
                 fn iter_all_0_to_1(&self, x0: Math) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -21445,6 +22627,8 @@ fn lir_math() {
             impl Relation for ConstRelation {
                 type Row = (std::primitive::i64, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -21590,6 +22774,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Const(x0.into()), value.into()))
+                    }
+                }
             }
             impl ConstRelation {
                 fn iter_all_0_to_1(&self, x0: std::primitive::i64) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -21645,6 +22834,8 @@ fn lir_math() {
             impl Relation for VarRelation {
                 type Row = (runtime::IString, Math);
                 type Unification = Unification;
+                type Enode = Enode;
+                type Eclass = Eclass;
                 const COST: u32 = 2u32;
                 fn new() -> Self {
                     Self::default()
@@ -21790,6 +22981,11 @@ fn lir_math() {
                         self.deferred = false;
                     }
                 }
+                fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
+                    for (&(x0,), &(value, _timestamp)) in self.fd_index_0.iter() {
+                        out.push((Enode::Var(x0.into()), value.into()))
+                    }
+                }
             }
             impl VarRelation {
                 fn iter_all_0_to_1(&self, x0: runtime::IString) -> impl Iterator<Item = (Math,)> + use<'_> {
@@ -21913,6 +23109,121 @@ fn lir_math() {
                 }
                 pub fn insert_var(&mut self, x: <VarRelation as Relation>::Row) {
                     self.var_.push(x);
+                }
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Enode {
+                Fuel(Eclass),
+                ZeroFuel(),
+                Diff(Eclass, Eclass),
+                Integral(Eclass, Eclass, Eclass),
+                Add(Eclass, Eclass),
+                Sub(Eclass, Eclass),
+                Mul(Eclass, Eclass),
+                Div(Eclass, Eclass),
+                Pow(Eclass, Eclass),
+                Ln(Eclass),
+                Sqrt(Eclass),
+                Sin(Eclass),
+                Cos(Eclass),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum Eclass {
+                FuelUnit(FuelUnit),
+                Math(Math),
+            }
+            impl Into<Eclass> for FuelUnit {
+                fn into(self) -> Eclass {
+                    Eclass::FuelUnit(self)
+                }
+            }
+            impl Into<Eclass> for Math {
+                fn into(self) -> Eclass {
+                    Eclass::Math(self)
+                }
+            }
+            #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+            pub enum ExtractExpr {
+                Fuel(Box<Self>),
+                ZeroFuel(),
+                Diff(Box<Self>, Box<Self>),
+                Integral(Box<Self>, Box<Self>, Box<Self>),
+                Add(Box<Self>, Box<Self>),
+                Sub(Box<Self>, Box<Self>),
+                Mul(Box<Self>, Box<Self>),
+                Div(Box<Self>, Box<Self>),
+                Pow(Box<Self>, Box<Self>),
+                Ln(Box<Self>),
+                Sqrt(Box<Self>),
+                Sin(Box<Self>),
+                Cos(Box<Self>),
+                Const(std::primitive::i64),
+                Var(runtime::IString),
+            }
+            impl EnodeInputs<Eclass> for Enode {
+                fn inputs(self) -> Vec<Eclass> {
+                    match self {
+                        Enode::Fuel(x0) => vec![x0],
+                        Enode::ZeroFuel() => vec![],
+                        Enode::Diff(x0, x1) => vec![x0, x1],
+                        Enode::Integral(x0, x1, x2) => vec![x0, x1, x2],
+                        Enode::Add(x0, x1) => vec![x0, x1],
+                        Enode::Sub(x0, x1) => vec![x0, x1],
+                        Enode::Mul(x0, x1) => vec![x0, x1],
+                        Enode::Div(x0, x1) => vec![x0, x1],
+                        Enode::Pow(x0, x1) => vec![x0, x1],
+                        Enode::Ln(x0) => vec![x0],
+                        Enode::Sqrt(x0) => vec![x0],
+                        Enode::Sin(x0) => vec![x0],
+                        Enode::Cos(x0) => vec![x0],
+                        Enode::Const(x0) => vec![],
+                        Enode::Var(x0) => vec![],
+                    }
+                }
+            }
+            impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                    Some(match extract(self)? {
+                        Enode::Fuel(x0) => ExtractExpr::Fuel(Box::new(x0.map_extract(extract)?)),
+                        Enode::ZeroFuel() => ExtractExpr::ZeroFuel(),
+                        Enode::Diff(x0, x1) => ExtractExpr::Diff(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Integral(x0, x1, x2) => ExtractExpr::Integral(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                            Box::new(x2.map_extract(extract)?),
+                        ),
+                        Enode::Add(x0, x1) => ExtractExpr::Add(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Sub(x0, x1) => ExtractExpr::Sub(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Mul(x0, x1) => ExtractExpr::Mul(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Div(x0, x1) => ExtractExpr::Div(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Pow(x0, x1) => ExtractExpr::Pow(
+                            Box::new(x0.map_extract(extract)?),
+                            Box::new(x1.map_extract(extract)?),
+                        ),
+                        Enode::Ln(x0) => ExtractExpr::Ln(Box::new(x0.map_extract(extract)?)),
+                        Enode::Sqrt(x0) => ExtractExpr::Sqrt(Box::new(x0.map_extract(extract)?)),
+                        Enode::Sin(x0) => ExtractExpr::Sin(Box::new(x0.map_extract(extract)?)),
+                        Enode::Cos(x0) => ExtractExpr::Cos(Box::new(x0.map_extract(extract)?)),
+                        Enode::Const(x0) => ExtractExpr::Const(x0),
+                        Enode::Var(x0) => ExtractExpr::Var(x0),
+                    })
                 }
             }
             #[derive(Debug, Default)]
@@ -22950,6 +24261,30 @@ fn lir_math() {
                     ]
                     .into_iter()
                     .collect()
+                }
+                pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                    self.fuel_.serialize(out);
+                    self.zero_fuel_.serialize(out);
+                    self.diff_.serialize(out);
+                    self.integral_.serialize(out);
+                    self.add_.serialize(out);
+                    self.sub_.serialize(out);
+                    self.mul_.serialize(out);
+                    self.div_.serialize(out);
+                    self.pow_.serialize(out);
+                    self.ln_.serialize(out);
+                    self.sqrt_.serialize(out);
+                    self.sin_.serialize(out);
+                    self.cos_.serialize(out);
+                    self.const_.serialize(out);
+                    self.var_.serialize(out);
+                }
+                #[doc = r" Perform DAG extraction"]
+                pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    let target: Eclass = target.into();
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::extract(serialized_egraph.into_iter(), target)
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {

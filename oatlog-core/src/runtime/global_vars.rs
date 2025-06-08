@@ -1,4 +1,4 @@
-use crate::runtime::{Eclass, RelationElement, UnionFind};
+use crate::runtime::{EclassRepr, RelationElement, UnionFind};
 
 #[derive(Default, Debug)]
 pub struct GlobalVars<T>(Vec<GlobalVar<T>>);
@@ -49,7 +49,7 @@ impl<T: RelationElement> GlobalVars<T> {
         x.new.then_some(x.val)
     }
 }
-impl<T: Eclass> GlobalVars<T> {
+impl<T: EclassRepr> GlobalVars<T> {
     pub fn update(&mut self, uf: &mut UnionFind<T>) {
         for GlobalVar { val, new: _, next } in &mut self.0 {
             if let Some(next) = next {

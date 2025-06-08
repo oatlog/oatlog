@@ -1,6 +1,8 @@
 use crate::{
-    ids::{GlobalId, TypeId},
-    lir::{GlobalCompute, Initial, Literal, RelationData, RelationKind, Theory, TypeKind},
+    ids::{ColumnId, GlobalId, TypeId},
+    lir::{
+        GlobalCompute, IndexInfo, Initial, Literal, RelationData, RelationKind, Theory, TypeKind,
+    },
     typed_vec::TVec,
 };
 use itertools::Itertools as _;
@@ -207,6 +209,8 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
     let theory_ty = ident::theory_ty(theory);
     let theory_delta_ty = ident::theory_delta_ty(theory);
 
+    let extract_impl = codegen_extract(theory);
+
     quote! {
         use oatlog::runtime::{self, *};
 
@@ -214,6 +218,8 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
         #(#relations)*
 
         #delta
+
+        #extract_impl
 
         #[derive(Debug, Default)]
         struct Unification {
@@ -298,6 +304,17 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                     )*
                 ].into_iter().collect()
             }
+            pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
+                #(self.#stored_relations.serialize(out);)*
+            }
+            /// Perform DAG extraction
+            pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                let target: Eclass = target.into();
+                let mut serialized_egraph = Vec::new();
+                self.serialize(&mut serialized_egraph);
+                runtime::extract(serialized_egraph.into_iter(), target)
+
+            }
             #canonicalize
         }
 
@@ -316,6 +333,208 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
         }
         impl std::ops::DerefMut for #theory_ty {
             fn deref_mut(&mut self) -> &mut Self::Target { &mut self.delta }
+        }
+    }
+}
+
+fn codegen_extract(theory: &Theory) -> TokenStream {
+    let mut enode_ty = TokenStream::new();
+    let mut extract_expr_ty = TokenStream::new();
+    let mut enode_inputs = TokenStream::new();
+    let mut map_extract = TokenStream::new();
+    for rel in &theory.relations {
+        let Some(rel) = rel.as_ref() else {
+            continue;
+        };
+
+        // let col_ty = rel
+        //     .columns
+        //     .iter()
+        //     .map(|ty| ident::type_ty(&theory.types[ty]))
+        //     .collect_vec();
+
+        let RelationKind::Table { index_to_info } = &rel.kind else {
+            continue;
+        };
+
+        for info in index_to_info {
+            let IndexInfo::Fd {
+                key_columns,
+                value_columns,
+                generate_check_value_subsets,
+            } = info
+            else {
+                continue;
+            };
+
+            if value_columns.len() != 1 {
+                continue;
+            }
+
+            let value_columns: Vec<ColumnId> = value_columns.iter().map(|x| *x.0).collect();
+
+            let &[out_col] = value_columns.as_slice() else {
+                continue;
+            };
+
+            let is_symbolic = |x: ColumnId| theory.types[rel.columns[x]].kind == TypeKind::Symbolic;
+
+            let map_symbolic = |x: ColumnId| -> TokenStream {
+                if is_symbolic(x) {
+                    quote!(Eclass)
+                } else {
+                    let ty = &theory.types[rel.columns[x]];
+                    ident::type_ty(ty)
+                }
+            };
+            let rel_ty = ident::rel_enode_ty(rel);
+
+            enode_ty.extend({
+                let inner = key_columns
+                    .iter()
+                    .copied()
+                    .map(|x| {
+                        if is_symbolic(x) {
+                            quote!(Eclass)
+                        } else {
+                            let ty = &theory.types[rel.columns[x]];
+                            ident::type_ty(ty)
+                        }
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+
+                quote!(#rel_ty(#inner),)
+            });
+
+            extract_expr_ty.extend({
+                let inner = key_columns
+                    .iter()
+                    .copied()
+                    .map(|x| {
+                        if is_symbolic(x) {
+                            quote!(Box<Self>)
+                        } else {
+                            let ty = &theory.types[rel.columns[x]];
+                            ident::type_ty(ty)
+                        }
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+                quote!(#rel_ty(#inner),)
+            });
+
+            enode_inputs.extend({
+                let columns: TokenStream = key_columns
+                    .iter()
+                    .copied()
+                    .map(|x| {
+                        let c = ident::column(x);
+                        quote!(#c)
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+
+                let input_columns: TokenStream = key_columns
+                    .iter()
+                    .copied()
+                    .filter_map(|x| {
+                        is_symbolic(x).then(|| {
+                            let c = ident::column(x);
+                            quote!(#c)
+                        })
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+
+                quote!(Enode::#rel_ty(#columns) => vec![#input_columns],)
+            });
+
+            map_extract.extend({
+                let columns: TokenStream = key_columns
+                    .iter()
+                    .copied()
+                    .map(|x| {
+                        let c = ident::column(x);
+                        quote!(#c)
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+
+                let rec_columns: TokenStream = key_columns
+                    .iter()
+                    .copied()
+                    .map(|x| {
+                        let col = ident::column(x);
+                        if is_symbolic(x) {
+                            quote!(Box::new(#col.map_extract(extract)?))
+                        } else {
+                            quote!(#col)
+                        }
+                    })
+                    .reduce(|a, b| quote!(#a, #b))
+                    .unwrap_or(quote!());
+
+                quote! {
+                    Enode::#rel_ty(#columns) => ExtractExpr::#rel_ty(
+                        #rec_columns
+                    ),
+                }
+            });
+
+            break;
+        }
+    }
+
+    let mut eclass_ty = TokenStream::new();
+    let mut eclass_into = TokenStream::new();
+
+    for ty in &theory.types {
+        let TypeKind::Symbolic = ty.kind else {
+            continue;
+        };
+
+        let ty_ident = ident::type_ty(ty);
+        eclass_ty.extend(quote!(#ty_ident(#ty_ident),));
+
+        eclass_into.extend(quote! {
+            impl Into<Eclass> for #ty_ident {
+                fn into(self) -> Eclass {
+                    Eclass::#ty_ident(self)
+                }
+            }
+        })
+    }
+
+    quote! {
+        #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum Enode {
+            #enode_ty
+        }
+        #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum Eclass {
+            #eclass_ty
+        }
+        #eclass_into
+        #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
+        pub enum ExtractExpr {
+            #extract_expr_ty
+        }
+
+        impl EnodeInputs<Eclass> for Enode {
+            fn inputs(self) -> Vec<Eclass> {
+                match self {
+                    #enode_inputs
+                }
+            }
+        }
+
+        impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+            fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+                Some(match extract(self)? {
+                    #map_extract
+                })
+            }
         }
     }
 }
@@ -560,6 +779,10 @@ mod ident {
     /// `MathRelation`, `AddRelation`
     pub(crate) fn rel_ty(rel: &RelationData) -> Ident {
         format_ident!("{}Relation", rel.name.to_pascal_case())
+    }
+    /// `Add`, `Const`
+    pub(crate) fn rel_enode_ty(rel: &RelationData) -> Ident {
+        format_ident!("{}", rel.name.to_pascal_case())
     }
     /// `add_`
     pub(crate) fn rel_var(rel: &RelationData) -> Ident {

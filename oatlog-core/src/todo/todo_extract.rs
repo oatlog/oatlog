@@ -7,21 +7,17 @@ struct Math(u32);
 enum Eclass {
     Math(Math),
 }
+impl Into<Eclass> for Math {
+    fn into(self) -> Eclass {
+        Eclass::Math(self)
+    }
+}
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 enum Enode {
     Add(Eclass, Eclass),
     Mul(Eclass, Eclass),
     Const(i64),
-}
-impl Enode {
-    fn inputs(self) -> Vec<Eclass> {
-        match self {
-            Enode::Add(e0, e1) => vec![e0, e1],
-            Enode::Mul(e0, e1) => vec![e0, e1],
-            Enode::Const(e0) => vec![],
-        }
-    }
 }
 
 #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -31,8 +27,18 @@ enum ExtractExpr {
     Const(i64),
 }
 
-impl Eclass {
-    fn map_extract(self, extract: impl Fn(Eclass) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
+impl EnodeInputs<Eclass> for Enode {
+    fn inputs(self) -> Vec<Eclass> {
+        match self {
+            Enode::Add(e0, e1) => vec![e0, e1],
+            Enode::Mul(e0, e1) => vec![e0, e1],
+            Enode::Const(e0) => vec![],
+        }
+    }
+}
+
+impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+    fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
         Some(match extract(self)? {
             Enode::Add(e0, e1) => ExtractExpr::Add(
                 Box::new(e0.map_extract(extract)?),
@@ -47,90 +53,116 @@ impl Eclass {
     }
 }
 
+use runtime::{EclassMapExtract, EnodeInputs, extract};
+
+fn foo(
+    enode_to_eclass: std::collections::HashMap<Enode, Eclass>,
+    root: Eclass,
+) -> Option<ExtractExpr> {
+    extract(enode_to_eclass, root)
+}
+
 // RUNTIME:
 
 //         (Enode <- Eclass)  (Enode <- Eclass)
 //                ->                 ->
 
 // NOTE: only include things we want to be potentially extracted in enode_to_eclass
-fn extract(
-    enode_to_eclass: std::collections::HashMap<Enode, Eclass>,
-    root: Eclass,
-) -> Option<ExtractExpr> {
-    use std::collections::{HashMap, HashSet};
-    type Map<K, V> = HashMap<K, V>;
-    type Set<K, V> = HashSet<K, V>;
+mod runtime {
+    use std::hash::Hash;
 
-    // how many unprocessed enodes?
-    let mut eclass_in_deg: Map<Eclass, usize> = Map::new();
-
-    // how many unprocessed eclasses?
-    let mut enode_in_deg: Map<Enode, usize> = Map::new();
-
-    let mut eclass_to_enode: Map<Eclass, Vec<Enode>> = Map::new();
-
-    let mut eclass_readers: Map<Eclass, Vec<Enode>> = Map::new();
-    for (&enode, &eclass) in enode_to_eclass.iter() {
-        eclass_to_enode.entry(eclass).or_default().push(enode);
-        *eclass_in_deg.entry(eclass).or_default() += 1;
-
-        let inputs = enode.inputs();
-        for eclass in inputs.iter().copied() {
-            eclass_readers.entry(eclass).or_default().push(enode);
-        }
-
-        *enode_in_deg.entry(enode).or_default() = inputs.len();
+    pub trait EnodeInputs<Eclass> {
+        fn inputs(self) -> Vec<Eclass>;
     }
 
-    let mut eclass_queue: Vec<Eclass> = Vec::new();
-    let mut enode_queue: Vec<Enode> = Vec::new();
-
-    for (&enode, &eclass) in enode_to_eclass.iter() {
-        if enode_in_deg[&enode] == 0 {
-            enode_queue.push(enode);
-        }
+    pub trait EclassMapExtract<Enode, ExtractExpr>: Sized {
+        fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy)
+        -> Option<ExtractExpr>;
     }
 
-    let mut enode_cost: Map<Enode, i64> = Map::new();
-    let mut eclass_cost: Map<Eclass, (i64, Enode)> = Map::new();
+    pub fn extract<
+        Enode: EnodeInputs<Eclass> + Copy + Clone + Hash + Eq,
+        Eclass: EclassMapExtract<Enode, ExtractExpr> + Copy + Clone + Hash + Eq,
+        ExtractExpr,
+    >(
+        enode_to_eclass: std::collections::HashMap<Enode, Eclass>,
+        root: Eclass,
+    ) -> Option<ExtractExpr> {
+        use std::collections::{HashMap, HashSet};
+        type Map<K, V> = HashMap<K, V>;
+        type Set<K, V> = HashSet<K, V>;
 
-    while !(eclass_queue.is_empty() && enode_queue.is_empty()) {
-        while let Some(eclass) = eclass_queue.pop() {
-            let (cost, enode) = eclass_to_enode[&eclass]
-                .iter()
-                .copied()
-                .map(|enode| (enode_cost[&enode], enode))
-                .min()
-                .expect("attempted to extract empty eclass?");
+        // how many unprocessed enodes?
+        let mut eclass_in_deg: Map<Eclass, usize> = Map::new();
 
-            eclass_cost.insert(eclass, (cost, enode));
-            for reader_enode in eclass_readers[&eclass].iter().copied() {
-                let count = enode_in_deg.entry(reader_enode).or_default();
+        // how many unprocessed eclasses?
+        let mut enode_in_deg: Map<Enode, usize> = Map::new();
+
+        let mut eclass_to_enode: Map<Eclass, Vec<Enode>> = Map::new();
+
+        let mut eclass_readers: Map<Eclass, Vec<Enode>> = Map::new();
+        for (&enode, &eclass) in enode_to_eclass.iter() {
+            eclass_to_enode.entry(eclass).or_default().push(enode);
+            *eclass_in_deg.entry(eclass).or_default() += 1;
+
+            let inputs = enode.inputs();
+            for eclass in inputs.iter().copied() {
+                eclass_readers.entry(eclass).or_default().push(enode);
+            }
+
+            *enode_in_deg.entry(enode).or_default() = inputs.len();
+        }
+
+        let mut eclass_queue: Vec<Eclass> = Vec::new();
+        let mut enode_queue: Vec<Enode> = Vec::new();
+
+        for (&enode, &eclass) in enode_to_eclass.iter() {
+            if enode_in_deg[&enode] == 0 {
+                enode_queue.push(enode);
+            }
+        }
+
+        let mut enode_cost: Map<Enode, i64> = Map::new();
+        let mut eclass_cost: Map<Eclass, (i64, Enode)> = Map::new();
+
+        while !(eclass_queue.is_empty() && enode_queue.is_empty()) {
+            while let Some(eclass) = eclass_queue.pop() {
+                let (cost, enode) = eclass_to_enode[&eclass]
+                    .iter()
+                    .copied()
+                    .map(|enode| (enode_cost[&enode], enode))
+                    .min_by_key(|&(cost, _)| cost)
+                    .expect("attempted to extract empty eclass?");
+
+                eclass_cost.insert(eclass, (cost, enode));
+                for reader_enode in eclass_readers[&eclass].iter().copied() {
+                    let count = enode_in_deg.entry(reader_enode).or_default();
+                    *count -= 1;
+
+                    if *count == 0 {
+                        enode_queue.push(reader_enode);
+                    }
+                }
+            }
+            while let Some(enode) = enode_queue.pop() {
+                // cost of the enode itself.
+                let mut cost = 1;
+
+                for input in enode.inputs() {
+                    let (eclass_cost, _) = eclass_cost[&input];
+                    cost += eclass_cost;
+                }
+                enode_cost.insert(enode, cost);
+
+                let eclass = enode_to_eclass[&enode];
+                let count = eclass_in_deg.entry(eclass).or_default();
                 *count -= 1;
-
                 if *count == 0 {
-                    enode_queue.push(reader_enode);
+                    eclass_queue.push(eclass);
                 }
             }
         }
-        while let Some(enode) = enode_queue.pop() {
-            // cost of the enode itself.
-            let mut cost = 1;
 
-            for input in enode.inputs() {
-                let (eclass_cost, _) = eclass_cost[&input];
-                cost += eclass_cost;
-            }
-            enode_cost.insert(enode, cost);
-
-            let eclass = enode_to_eclass[&enode];
-            let count = eclass_in_deg.entry(eclass).or_default();
-            *count -= 1;
-            if *count == 0 {
-                eclass_queue.push(eclass);
-            }
-        }
+        root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
     }
-
-    root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
 }

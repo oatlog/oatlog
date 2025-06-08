@@ -1,4 +1,4 @@
-use crate::runtime::Eclass;
+use crate::runtime::EclassRepr;
 
 // TODO: consider multi-subscriber queue
 // - for `new` when adding rule scheduling
@@ -30,7 +30,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         Ok(())
     }
 }
-impl<T: Eclass> UnionFind<T> {
+impl<T: EclassRepr> UnionFind<T> {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
