@@ -78,7 +78,7 @@ fn main() {
     */
 
     // std::hint::black_box(theory);
-    // record_timings();
+    record_timings();
 }
 
 fn compare_egglog_oatlog(

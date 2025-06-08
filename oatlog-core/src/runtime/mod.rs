@@ -126,13 +126,15 @@ fn foo(map, insertions) {
 }
 */
 
-pub fn reinsert_hashmap<Key: Hash + Copy, Val: Copy, Row: Copy>(
+pub fn reinsert_hashmap<Key: Hash + Copy + Eq, Val: Copy, Row: Copy + Default>(
     map: &mut hashbrown_14::HashMap<Key, Val>,
     insertions: &[Row],
     mut map_insert: impl FnMut(&mut hashbrown_14::HashMap<Key, Val>, Row, TimeStamp),
     pack_key_val: impl Fn(Key, Val) -> (Row, TimeStamp),
+    extract_key: impl Fn(Row) -> Key,
     latest_timestamp: TimeStamp,
 ) {
+    /*
     let needed_capacity = map.len() + insertions.len();
     let current_capacity = map.capacity();
 
@@ -150,6 +152,61 @@ pub fn reinsert_hashmap<Key: Hash + Copy, Val: Copy, Row: Copy>(
             map_insert(map, row, timestamp);
         }
     }
+    */
+
+    /*
+    let should_sort = insertions.len() >= map.len() && map.len() > 8192;
+
+    if should_sort {
+        // let hasher = map.hasher();
+        // let mut bin_count = [0; 256];
+
+        // for row in insertions {
+        //     use std::hash::BuildHasher;
+        //     let key = extract_key(*row);
+        //     let hash: u64 = hasher.hash_one(key);
+        //     let bin = ((hash >> 6) & 0xFF) as usize;
+        //     bin_count[bin] += 1;
+        // }
+
+        // // dbg!(bin_count);
+
+        // let mut cc = 0;
+        // for i in 0..256 {
+        //     let tmp = bin_count[i];
+        //     bin_count[i] = cc;
+        //     cc += tmp;
+        // }
+
+        // let mut out: Vec<std::mem::MaybeUninit<Row>> = Vec::with_capacity(insertions.len());
+        // unsafe { out.set_len(insertions.len()) };
+
+        // for row in insertions {
+        //     use std::hash::BuildHasher;
+        //     let key = extract_key(*row);
+        //     let hash: u64 = hasher.hash_one(key);
+        //     let bin = ((hash >> 6) & 0xFF) as usize;
+
+        //     let index = bin_count[bin];
+        //     bin_count[bin] += 1;
+        //     out[index].write(*row);
+        // }
+
+        // for row in out {
+        //     let row = unsafe { row.assume_init() };
+        //     map_insert(map, row, latest_timestamp);
+        // }
+
+        // for batch in bins {
+        //     for row in batch {
+        //         map_insert(map, row, latest_timestamp);
+        //     }
+        // }
+        // for &row in insertions.iter() {
+        //     map_insert(map, row, latest_timestamp);
+        // }
+    }
+    */
 
     for &row in insertions.iter() {
         map_insert(map, row, latest_timestamp);

@@ -431,6 +431,7 @@ fn update_with_category(
                         }
                     },
                     |(#(#key_cols,)*), (#(#val_cols,)* timestamp,)| ((#(#columns,)*), timestamp),
+                    |(#(#columns,)*)| (#(#key_cols,)*),
                     latest_timestamp,
                 );
                 */
@@ -488,6 +489,54 @@ fn update_with_category(
                     .map(ident::column)
                     .collect_vec();
 
+                let col_is_root =
+                    |cols: Box<dyn Iterator<Item = (ColumnId, Option<TokenStream>)>>| {
+                        cols.filter_map(|(c, ident)| {
+                            let ident = ident.unwrap_or({
+                                let ident = ident::column(c);
+                                quote!(#ident)
+                            });
+                            let ty = rel.columns[c];
+                            let type_ = &theory.types[ty];
+                            (type_.kind == TypeKind::Symbolic).then(|| {
+                                let uf = ident::type_uf(type_);
+                                quote! {
+                                    uf.#uf.is_root(#ident)
+                                }
+                            })
+                        })
+                        .reduce(|a, b| quote! { #a & #b })
+                        .unwrap_or(quote! { true })
+                    };
+
+                let key_is_root = col_is_root(Box::new(key_columns.iter().map(|&c| (c, None))));
+                let val_is_root = col_is_root(Box::new(value_columns.keys().map(|&c| {
+                    (
+                        c,
+                        Some({
+                            let ident = ident::column(c);
+                            quote!(*#ident)
+                        }),
+                    )
+                })));
+
+                let canonicalize_val_in_place: TokenStream = {
+                    value_columns
+                        .keys()
+                        .filter_map(|c| {
+                            let ty = rel.columns[c];
+                            let type_ = &theory.types[ty];
+                            let ident = ident::column(*c);
+                            (type_.kind == TypeKind::Symbolic).then(|| {
+                                let uf = ident::type_uf(type_);
+                                quote! {
+                                    *#ident = uf.#uf.find(*#ident);
+                                }
+                            })
+                        })
+                        .collect()
+                };
+
                 let is_root = rel
                     .columns
                     .iter_enumerate()
@@ -521,7 +570,21 @@ fn update_with_category(
                         |(#(#columns,)*)| #is_root,
                     );
                     */
-                    self.#field_ident.retain(|&(#(#key_ident,)*),&mut (#(#value_ident,)* _timestamp)| {
+                    // no benefit?
+                    // self.#field_ident.retain(|&(#(#key_ident,)*), (#(#value_ident,)* timestamp)| {
+                    //     if !(#key_is_root) {
+                    //         #(let #value_ident = *#value_ident;)*
+                    //         insertions.push((#(#columns,)*));
+                    //         false
+                    //     } else if !(#val_is_root) {
+                    //         #canonicalize_val_in_place
+                    //         *timestamp = latest_timestamp;
+                    //         true
+                    //     } else {
+                    //         true
+                    //     }
+                    // });
+                    self.#field_ident.retain(|&(#(#key_ident,)*), &mut (#(#value_ident,)* _timestamp)| {
                         if #is_root {
                             true
                         } else {
@@ -529,6 +592,7 @@ fn update_with_category(
                             false
                         }
                     });
+
                     self.update_begin(&insertions[offset..], uf, latest_timestamp);
                     true
                 }
