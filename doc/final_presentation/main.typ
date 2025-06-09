@@ -909,7 +909,7 @@ Bonus!
   grid(
     columns: (1fr, 1fr),
     ```python
-    # recursive e-matching O(n^3)
+    # recursive e-matching O(n^2)
     for (x, y, z) in Add():
       for (a, c1) in Mul(x):
         for (b, c2) in Mul(y):
@@ -927,6 +927,9 @@ Bonus!
     ```,
   ),
 )
+
+- Finding optimal loop structure $=>$ query planning (joins).
+
 == Oops, patterns are actually database joins
 
 ```python
@@ -1131,7 +1134,7 @@ $X$ after step = $X union Delta X$
   inset: 22pt,
   [],              [$"Mul"$], [$Delta "Mul"$],
   [$"Add"$],       [#highlight[$"Mul" join "Add"$]], [$Delta "Mul" join "Add"$],
-  [$Delta "Add"$], [$Delta "Mul" join Delta "Add"$], [$Delta "Mul" join Delta "Add"$],
+  [$Delta "Add"$], [$"Mul" join Delta "Add"$], [$Delta "Mul" join Delta "Add"$],
 ),
 
 
@@ -1265,9 +1268,7 @@ i = fm_pp(ci, zr, zi * 2)             -> 2 ops
 
 == Architecture
 
-[high level architecture]
-
-- motivation for each IR
+#image("../figures/architecture.svg"),
 
 == High-level IR (HIR)
 
@@ -1286,8 +1287,6 @@ unify = [{lhs, rhs}]
 - simplify/optimize + semi-naive
 
 == Trie IR (TIR)/Query planning
-
-#TODO[we have not explained what a join actually looks like yet...]
 
 #text(
   size: 20pt,
@@ -1333,7 +1332,7 @@ unify = [{lhs, rhs}]
 == Indexes
 
 - Query subset of columns
-- Add(#highlight[3], ?, ?) `$->$` [Add(#highlight[3], 43, 59), Add(#highlight[3], 59, 25), ..]
+- Add(#highlight[3], ?, ?) $->$ [Add(#highlight[3], 43, 59), Add(#highlight[3], 59, 25), ..]
 
 Add(X, Y, Z):
 
