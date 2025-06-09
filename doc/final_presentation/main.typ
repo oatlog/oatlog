@@ -896,10 +896,52 @@ Bonus!
 
 = E-graphs as databases
 
-== #TODO[Show good and bad pattern impl. Is query planning!]
+== Searching for patterns// #TODO[Show good and bad pattern impl. Is query planning!]
 
-#TODO[Show top-down e-match of distributive law. Slow! Show fast variant (using semi-join). (Avoid
-semi-naive in example.) How can this be found automatically? Relational query planning!]
+// #TODO[Show top-down e-match of distributive law. Slow! Show fast variant (using semi-join). (Avoid
+//   semi-naive in example.) How can this be found automatically? Relational query planning!]
+
+```egglog
+(rewrite (Add (Mul a c) (Mul b c)) (...))
+```
+#text(
+  size: 20pt,
+  grid(
+    columns: (1fr, 1fr),
+    ```python
+    # recursive e-matching O(n^3)
+    for (x, y, z) in Add():
+      for (a, c1) in Mul(x):
+        for (b, c2) in Mul(y):
+          # filtering too late!
+          if c1 == c2:
+            output(..)
+    ```,
+    ```python
+    # optimal O(n^1.5)
+    for (x, y, z) in Add():
+      if (_, _, y) in Mul:
+        for a in Mul(x):
+          for b in Mul(y, c):
+            output(..)
+    ```,
+  ),
+)
+== Oops, patterns are actually database joins
+
+```python
+# optimal query planning O(n^1.5)
+for (x, y, z) in Add():
+  # semi join
+  if (_, _, y) in Mul:
+    for a in Mul(x):
+      # indexed lookup on (y, c)
+      for b in Mul(y, c):
+        # no filter needed!
+        output();
+```
+
+$ "Add" (x, y, z) join "Mul" (a, c, x) join "Mul" (b, c, y) $
 
 == Oops, patterns are actually database joins
 
@@ -1034,7 +1076,9 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
 
 
 == Database join implementation
+$ "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlight[x]) $
 
+/*
 #text(
   15pt,
   grid(
@@ -1051,35 +1095,59 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
     }
     return out;
     ```,
-    ```rust
-    // hash join
-    let mut out = Vec::new();
-    let mut mul_index = HashMap::new();
-    for mul_row in mul_relation {
-        mul_index.insert(mul_row.x, mul_row);
-    }
-    for add_row in add_relation {
-        let mul_row = mul_index[add_row.x];
-        out.push(foobar(add_row, mul_row));
-    }
-    return out;
-    ```,
   ),
+)
+*/
+#text(
+  20pt,
+  ```rust
+  let mut out = Vec::new();
+
+  // x -> Add(a, b, x)
+  let mut add_index = HashMap::new();
+  for add_row in add_relation {
+      add_index.insert(add_row.x, add_row);
+  }
+  // for each mul
+  for mul_row in mul_relation {
+      // find the matching add in O(1)
+      let add_row = add_index[add_row.x];
+      //                      ^^^^^^^^^
+      out.push(foobar(add_row, mul_row));
+  }
+  return out;
+  ```,
 )
 
 == Semi-naive evaluation
 
-#TODO[Square figure also or instead?]
-
+- We get some $Delta$ in each step
 - Avoid re-discovering #highlight[old join results]
 
-$
-  "Mul" join "Add" =& ("Mul"_"new" union "Mul"_"old") join ("Add"_"new" union "Add"_"old")\
-"Mul" join "Add" =& ("Mul"_"new" join "Add"_"new") union\
-&("Mul"_"new" join "Add"_"old") union\
-&("Mul"_"old" join "Add"_"new") union\
-&#highlight[($"Mul"_"old" join "Add"_"old"$)]\
-$
+$X$ after step = $X union Delta X$
+
+#table(
+  columns: (auto, auto, auto),
+  inset: 22pt,
+  [],              [$"Mul"$], [$Delta "Mul"$],
+  [$"Add"$],       [#highlight[$"Mul" join "Add"$]], [$Delta "Mul" join "Add"$],
+  [$Delta "Add"$], [$Delta "Mul" join Delta "Add"$], [$Delta "Mul" join Delta "Add"$],
+),
+
+
+//#TODO[Square figure also or instead?]
+
+// == Semi-naive evaluation
+// - $"Mul"$ is called $"Mul"_"old"$
+// - $Delta "Mul"$ is called $"Mul"_"new"$
+
+// $
+//   "Mul" join "Add" =& ("Mul"_"new" union "Mul"_"old") join ("Add"_"new" union "Add"_"old")\
+// "Mul" join "Add" =& ("Mul"_"new" join "Add"_"new") union\
+// &("Mul"_"new" join "Add"_"old") union\
+// &("Mul"_"old" join "Add"_"new") union\
+// &#highlight[($"Mul"_"old" join "Add"_"old"$)]\
+// $
 
 = Our contribution
 
@@ -1090,14 +1158,71 @@ $
 - be compatible
 - be faster
 
-== Oatlog
-
-[figure of equality saturation workflow with parts that oatlog solve highlighted]
+// == Oatlog
+//
+// [figure of equality saturation workflow with parts that oatlog solve highlighted]
 
 == Oatlog (ahead of time (aot $approx$ oat) + datalog)
 
-[figure of egglog DSL -> rust code]
+// [figure of egglog DSL -> rust code]
 
+#text(
+  11pt,
+  grid(
+    columns: (1fr, 1fr),
+    [
+      ```egglog
+      (datatype Math
+        (Mul Math Math)
+        (Div Math Math)
+        (LeftShift Math Math)
+        (Var String)
+        (Const i64)
+      )
+      (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
+      (rewrite (Div (Mul a b) c) (Mul a (Div b c)))
+      (rewrite (Div (Const a) (Const b)) (/ a b))
+      (rewrite (Mul a (Const 1)) a)
+      ```
+      #text(
+        16pt,
+        [
+          - user provides schema + rewrite rules
+          - Oatlog generates rust code to apply rewrites.
+        ],
+      )
+    ],
+    ```rust
+    // 1000s of LOC generated
+    struct Math(u32);
+    struct MulRelation {
+      ...
+    }
+    struct DivRelation {
+      ...
+    }
+    struct Theory {
+      mul: MulRelation,
+      div: DivRelation,
+      ...
+    }
+    impl Theory {
+      fn step(&mut self) {
+        self.apply_rules();
+        self.canonicalize();
+      }
+      fn apply_rules(&mut self) {..}
+      fn canonicalize(&mut self) {..}
+
+      fn insert_mul(&mut self, ..) {..}
+      fn insert_div(&mut self, ..) {..}
+      /* ... */
+
+      fn union_math(&mut self, a: Math, b: Math) {}
+    }
+    ```,
+  ),
+)
 
 == Correctness
 
@@ -1110,9 +1235,31 @@ $
 
 [table with lots of green]
 
-== Demo (maybe)
+== Mandelbrot set
 
-[something with extraction would be cool]
+#image("mandelbrot_set.jpg", width: 80%)
+
+== Demo
+
+$ z_r <- z_r dot z_r - z_i dot z_i + c_r $
+$ z_i <- 2 dot z_r dot z_i + c_i $
+
+But CPUs can compute
+$a + b * c$ 
+in the same time as 
+$a + b$.
+
+```
+r = zr * zr - zi * zi + cr            -> 4 ops
+i = 2 * zr * zi + ci                  -> 3 ops
+```
+
+```
+r = fm_pp(fm_pn(cr, zi, zi), zr, zr)  -> 2 ops
+i = fm_pp(ci, zr, zi * 2)             -> 2 ops
+```
+
+// [something with extraction would be cool]
 
 = Bonus slides!
 
