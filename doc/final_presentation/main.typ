@@ -1295,7 +1295,49 @@ Oatlog's goal:
 
 == Benchmarks
 
-[table with lots of green]
+#box(
+  height: 11.6em,
+  text(
+    size: 12pt,
+    columns(
+      2,
+      table(
+        columns: (auto, auto, auto, auto, auto),
+        inset: 4pt,
+        table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),
+        [`fuel1_math`, saturated], [973], [5.479 ms], [439.2 µs], table.cell(fill: green.lighten(27%))[12.48x],
+        [`fuel2_math`, saturated], [1516], [7.037 ms], [605.4 µs], table.cell(fill: green.lighten(27%))[11.62x],
+        [`fuel3_math`, saturated], [50021], [189.6 ms], [31.77 ms], table.cell(fill: green.lighten(36%))[5.97x],
+        [`math`, 0 steps], [35], [547.4 µs], [3.096 µs], table.cell(fill: green.lighten(13%))[176.80x],
+        [`math`, 1 steps], [69], [680.2 µs], [7.261 µs], table.cell(fill: green.lighten(15%))[93.69x],
+        [`math`, 2 steps], [118], [866.2 µs], [13.08 µs], table.cell(fill: green.lighten(16%))[66.21x],
+        [`math`, 3 steps], [208], [1.073 ms], [23.04 µs], table.cell(fill: green.lighten(18%))[46.59x],
+        [`math`, 4 steps], [389], [1.354 ms], [41.46 µs], table.cell(fill: green.lighten(20%))[32.65x],
+        [`math`, 5 steps], [784], [1.809 ms], [85.20 µs], table.cell(fill: green.lighten(22%))[21.24x],
+        [`math`, 6 steps], [1576], [2.614 ms], [213.3 µs], table.cell(fill: green.lighten(27%))[12.26x],
+        [`math`, 7 steps], [3160], [4.262 ms], [499.9 µs], table.cell(fill: green.lighten(31%))[8.53x],
+        [`math`, 8 steps], [8113], [7.525 ms], [1.121 ms], table.cell(fill: green.lighten(34%))[6.71x],
+        [`math`, 9 steps], [28303], [15.92 ms], [3.371 ms], table.cell(fill: green.lighten(40%))[4.72x],
+        [`math`, 10 steps], [136446], [61.52 ms], [15.39 ms], table.cell(fill: green.lighten(43%))[4.00x],
+        [`math`, 11 steps], [1047896], [448.6 ms], [177.8 ms], table.cell(fill: green.lighten(55%))[2.52x],
+        [`math`, 12 steps], [15987528], [8.125 s], [4.923 s], table.cell(fill: green.lighten(71%))[1.65x],
+        [`boolean_adder`, 0 steps], [44], [788.4 µs], [3.279 µs], table.cell(fill: green.lighten(13%))[240.44x],
+        [`boolean_adder`, 1 steps], [106], [935.9 µs], [6.771 µs], table.cell(fill: green.lighten(14%))[138.22x],
+        [`boolean_adder`, 2 steps], [241], [1.134 ms], [16.39 µs], table.cell(fill: green.lighten(16%))[69.21x],
+        [`boolean_adder`, 3 steps], [511], [1.515 ms], [39.63 µs], table.cell(fill: green.lighten(19%))[38.23x],
+        [`boolean_adder`, 4 steps], [727], [2.255 ms], [87.35 µs], table.cell(fill: green.lighten(21%))[25.82x],
+        [`boolean_adder`, 5 steps], [906], [3.601 ms], [151.3 µs], table.cell(fill: green.lighten(22%))[23.79x],
+        [`boolean_adder`, 6 steps], [1332], [5.081 ms], [257.5 µs], table.cell(fill: green.lighten(23%))[19.73x],
+        [`boolean_adder`, 7 steps], [2374], [6.718 ms], [459.1 µs], table.cell(fill: green.lighten(25%))[14.63x],
+        [`boolean_adder`, 8 steps], [5246], [10.24 ms], [921.3 µs], table.cell(fill: green.lighten(28%))[11.12x],
+        [`boolean_adder`, 9 steps], [15778], [19.55 ms], [2.217 ms], table.cell(fill: green.lighten(30%))[8.82x],
+        [`boolean_adder`, 10 steps], [77091], [50.51 ms], [8.953 ms], table.cell(fill: green.lighten(37%))[5.64x],
+        [`boolean_adder`, 11 steps], [854974], [337.7 ms], [112.7 ms], table.cell(fill: green.lighten(50%))[3.00x],
+        [`boolean_adder`, 12 steps], [24610667], [160.7 s], [148.9 s], table.cell(fill: green.lighten(95%))[1.08x],
+      ),
+    ),
+  ),
+)
 
 == Mandelbrot set
 
