@@ -126,7 +126,7 @@ Note that:
 $ q_1 subset.eq q_2 and q_2 subset.eq q_1 <=> q_1 equiv q_2 $
 
 Canonical database is a database where all premises(body) are part of the database:
-$ q_1  :- R(x,y),S(y,y),R(y,w) $
+$ q_1 :- R(x,y),S(y,y),R(y,w) $
 $ q_1' :- R(x,y),S(y,z),R(z,w) $
 $ D[q_1] = { R(x, y), S(y, y), R(y, w) } $
 
@@ -152,9 +152,9 @@ There are many incompatible definitions of hypergraph cycles, this text uses the
 == Ear
 A hyperedge $e$ where
 - we can divide it's nodes into two groups
-    - appear exclusively in $e$
-    - contained in a single other hyperedge $f$.
-        - $f$ is a called a witness of $e$.
+  - appear exclusively in $e$
+  - contained in a single other hyperedge $f$.
+    - $f$ is a called a witness of $e$.
 
 For $R(x,y), S(y,z), T(z,w)$, R and T are ears.
 
@@ -168,8 +168,8 @@ $F(q) = (V,E)$ where
 - $V$ are atoms.
 - $E$ are variables.
 - forall pairs R, S sharing variables:
-    - R,S belong to the same connected component.
-    - Shared variables occur on the unique path from S to R.
+  - R,S belong to the same connected component.
+  - Shared variables occur on the unique path from S to R.
 
 If $F$ is a tree then it is called a join forest and is equivalent to checking if it is acyclic.
 
@@ -202,7 +202,7 @@ Fractional edge cover:
 Vector $u$, for $H(q)$ assign weights to edges such that for each variable the sum of weights is more than 1.
 
 $
-|q(I)| <= product_(j=1) N_j^(u_j)
+  |q(I)| <= product_(j=1) N_j^(u_j)
 $
 
 Solving for the minimal bound can be done by taking the logarithm and doing linear programming.
@@ -241,7 +241,106 @@ for (x, y) in A:
 
 ```
 
+== second try
 
+1. If we have R(x, x), introduce R(x, y), Id(x, y)
+
+2. If we only have S(c, b), introduce materialized view S'(b, c)
+
+3. R(..), R(..) -> R(..), R'(..)
+
+4. R(2, x) -> R(y, x), Const_2(y)
+
+one iterator per "relation", assuming each relation is only present once in the query.
+
+Sorted lists with separate columns?
+
+```rust
+trait TrieIterator {
+    // advance iterator to reach >= pattern
+    // move to end if pattern does not exist.
+    fn seek(&mut self, pattern: impl Pattern);
+    fn next(&mut self);
+
+    fn key(&self) -> Tuple;
+    fn at_end(&self) -> bool;
+
+    // reset to beginning
+    fn open() -> Self;
+}
+
+// ordering: [a, b, c]
+
+let R = relation!(a, b);
+let S = relation!(b, c);
+let T = relation!(a, c); // NOT (c, a)
+
+let mut ri = R.open();
+let mut ti = T.open();
+
+let mut last_a = -1;
+loop {
+  if ri.at_end() {
+    return;
+  }
+
+  // advance to a new a
+  if last_a == ri.key().a {
+    ri.seek((last_a+1, _))
+  }
+  last_a = ri.key().a;
+  let a = last_a;
+
+  ti.seek((a, _));
+  if ti.at_end() {
+    return;
+  }
+  if ti.key().a != a {
+    continue;
+  }
+
+  let mut last_b = -1;
+  loop {
+    if ri.key().b == last_b {
+      ri.seek((last_b+1, _));
+    }
+    if ri.at_end() {
+      return;
+    }
+
+
+
+  }
+
+
+
+}
+
+let mut si = S.open();
+
+```
+
+```python
+# Q(a, b, c) = R(a, b), S(b, c), T(a, c)
+#
+#
+
+# join R, T to make iterator of a's
+
+# for a given value of a, pick b by joining R(a) with S, to create an inner iterator of b's
+
+# for a given value of a,b pick c by joining with S, T
+
+# 1 iterator per relation
+
+
+for (a, _) in R:
+  if (a, _) in T:
+
+
+
+
+```
 
 
 = Computing Join Queries with Functional Dependencies
@@ -341,8 +440,8 @@ Template expanders have the following problems:
 Multi-level IR has two kinds of transformations:
 - optimizations
 - lowerings
-    - expands code size
-    - trade off between search space and granularity of DSL.
+  - expands code size
+  - trade off between search space and granularity of DSL.
 
 
 Join reordering are feasible in high-level IR and regalloc in low level IR.
@@ -378,13 +477,13 @@ Between a pair of DSLs there is a unique path of lowerings between them (lowerin
 
 Types of DSLs
 - Declarative
-    - Specification of results
-    - Small search space
-    - Optimizations are more impactful.
+  - Specification of results
+  - Small search space
+  - Optimizations are more impactful.
 - Imperative
-    - Details about how to compute results are explicit.
-    - Data structures
-    - Predictable performance
+  - Details about how to compute results are explicit.
+  - Data structures
+  - Predictable performance
 
 Dataflow is better than AST.
 
@@ -396,9 +495,9 @@ Encode dataflow information by converting to a canonical representation.
 instead of having iterator APIs, we should work with "consumer/producer" models
 
 - Pull model
-    - Parents call next to get a single tuple.
+  - Parents call next to get a single tuple.
 - Push model
-    - Child calls next on parent to give it a tuple.
+  - Child calls next on parent to give it a tuple.
 
 = Functional Collection Programming with Semi-ring Dictionaries (2022)
 USEFUL AND CATEGORY THEORY??
@@ -449,10 +548,10 @@ If we put everything in a big list, we can still get prefix indexes by having in
 
 Optimizations:
 - Loop fusion
-    - deforestation
+  - deforestation
 - Loop Hoisting
-    - Joins are distributive.
-    - They can be factored out.
+  - Joins are distributive.
+  - They can be factored out.
 
 
 == Data layout representations
@@ -676,7 +775,7 @@ Output is in SOA format.
 - Can use compiler optimizations better.
 - Can perform checks like "Is buffer full" per block instead of per tuple
 - Performance counters per-block have less overhead.
-    - Allow for adaptive execution.
+  - Allow for adaptive execution.
 
 => it might make sense for the b-tree nodes to internally store tuples in an AOS way instead of a
 SOA way, for example:
@@ -742,7 +841,7 @@ We can do query planning with DP, but have some restrictions to reduce the searc
 
 - Push down (towards leaves) selections (=> filter as early as possible)
 - Avoid cross products (=> graph is connected)
-    - Cross products are only needed if graph is not connected.
+  - Cross products are only needed if graph is not connected.
 - Generate only left-deep trees (all joins become "linked list" joins).
 - Perform grouping last.
 
@@ -753,19 +852,19 @@ Problem is NP for simple cost functions but query sizes are small.
 Relation $R$ with $A_1, A_2 subset "attr"(R)$ satisfies functional dependency.
 Note that $A_1, A_2$ are *sets* of attributes.
 $ f : A_1 -> A_2 $
-If for all tuples $t_1, t_2 in R$  
+If for all tuples $t_1, t_2 in R$
 $ t_1.A_1 = t_2.A_1 => t_1.A_2 = t_2.A_2 $
 Functional dependency is essentially logical implication.
 
 The functional dependencies can be found from schema, specifically key constraints and check conditions (paraphrased, references "Exploiting Functional Dependence in Query Optimization")
 
 Additional constraints can be introduced by the following algebraic operations (complete set, Armstrong's axioms)
-+ $ X subset Y => Y -> X $ 
++ $ X subset Y => Y -> X $
 + $ (X union Z) subset (Y union Z) => (Y union Z) -> (X union Z) $
 + $ X -> Y and Y -> Z => X -> Z $
 
 $A$ is a *super key* of R if
-$ A subset "attr"(R)$
+$A subset "attr"(R)$
 
 
 $A$ is a *key* of R if no subset of $A$ is a *super key*.
@@ -779,8 +878,8 @@ All collections are finite.
 
 - Sets: have the obvious algebraic properties.
 - Bags: or multisets, allow duplicates. a map to a count
-    - intermediate queries are basically bags, so their algebraic properties might be useful.
-    - A subset of the laws for sets apply to bags.
+  - intermediate queries are basically bags, so their algebraic properties might be useful.
+  - A subset of the laws for sets apply to bags.
 - Sequence: ordered, allow duplicates.
 
 
@@ -812,11 +911,11 @@ Unions of conjunctive queries can be minimized by pairwise containment.
 - functional dependencies
 
 - column constraint
-    - `Check (EmpId Between 1 and 100)`
-    - Unique
-        - Primary key
-        - Unique indexes
-        - Unique constraints
+  - `Check (EmpId Between 1 and 100)`
+  - Unique
+    - Primary key
+    - Unique indexes
+    - Unique constraints
 - table constraint definitions
 
 
