@@ -1217,6 +1217,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "quadratic-formula-extract"
+version = "0.1.0"
+dependencies = [
+ "expect-test",
+ "oatlog",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

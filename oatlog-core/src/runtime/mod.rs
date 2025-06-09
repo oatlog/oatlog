@@ -502,20 +502,33 @@ pub fn extract<
     let mut enode_cost: Map<Enode, i64> = Map::new();
     let mut eclass_cost: Map<Eclass, (i64, Enode)> = Map::new();
 
+    // TODO: make this O(n) instead of O(n^2)
+    dbg!();
+
     while !(eclass_queue.is_empty() && enode_queue.is_empty()) {
         while let Some(eclass) = eclass_queue.pop() {
-            let (cost, enode) = eclass_to_enode[&eclass]
+            let Some((cost, enode)) = eclass_to_enode[&eclass]
                 .iter()
                 .copied()
-                .map(|enode| (enode_cost[&enode], enode))
+                .filter_map(|enode| Some((enode_cost.get(&enode).copied()?, enode)))
                 .min()
-                .expect("attempted to extract empty eclass?");
+            else {
+                continue;
+            };
+
+            if let Some((prev_cost, _)) = eclass_cost.get(&eclass) {
+                if *prev_cost == cost {
+                    continue;
+                }
+            }
 
             eclass_cost.insert(eclass, (cost, enode));
             if let Some(eclass_readers) = eclass_readers.get(&eclass) {
                 for reader_enode in eclass_readers.iter().copied() {
                     let count = enode_in_deg.entry(reader_enode).or_default();
-                    *count -= 1;
+                    if *count > 0 {
+                        *count -= 1;
+                    }
 
                     if *count == 0 {
                         enode_queue.push(reader_enode);
@@ -527,20 +540,30 @@ pub fn extract<
             // cost of the enode itself.
             let mut cost = 1;
 
+            let mut unfinished = false;
             for input in enode.inputs() {
-                let (eclass_cost, _) = eclass_cost[&input];
+                let Some(&(eclass_cost, _)) = eclass_cost.get(&input) else {
+                    unfinished = true;
+                    break;
+                };
                 cost += eclass_cost;
+            }
+            if unfinished {
+                break;
             }
             enode_cost.insert(enode, cost);
 
             let eclass = enode_to_eclass[&enode];
             let count = eclass_in_deg.entry(eclass).or_default();
-            *count -= 1;
-            if *count == 0 {
-                eclass_queue.push(eclass);
+            if *count > 0 {
+                *count -= 1;
             }
+            // if *count == 0 {
+            eclass_queue.push(eclass);
+            // }
         }
     }
+    dbg!();
 
     root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
 }

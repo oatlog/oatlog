@@ -342,6 +342,24 @@ for (a, _) in R:
 
 ```
 
+a, b, c, d
+
+// c a c b c c c d c a
+
+R(b, a, d), S(c, b, c), S(c, b, d) 
+
+1. Duplicate relations get new names
+
+R(b, a, d), S(c, b, c), T(c, b, d) 
+
+2. duplicate variables in single relation are split.
+
+R(b, a, d), S(c, b, e), T(c, b, d), equal(c, e)
+
+3. create materialized views for all relations with variable order [a, b, c, d, e]
+
+R'(a, b, d), S'(b, c, e), T'(b, c, d), equal(c, e)
+
 
 = Computing Join Queries with Functional Dependencies
 https://www.semanticscholar.org/paper/Computing-Join-Queries-with-Functional-Dependencies-Khamis-Ngo/41877f02e23aa3800cdfbd1de9e38fc6bbf437d0

@@ -892,6 +892,8 @@ impl SymbolicRule {
             )
         );
 
+        // TODO erik for loke: fix whatever bug was here.
+
         // TODO erik for loke: I think this might not generate the minimum set in some edge cases,
         // what if the very last element in `rules` dominates all previous rules? In that case,
         // nothing will be removed from ret?
@@ -902,6 +904,7 @@ impl SymbolicRule {
         // `MulOld(AddOld(a,b),AddNew(a,c))` in the distributive law
         //
         // using that `Mul` is commutative and `Old` more specific than `All`.
+        /*
         let mut ret = Vec::new();
         'outer: for rule in rules {
             for existing in &mut ret {
@@ -916,6 +919,8 @@ impl SymbolicRule {
         }
 
         ret.into_iter()
+        */
+        rules.into_iter()
     }
 
     fn optimize(mut self, relations: &TVec<RelationId, Relation>) -> Self {
