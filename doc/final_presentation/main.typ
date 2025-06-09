@@ -82,6 +82,14 @@ BONUS SLIDES
 - various constant factor things
 */
 
+== Outline
+
+"A high-performance e-graph engine"
+
+- High performance, how? #pause
+- What is an e-graph? #pause
+- Why even care?
+
 = Phase ordering problem
 
 == Interleaved optimizations
@@ -160,14 +168,15 @@ BONUS SLIDES
 == Order-dependent optimizations
 
 ```rust
-// input
+// A: input
 (x * 2) / 2
 
-// strength reduced
+// B: strength reduced
 (x << 1) / 2
 
-// reassociated
+// C: reassociated
 x * (2 / 2)
+
 // constant folded
 x
 ```
@@ -184,9 +193,9 @@ x
       diagram(
         spacing: (3em, 1em),
         node-stroke: 1pt,
-        node(A1, ""),
-        node(B0, ""),
-        node(C1, ""),
+        node(A1, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$B$])], shape: circle),
+        node(B0, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$A$])], shape: circle),
+        node(C1, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$C$])], shape: circle),
         node(C2, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
         edge(B0, A1, "->", stroke: R),
         edge(B0, C1, "->", stroke: G),
@@ -204,7 +213,7 @@ x
 == Traditional compilation passes
 
 #{
-  let (A2, A3) = ((2, 0), (3, 0))
+  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
   let (B1, B2) = ((1, 1), (2, 1))
   let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
   let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
@@ -225,6 +234,7 @@ x
       pause,
       node(A2, ""),
       node(A3, ""),
+      node(A4, ""),
       node(B1, ""),
       node(D1, ""),
       node(E2, ""),
@@ -242,6 +252,7 @@ x
       edge(B2, A3, "->", stroke: B),
       edge(D1, D2, "->", stroke: R),
       edge(D2, D3, "->", stroke: G),
+      edge(A3, A4, "->", stroke: G),
     ),
   )
 }
@@ -265,7 +276,7 @@ x
 == Equality saturation
 
 #{
-  let (A2, A3) = ((2, 0), (3, 0))
+  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
   let (B1, B2) = ((1, 1), (2, 1))
   let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
   let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
@@ -285,6 +296,7 @@ x
       edge(C2, C3, "->", stroke: B),
       node(A2, ""),
       node(A3, ""),
+      node(A4, ""),
       node(B1, ""),
       node(D1, ""),
       node(E2, ""),
@@ -302,6 +314,7 @@ x
       edge(B2, A3, "->", stroke: B),
       edge(D1, D2, "->", stroke: R),
       edge(D2, D3, "->", stroke: G),
+      edge(A3, A4, "->", stroke: G),
     ),
   )
 }
@@ -309,7 +322,7 @@ x
 == Equality saturation
 
 #{
-  let (A2, A3) = ((2, 0), (3, 0))
+  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
   let (B1, B2) = ((1, 1), (2, 1))
   let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
   let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
@@ -329,6 +342,7 @@ x
       edge(C2, C3, "=", stroke: B),
       node(A2, ""),
       node(A3, ""),
+      node(A4, ""),
       node(B1, ""),
       node(D1, ""),
       node(E2, ""),
@@ -346,6 +360,7 @@ x
       edge(B2, A3, "=", stroke: B),
       edge(D1, D2, "=", stroke: R),
       edge(D2, D3, "=", stroke: G),
+      edge(A3, A4, "=", stroke: G),
     ),
   )
 }
@@ -886,7 +901,7 @@ E-graphs save us if $a + b = a xor b$
 Phase ordering problems:
 - #strike[Order dependent]
 - #strike[Local choices]
-- Exponential possiblities? (reduced through semantic deduplication)
+- Exponential possibilities? (reduced through semantic deduplication)
 
 #pause
 Bonus!
@@ -896,20 +911,42 @@ Bonus!
 
 = E-graphs as databases
 
-== Searching for patterns// #TODO[Show good and bad pattern impl. Is query planning!]
+== Executing rewrite rules
 
-// #TODO[Show top-down e-match of distributive law. Slow! Show fast variant (using semi-join). (Avoid
-//   semi-naive in example.) How can this be found automatically? Relational query planning!]
+#place(
+  center + horizon,
+  dy: -1em,
+  ```egglog
+  (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
+           ^^^^^^^^^^^^^^^^^
+           pattern           ^^^^^^^^^^^^^^^^^^^^^^^^
+                             insertions
+  ```,
+)
+#place(
+  bottom,
+  dy: -2em,
+  dx: 2em,
+  [
+    Alternate between
+    - Pattern matching
+    - Batch insertion
+  ],
+)
+
+== Searching for patterns
+
 
 ```egglog
 (rewrite (Add (Mul a c) (Mul b c)) (...))
 ```
+#h(1em)
 #text(
   size: 20pt,
   grid(
     columns: (1fr, 1fr),
     ```python
-    # recursive e-matching O(n^2)
+    # top-down e-matching O(n^2)
     for (x, y, z) in Add():
       for (a, c1) in Mul(x):
         for (b, c2) in Mul(y):
@@ -921,14 +958,14 @@ Bonus!
     # optimal O(n^1.5)
     for (x, y, z) in Add():
       if (_, _, y) in Mul:
-        for a in Mul(x):
-          for b in Mul(y, c):
+        for (a, c) in Mul(x):
+          for b in Mul(c, y):
             output(..)
     ```,
   ),
 )
 
-- Finding optimal loop structure $=>$ query planning (joins).
+Finding optimal loop structure $=>$ query planning (joins).
 
 == Oops, patterns are actually database joins
 
@@ -937,24 +974,30 @@ Bonus!
 for (x, y, z) in Add():
   # semi join
   if (_, _, y) in Mul:
-    for a in Mul(x):
+    for (a, c) in Mul(x):
       # indexed lookup on (y, c)
       for b in Mul(y, c):
         # no filter needed!
-        output();
+        output(..)
 ```
-
-$ "Add" (x, y, z) join "Mul" (a, c, x) join "Mul" (b, c, y) $
+#v(1em)
+#align(
+  center,
+  ```egglog
+  (Add (Mul a c) (Mul b c))
+  ```,
+)
+$ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $
 
 == Oops, patterns are actually database joins
 
 // Note that we renamed the columns
 // generalize to any pattern by renaming relation and columns.
 
-$ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlight[x]) $
+$ "Mul"("Add"(a, b), c) <=> "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
 
-- Table row = e-node
-- Table element = e-class (integer)
+- Table row $<==>$ computation (e-node)
+- Table element $<==>$ value (e-class, an integer)
 
 #{
   let hidden(num) = { text([#num], fill: luma(90%)) }
@@ -966,12 +1009,12 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
       inset: 8pt,
       table.header(
         table.cell(colspan: 3, [*Mul*]),
-        [#highlight[x]],
+        [#text(purple)[x]],
         [c],
         [y],
       ),
 
-      [#highlight[30]], [18], [24],
+      [#text(purple)[30]], [18], [24],
       [#hidden(6)], [#hidden(36)], [#hidden(75)],
       [#hidden(54)], [#hidden(66)], [#hidden(87)],
       [...], [...], [...],
@@ -983,11 +1026,11 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
         table.cell(colspan: 3, [*Add*]),
         [a],
         [b],
-        [#highlight[x]],
+        [#text(purple)[x]],
       ),
 
       [#hidden(98)], [#hidden(39)], [#hidden(27)],
-      [63], [96], [#highlight[30]],
+      [63], [96], [#text(purple)[30]],
       [#hidden(51)], [#hidden(8)], [#hidden(99)],
       [...], [...], [...],
     ),
@@ -996,14 +1039,14 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
       inset: 8pt,
       table.header(
         table.cell(colspan: 5, [*Mul* $join$ *Add*]),
-        [#highlight[x]],
+        [#text(purple)[x]],
         [c],
         [y],
         [a],
         [b],
       ),
 
-      [#highlight[30]], [18], [24], [63], [96],
+      [#text(purple)[30]], [18], [24], [63], [96],
       [#hidden(88)], [#hidden(89)], [#hidden(5)], [#hidden(49)], [#hidden(57)],
       [#hidden(50)], [#hidden(37)], [#hidden(20)], [#hidden(53)], [#hidden(58)],
       [...], [...], [...], [...], [...],
@@ -1075,11 +1118,11 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlig
 // [#hidden(64)],
 // [#hidden(85)],
 
-- $=>$ fast e-graph engines are fast database engines.
+$==>$ fast e-graph engines are fast database engines
 
 
-== Database join implementation
-$ "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlight[x]) $
+== Hashmap joins
+$ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
 
 /*
 #text(
@@ -1124,42 +1167,54 @@ $ "Mul"(#highlight[x], c, y) join "Add"(a, b, #highlight[x]) $
 
 == Semi-naive evaluation
 
-- We get some $Delta$ in each step
-- Avoid re-discovering #highlight[old join results]
+#{
+  let hl = aqua.lighten(30%)
+  [
+    - Multiple steps of insertions ($Delta X$)
+    - Only match new results (#box(fill: hl, width: 14pt, height: 14pt))
 
-$X$ after step = $X union Delta X$
+    $X$ after step $= X union Delta X$
 
-#table(
-  columns: (auto, auto, auto),
-  inset: 22pt,
-  [],              [$"Mul"$], [$Delta "Mul"$],
-  [$"Add"$],       [#highlight[$"Mul" join "Add"$]], [$Delta "Mul" join "Add"$],
-  [$Delta "Add"$], [$"Mul" join Delta "Add"$], [$Delta "Mul" join Delta "Add"$],
-),
-
-
-//#TODO[Square figure also or instead?]
-
-// == Semi-naive evaluation
-// - $"Mul"$ is called $"Mul"_"old"$
-// - $Delta "Mul"$ is called $"Mul"_"new"$
-
-// $
-//   "Mul" join "Add" =& ("Mul"_"new" union "Mul"_"old") join ("Add"_"new" union "Add"_"old")\
-// "Mul" join "Add" =& ("Mul"_"new" join "Add"_"new") union\
-// &("Mul"_"new" join "Add"_"old") union\
-// &("Mul"_"old" join "Add"_"new") union\
-// &#highlight[($"Mul"_"old" join "Add"_"old"$)]\
-// $
+    #place(
+      center,
+      dx: 2em,
+      dy: -1em,
+      text(
+        18pt,
+        table(
+          columns: (auto, 10em, 7em),
+          rows: (auto, 10em, 4em),
+          stroke: none,
+          inset: 4pt,
+          align: center + horizon,
+          [], table.vline(start: 1), [$"Mul"$], table.vline(start: 1), [$Delta"Mul"$], table.vline(start: 1),
+          table.hline(start: 1),
+          align(right)[$"Add"$], [$"Add" join "Mul"$], table.cell(fill: hl)[$"Add" join Delta"Mul"$],
+          table.hline(start: 1),
+          align(right)[$Delta"Add"$], table.cell(fill: hl)[$Delta"Add" join "Mul"$], table.cell(
+            fill: hl,
+          )[$Delta"Add" join Delta"Mul"$],
+          table.hline(start: 1),
+        ),
+      ),
+    )
+  ]
+}
 
 = Our contribution
 
-== Short history and problem statement
+== Oatlog's role within e-graph history
 
-- egg exists
-- egglog is both the name of an existing e-graph engine and a language
-- be compatible
-- be faster
+- e-graphs for theorem proving (1980)
+- equality saturation (2009)
+- egg (2021), batched canonicalization
+- egglog (2023), full relational database
+  - both engine and theory language
+
+#pause
+Oatlog's goal:
+- compatible with egglog (language)
+- faster than egglog (engine)
 
 // == Oatlog
 //
@@ -1170,9 +1225,9 @@ $X$ after step = $X union Delta X$
 // [figure of egglog DSL -> rust code]
 
 #text(
-  11pt,
+  12pt,
   grid(
-    columns: (1fr, 1fr),
+    columns: (5fr, 4fr),
     [
       ```egglog
       (datatype Math
@@ -1188,15 +1243,15 @@ $X$ after step = $X union Delta X$
       (rewrite (Mul a (Const 1)) a)
       ```
       #text(
-        16pt,
+        20pt,
         [
-          - user provides schema + rewrite rules
-          - Oatlog generates rust code to apply rewrites.
+          - User provides schema + rewrite rules
+          - Oatlog generates Rust code to apply rewrites.
         ],
       )
     ],
     ```rust
-    // 1000s of LOC generated
+    // Thousands of LOC generated
     struct Math(u32);
     struct MulRelation {
       ...
@@ -1231,12 +1286,12 @@ $X$ after step = $X union Delta X$
 
 - egglog testsuite
   - 18 correct nonzero
-  - 7 zero sized e-graph
+  - 7 zero-sized e-graph
   - 3 panic in egglog
-  - 63 have minor surface-level features missing in oatlog
-  - shrinking
-- index implementation
-  - quickcheck
+  - 63 have features missing in oatlog (mostly minor features)
+- theory shrinking into minimal reproducing examples
+- snapshot tests
+- property testing of subcomponents
 
 == Benchmarks
 
@@ -1244,7 +1299,7 @@ $X$ after step = $X union Delta X$
 
 == Mandelbrot set
 
-#image("mandelbrot_set.jpg", width: 80%)
+#place(center + horizon, image("mandelbrot_set.jpg", width: 80%))
 
 == Demo
 
@@ -1252,9 +1307,10 @@ $ z_r <- z_r dot z_r - z_i dot z_i + c_r $
 $ z_i <- 2 dot z_r dot z_i + c_i $
 
 But CPUs can compute
-$a + b * c$ 
-in the same time as 
-$a + b$.
+$a + b dot c$
+in the same time as
+$a + b$.\
+(fused multiply-add)
 
 ```
 r = zr * zr - zi * zi + cr            -> 4 ops
@@ -1270,9 +1326,37 @@ i = fm_pp(ci, zr, zi * 2)             -> 2 ops
 
 = Bonus slides!
 
+== Peephole optimization
+
+#v(1em)
+#grid(
+  columns: (11fr, 15fr, 10fr),
+  gutter: 1em,
+  [
+    ```c
+    mem[0] = 1
+    a = mem[0] + 2
+    mem[3] = 4
+    return mem[a] + 5
+    ```
+
+    Local rewrites to fixpoint
+
+    Optimizations are
+    - fused
+    - incremental
+    - algebraic
+  ],
+  figure(
+    image("../figures/peephole_example.svg", fit: "contain", height: 82%),
+    caption: [Peephole-able IR],
+  ),
+  image("../figures/passes_vs_peepholes.svg", height: 93%),
+)
+
 == Architecture
 
-#image("../figures/architecture.svg"),
+#image("../figures/architecture.svg")
 
 == High-level IR (HIR)
 
@@ -1288,7 +1372,12 @@ insert = [(Mul z c rhs), (Add a b z)]
 unify = [{lhs, rhs}]
 ```
 
-- simplify/optimize + semi-naive
+- simplify/optimize
+- expand into semi-naive variants
+- exploit commutativity (novel idea!)
+  - deduplicate storage
+  - avoid some e-matching work
+  - (slightly more general than commutativity,\ "invariant permutations")
 
 == Trie IR (TIR)/Query planning
 
@@ -1331,36 +1420,23 @@ unify = [{lhs, rhs}]
   ),
 )
 
-- merge locally optimal choices.
+- query-plan each according to WCOJ + some heuristics
+- merge common prefixes into a trie (novel idea!)
 
 == Indexes
 
 - Query subset of columns
-- Add(#highlight[3], ?, ?) $->$ [Add(#highlight[3], 43, 59), Add(#highlight[3], 59, 25), ..]
+- $"Add"(#text(purple)[3], ?, ?) -> ["Add"(#text(purple)[3], 43, 59), "Add"(#text(purple)[3], 59, 25), ..]$
 
-Add(X, Y, Z):
+$"Add"(X, Y, Z)$:
 
-- (X,Y) -> Z:
-  - has functional dependence
+- $(X,Y) -> Z$:
+  - functional dependency, uniquely determined $Z$
   - `HashMap<(X, Y), Z>`
-- (Z) -> (X, Y):
-  - no functional dependence
+- $Z -> (X, Y)$:
+  - no functional dependency
   - `HashMap<(Z), Vec<(X, Y)>>`
-  - or `HashMap<(Z), &[(X, Y)]>>`
-
-
-// [#hidden(43)],
-// [#hidden(59)],
-// [#hidden(25)],
-// [#hidden(35)],
-// [#hidden(11)],
-// [#hidden(80)],
-// [#hidden(97)],
-// [#hidden(65)],
-// [#hidden(42)],
-
-
-= Canonicalization
+  - (actually closer to `HashMap<(Z), &[(X, Y)]>>`)
 
 == Union-find datastructure
 
@@ -1381,7 +1457,7 @@ union-find = {
 
 == Canonicalizing relations
 
-Add = [(47, 84, 95), (47, 92, 99), (74, 48, 69)]
+$"Add" = [(47, 84, 95), (47, 92, 99), (74, 48, 69)]$
 
 ```
 union-find = {
@@ -1389,9 +1465,9 @@ union-find = {
 }
 ```
 
-Add = [(#highlight[47, 84], 95), (#highlight[47, 84], 99), (74, 48, 69)]
+$"Add" = [(#text(purple)[47, 84], 95), (#text(purple)[47, 84], 99), (74, 48, 69)]$
 
-$=> $ unify 95, 99
+$=> $ unify $95, 99$
 
 == Canonicalization implementation
 
@@ -1418,49 +1494,8 @@ $=> $ unify 95, 99
   ```,
 )
 
-== Saturation
-
-```rust
-loop {
-    apply_rules();
-    canonicalize();
-}
-```
+(not actual Oatlog code, but semantically close)
 
 == Bounds on performance
 
 Slowest part is constructing indexes, but that cost can be amortized when more rewrite rules are present.
-
-== Peephole optimization
-
-#v(1em)
-#grid(
-  columns: (11fr, 15fr, 10fr),
-  gutter: 1em,
-  [
-    #uncover("2-")[
-      ```c
-      mem[0] = 1
-      a = mem[0] + 2
-      mem[3] = 4
-      return mem[a] + 5
-      ```
-    ]
-    #uncover("4-")[
-      Local rewrites to fixpoint
-
-      Optimizations are
-      - fused
-      - incremental
-      - algebraic
-    ]
-  ],
-  uncover(
-    "3-",
-    figure(
-      image("../figures/peephole_example.svg", fit: "contain", height: 82%),
-      caption: [Peephole-able IR],
-    ),
-  ),
-  image("../figures/passes_vs_peepholes.svg", height: 93%),
-)
