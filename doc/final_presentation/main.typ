@@ -1229,10 +1229,14 @@ $X$ after step = $X union Delta X$
 
 == Correctness
 
-[something with number of passing tests]
-
-- compare with egglog
-- quickcheck
+- egglog testsuite
+  - 18 correct nonzero
+  - 7 zero sized e-graph
+  - 3 panic in egglog
+  - 63 have minor surface-level features missing in oatlog
+  - shrinking
+- index implementation
+  - quickcheck
 
 == Benchmarks
 
