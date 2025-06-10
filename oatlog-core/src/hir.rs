@@ -904,7 +904,6 @@ impl SymbolicRule {
         // `MulOld(AddOld(a,b),AddNew(a,c))` in the distributive law
         //
         // using that `Mul` is commutative and `Old` more specific than `All`.
-        /*
         let mut ret = Vec::new();
         'outer: for rule in rules {
             for existing in &mut ret {
@@ -919,8 +918,6 @@ impl SymbolicRule {
         }
 
         ret.into_iter()
-        */
-        rules.into_iter()
     }
 
     fn optimize(mut self, relations: &TVec<RelationId, Relation>) -> Self {
