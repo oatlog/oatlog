@@ -2774,6 +2774,249 @@ Could we not just treat each BB as a function and use slotted e-graphs?
 
 If we find that the current row is not canonical, we know that it will be re-inserted later, so it can be skipped.
 
+= Thinking about projections and semi-naive and joins
+
+pi((A join B) union Delta (A join B))
+
+pi((A join B)) union pi(Delta (A join B))
+
+pi(
+    Delta A join B union
+    Delta A join Delta B union
+    Delta A join Delta B 
+)
+
+pi(Delta A join B) union
+pi(Delta A join Delta B) union
+pi(Delta A join Delta B)
+
+A(x, y, z) join B(...)
+
+if x is only referenced by A, then we can do:
+
+A'(y, z) join B(...)
+
+project distributes through join iff the variables are not "used" by the join.
+
+(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
+
+premise:
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+```
+
+action:
+
+```
+Mul(t0, c, z)
+Add(a, b, t0)
+```
+
+=> projection on a, b, c, z
+
+projection commutes IFF variables unused by join
+
+c, x, y are used by join
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+```
+
+=> no benefit in this case.
+
+(rewrite (Add (Add a b) c) (Add a (Add b c)))
+
+premise:
+```
+Add(x, c, y) join
+Add(a, b, x)
+```
+action:
+```
+Add(a, z, y)
+Add(b, c, z)
+```
+project on a, b, c, y
+
+=> no benefit in this case.
+
+assuming (rewrite ..), we need visible surface language variable (a, b, c..) to be unused in action and used exactly once in premise.
+
+Ok, does "eqlog"-style help here?
+
+premise:
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+Add(a, b, t0)
+```
+
+action:
+
+```
+Mul(t0, c, z)
+```
+
+well, no because a usage of variables in actions just translated to usage of variables in premise.
+
+but the first step does help:
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+```
+
+action:
+
+```
+Add(a, b, t0)
+//Mul(t0, c, z)
+```
+
+Here, we can now finally project on z, which has no benefit...
+
+Although, this gives another insight, that projections on the key of FD is free.
+
+Another approach is to perform projection by inserting into the hashcons and disabling the use of the hashcons as a index (other than for semi-joins ig?).
+
+Or specifically, we can no longer *iterate* the hashcons.
+
+It is sort-of possible to do project on join variables if we can do faster than O(n^3) matrix multiplication.
+Fast Join Project Query Evaluation using Matrix Multiplication
+https://dl.acm.org/doi/abs/10.1145/3318464.3380607
+
+= WCOJ variable ordering project
+
+(assume WCOJ = triefrog or generic join)
+
+We are WCOJ no matter what variable ordering we have.
+
+AND output is lexicographically increasing.
+
+Assume we have variables [a, b, c, d, e, f].
+
+We want to project [b, e] then:
+
+Pick variable ordering [[b, e], [a, c, d, f]]
+
+After selecting [b, e], then we just need to prove that there exists some [a, c, d, f].
+
+Ergo deduplication is free.
+
+So, is a "there exists" actually cheaper (complexity and/or constant factor)?
+
+Well regarding complexity, probably, but I can't find research on it.
+
+Regarding constant factor, it is obviously true.
+
+Let's try the distributive law again.
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+```
+
+action:
+
+```
+Mul(t0, c, z)
+Add(a, b, t0)
+```
+
+variables: [a, b, c, x, y, z]
+
+projection: [a, b, c, z]
+
+Well, because of FD, projection variable imply a value for x, y.
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y)
+```
+
+Looking at this again, we can see that [a, b, c] uniquely determines a join result and that some [a, b, c] is invalid due to the Add constraint.
+
+Ok, maybe we need to look at the motivating paper for star joins:
+
+Q(x, z) :- R(x, y), S(y, z)
+
+Right, for each x, y query if there is some z.
+
+..and this is the same as a join, but at least the project does not have an extra cost.
+
+back to the eqlog case:
+
+premise:
+
+```
+Add(x, y, z) join
+Mul(a, c, x) join
+Mul(b, c, y) join
+Add(a, b, t)
+```
+
+action:
+
+```
+Mul(t, c, z)
+```
+
+variables: [a, b, c, t, x, y, z]
+
+project: [t, c, z]
+
+ordering: [[c, t, z], [a, b, x, y]]
+
+```
+A(z*, x, y)
+B(c, a, x*)
+C(c, b, y*)
+D(t*, a, b)
+```
+[[B(c), C(c)], [D(t)], [A(z)], [B(a), D(a)]]
+
+This is probably unviable.
+
+another approach:
+
+variables: `[a, b, c*, t*, x, y, z*]`
+
+```python
+last = None
+last1 = None
+last2 = None
+for _ in _:
+  for _ in _:
+  #new_ctz:
+    for _ in _:
+      #early filtering
+      if last == (c, t, z):
+        continue
+      for _ in _:
+        for _ in _:
+          for _ in _:
+            if last != (c, t, z):
+              last = (c, t, z)
+              if last1 != (c, t):
+                output1();
+              if last2 != (t, z:
+                output2();
+              output();
+              continue new_ctz;
+```
+
+IFF we output in some lexicographic ordering, then any subset of variables will be served in lexicographic ordering.
+
 = TODO READ
 Papers are just under the first author i looked at.
 I stopped adding authors after a while since this is just too many papers.

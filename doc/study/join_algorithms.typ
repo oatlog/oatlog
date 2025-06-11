@@ -970,4 +970,10 @@ Needs:
 - fanout
 
 
+= Output-sensitive Conjunctive Query Evaluation
+https://dl.acm.org/doi/pdf/10.1145/3695838
+
+Faster joins without fast matrix multiplication.
+
+
 
