@@ -4,6 +4,9 @@
 
 #set raw(syntaxes: "../report/egglog.sublime-syntax")
 
+#show link: underline
+#show "naive": "naïve"
+
 #let TODO(msg) = {
   [#text(fill: red, weight: "bold", size: 20pt)[TODO: #msg]]
 }
@@ -14,14 +17,15 @@
 #set text(font: "New Computer Modern Sans")
 
 #let title = [Oatlog]
-#let subtitle = [A high-performance e-graph engine]
+#let subtitle = [A performant ahead-of-time compiled e-graph engine]
 #show: university-theme.with(
   config-common(enable-frozen-states-and-counters: false),
   config-info(
     title: title,
     subtitle: subtitle,
     author: [Loke Gustafsson #h(3em) Erik Magnusson],
-    date: datetime.today().display("[month repr:long] [day padding:none], [year]"),
+    //date: datetime.today().display("[month repr:long] [day padding:none], [year]"),
+    date: [June 17, 2025],
     institution: [
       #image("chalmerslogo.jpg", height: 3em)
       Chalmers University of Technology
@@ -84,15 +88,11 @@ problems/limitations (why egglog is probably still useful)
 
 = Future work for oatlog
 
-
 = Future work research community
 
 - rewrite rules have projections
 - slotted e-graphs
 - projections modulo semi-naive
-
-
-
 
 
 = Reusable insights
@@ -109,884 +109,22 @@ AOT good/bad
 - perform "optimizations" on the ruleset as a whole.
   - eg "inline" rewrites from one rule to another.
 
-
-
 */
 
+== TL:DR
 
-
-
-
-== Ahead of time compilation
-
-- Oatlog emits rust code for queries and relations.
-- Less abstract and therefore (subjectively) easier to understand.
-
-#text(
-  20pt,
-  ```rust
-  /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-  for (v2, c, v4) in self.mul_.iter_new() {
-      for (a, b) in self.add_.iter1_2_0_1(v2) {
-          let (v5,) = self.mul_.entry2_0_1_2(a, c, ..);
-          let (v6,) = self.mul_.entry2_0_1_2(b, c, ..);
-          self.delta.insert_add((v5, v6, v4));
-      }
-  }
-
-  /// (constructor Add (Math Math) Math)
-  struct AddRelation { ... }
-  ```,
-)
-
-== Prefix queries
-
-- prefix of query is "the same" $=>$ we want to merge into trie.
-
-
-#text(
-  size: 20pt,
-  grid(
-    columns: (auto, auto, auto, auto),
-    ```python
-    # rule 1
-    for _ in A:
-        for _ in B:
-            for _ in C:
-                X()
-                Y()
-    ```,
-    ```python
-    # rule 2
-    for _ in A:
-        for _ in B:
-            for _ in D:
-                X()
-                Z()
-    ```,
-    ```python
-    # rule 3
-    for _ in A:
-        for _ in B:
-            X()
-    ```,
-    ```python
-    # rule 1, 2 and 3
-    for _ in A:
-        for _ in B:
-            X()
-            for _ in C:
-                Y()
-            for _ in D:
-                Z()
-    ```,
-  ),
-)
-
-== Prefix queries
-- possible in linear time but tricky because we need to consider equality modulo renaming and variable reuse.
-- could be upstreamed into egglog.
-
-```python
-# rule 1
-for (x, y) in A():
-  for (z) in B(x):
-    ...
-
-# rule 2
-for (a, b) in A():
-  for (c) in B(a):
-    ...
-
-```
-
-== Comparison with other datalog engines
-
-// Datafrog: no runtime, manually perform query planning.
-// Crepe: negation,
-//
-// ```rust
-// struct Relation {
-//   old: Vec<Vec<Tuple>>,
-//   new: Vec<Tuple>,
-//   delta: Vec<Tuple>,
-// }
-// ```
-
-idk, they don't delete anything
-
-== Invariant permutations
-
-- some rules provide permutation information
-```egglog
-(rewrite (Add a b) (Add b a))
-```
-$=>$ `Add(a, b, c) = Add(b, a, c)`.
-
-- Inserting all permutations eagerly makes it an invariant.
-
-```rust
-for .. in .. {
-    self.insert_add(x, y, z);
-    self.insert_add(y, x, z); // new!
-}
-
-```
-
-== Invariant permutations - Queries
-
-- some semi-naive joins can be merged.
-
-#let hl(x) = { text(purple)[#x] }
-
-(rewrite (Add (Mul a c) (Mul b c)) (...))
-
-$
-  "Add"(hl("x"), hl("y"), "z") join "Mul"("a", "c", "x") join "Mul"("b", "c", "y")
-$
-
-- symmetry if we swap #hl("x") and #hl("y")!
-
-TODO: replace with for loops
-
-== Invariant permutations - Queries
-$
-  "New"( "Add"(hl("x"), hl("y"), "z") join "Mul"("a", "c", "x") join "Mul"("b", "c", "y"))
-$
-// $
-// t_1 &= "New"("Add")("x", "y", "z") &join& "Old"("Mul")("a", "c", "x") &join& "Old"("Mul")("b", "c", "y")\
-// t_2 &= "Add"("x", "y", "z")        &join& "New"("Mul")("a", "c", "x") &join& "Old"("Mul")("b", "c", "y")\
-// t_3 &= "Add"("x", "y", "z")        &join& "Mul"("a", "c", "x")        &join& "New"("Mul")("b", "c", "y")\
-// $
-
-Semi-naive variant 2 contains variant 1!
-
-#text(
-  15pt,
-  grid(
-    columns: (auto, auto),
-    ```rust
-    // variant 1
-    for (a, c, x) in mul.new() {
-        for (b, y) in mul.old().index(c) {
-            for (z) in add.all().index(x, y) {
-                /* ... */
-            }
-        }
-    }
-    // variant 2
-    for (b, c, y) in mul.new() {
-        for (a, x) in mul.all().index(c) {
-            for (z) in add.all().index(x, y) {
-                /* ... */
-            }
-        }
-    }
-    ```,
-    ```rust
-    // variant 3
-    for (x, y, z) in add.new() {
-        for (a, c) in mul.old().index(x) {
-            for (b) in mul.old().index(y, c) {
-                /* ... */
-            }
-        }
-    }
-    ```,
-  ),
-)
-
-== Invariant permutations - Queries
-
-// equal with variable renaming
-// a <-> b
-// x <-> y
-
-#text(
-  18pt,
-  ```rust
-  // variant 1
-  for (a, c, x) in mul.new() {
-      for (b, y) in mul.old().index(c) {
-          //            ^^^
-          for (z) in add.all().index(x, y) {
-              /* ... */
-          }
-      }
-  }
-  // variant 2 (with a <-> b, x <-> y)
-  for (a, c, x) in mul.new() {
-      for (b, y) in mul.all().index(c) {
-          //            ^^^
-          for (z) in add.all().index(x, y) {
-              /* ... */
-          }
-      }
-  }
-  ```,
-)
-
-== Invariant permutations - Indexes
-
-$"Add"(hl(a), hl(b), c)$ when $hl(a)$ can be swapped with $hl(b)$:
-
-$
-{hl(b)}    -> {hl(a), c} = {hl(a)}    -> {hl(b), c}\
-{hl(a), c} -> {hl(b)}    = {hl(b), c} -> {hl(a)}\
-$
-
-Fewer indexes!
-
-= OLD
-
-/*
-TITEL
-
-PHASE ORDERING
-visa behov av fler-stegs-optimering (midpoint)
-visa linjegraf RGB
-visa behov av bra lokalt beslut (midpoint)
-visa linjeträd RGB (noncommutative, temporally local choices, exponentially large space)
-llvm kaos, verkligt problem
-visa likhetsträd
-visa equality saturation (bygga + global extraction (vet framtiden))
-parentes om att program kan vara mathematical expressions/grafer, krävs här
-
-EGRAPHS
-expression tree från rapporten
-expression dag från rapporten (syntactic merge)
-e-graph från rapporten (semantic merge)
-(ej nämna funktionsabstraktion om ingen frågar)
-animering av (x*2)/2-egraph, ett steg i taget, uppenbart kommutativa omskrivningar. Färger inkl legend. Visa före och efter sammanslagning av e-klasser
-Samma exempel fast i egglog. Ergonomiskt språk, lätt att implementera en optimering! Peka på rewrite och visa "pattern", "inserts", "merge".
-
-DATABASE
-Visa top-down e-match på distributiva lagen. Långsamt! Visa snabbare variant. Icke-seminaivt exempel. Hur kan detta hittas automatiskt? Råkar vara databas query planning
-Visa databas, tabell och join
-Join impl visa kod
-Semi-naiv, både algebra och kvadrat-bild
-
-RESULTAT
-Kort historik, egglog språk och motor. Vi är kompilator, egglog är interpreter.
-Visa tabell, stora speedups för små, små speedups för stora. EJ läskig figur
-Varför? Oatlog query planning ahead of time, mer case-bash. Och konstantfaktor-fokus
-
-DEMO
-
-CONCLUSION
-- möjligheter inuti kompilatorer, bevisbarhet, enkelhet
-- potentiellt snabbare kompilering / bättre kompilering men det är spekulativt
-- "otroligt mycket lättare sätt att skriva kompilator på"
-- eggcc finns och använder egglog, så oatlog är drop-in
-
-- oatlog blir snabbare hela tiden, från en vecka sen rentav. Massa potential för vidare implementationsförbättring
-
-OPPOSITION
-
-BONUS SLIDES
-- trie query planning
-- invariant permutations
-- various constant factor things
-*/
+We have built Oatlog, an e-graph engine.
+- compatible with (a subset of) egglog (the language)
+- faster than egglog (the engine)
 
 == Outline
 
-"A high-performance e-graph engine"
++ E-graph implementation
++ Oatlog's benchmarks
++ Oatlog's techniques
++ Practical caveats
 
-- High performance, how? #pause
-- What is an e-graph? #pause
-- Why even care?
-
-= Phase ordering problem
-
-== Interleaved optimizations
-
-#slide(
-  repeat: 6,
-  self => [
-    #let (uncover, only, alternatives) = utils.methods(self)
-    #alternatives[```c
-      mem[0] = 1
-      a = mem[0] + 2
-      mem[3] = 4
-      return mem[a] + 5
-      ```][```c
-
-      a = 1 + 2
-      mem[3] = 4
-      return mem[a] + 5
-      ```][```c
-
-
-      mem[3] = 4
-      return mem[3] + 5
-      ```][```c
-
-
-
-      return 4 + 5
-      ```][```c
-
-
-
-      return 9
-      ```][```c
-      mem[0] = 1
-      a = mem[0] + 2
-      mem[3] = 4
-      return mem[a] + 5
-      ```]
-    + Store-to-load forwarding #pause
-    + Constant folding #pause
-    + Store-to-load forwarding #pause
-    + Constant folding #pause
-    #pause
-    #place(
-      center + horizon,
-      dx: 6em,
-      stack(
-        spacing: 1em,
-        {
-          let (C0, C1, C2, C3, C4) = ((0, 2), (1, 2), (2, 2), (3, 2), (4, 2))
-          let (R, G) = (red, green)
-          diagram(
-            spacing: (3em, 1em),
-            node-stroke: 1pt,
-            node(C0, ""),
-            node(C1, ""),
-            node(C2, ""),
-            node(C3, ""),
-            node(C4, ""),
-            edge(C0, C1, "->", stroke: R),
-            edge(C1, C2, "->", stroke: G),
-            edge(C2, C3, "->", stroke: R),
-            edge(C3, C4, "->", stroke: G),
-          )
-        },
-        [
-          #box(rect(fill: red, width: 14pt, height: 14pt)) Store-to-load forwarding\
-          #box(rect(fill: green, width: 14pt, height: 14pt)) Constant folding
-        ],
-      ),
-    )
-  ],
-)
-
-== Order-dependent optimizations
-
-```rust
-// A: input
-(x * 2) / 2
-
-// B: strength reduced
-(x << 1) / 2
-
-// C: reassociated
-x * (2 / 2)
-
-// constant folded
-x
-```
-#place(
-  center + horizon,
-  dx: 6em,
-  stack(
-    spacing: 1em,
-    {
-      let A1 = (1, 0)
-      let B0 = (0, 0.5)
-      let (C1, C2) = ((1, 1), (2, 1))
-      let (R, G, B) = (red, green, blue)
-      diagram(
-        spacing: (3em, 1em),
-        node-stroke: 1pt,
-        node(A1, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$B$])], shape: circle),
-        node(B0, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$A$])], shape: circle),
-        node(C1, "" + [#place(dx: -8pt, dy: -18pt, text(20pt)[$C$])], shape: circle),
-        node(C2, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
-        edge(B0, A1, "->", stroke: R),
-        edge(B0, C1, "->", stroke: G),
-        edge(C1, C2, "->", stroke: B),
-      )
-    },
-    [
-      #box(rect(fill: red, width: 14pt, height: 14pt)) Strength reduction\
-      #box(rect(fill: green, width: 14pt, height: 14pt)) Reassociation\
-      #box(rect(fill: blue, width: 14pt, height: 14pt)) Constant folding
-    ],
-  ),
-)
-
-== Traditional compilation passes
-
-#{
-  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
-  let (B1, B2) = ((1, 1), (2, 1))
-  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
-  let (E2, E3) = ((2, 4), (3, 4))
-  let (R, G, B) = (red, green, blue)
-  align(
-    center,
-    diagram(
-      spacing: (3em, 1em),
-      node-stroke: 1pt,
-      node(C0, ""),
-      node(C1, ""),
-      node(C2, ""),
-      node(C3, ""),
-      edge(C0, C1, "->", stroke: R),
-      edge(C1, C2, "->", stroke: G),
-      edge(C2, C3, "->", stroke: B),
-      pause,
-      node(A2, ""),
-      node(A3, ""),
-      node(A4, ""),
-      node(B1, ""),
-      node(D1, ""),
-      node(E2, ""),
-      node(E3, ""),
-      edge(C0, B1, "->", stroke: G),
-      edge(B1, A2, "->", stroke: B),
-      edge(A2, A3, "->", stroke: R),
-      edge(C0, D1, "->", stroke: B),
-      edge(D1, E2, "->", stroke: G),
-      edge(E2, E3, "->", stroke: R),
-      node(B2, ""),
-      node(D2, ""),
-      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
-      edge(B1, B2, "->", stroke: R),
-      edge(B2, A3, "->", stroke: B),
-      edge(D1, D2, "->", stroke: R),
-      edge(D2, D3, "->", stroke: G),
-      edge(A3, A4, "->", stroke: G),
-    ),
-  )
-}
-
-- Order dependent
-- Local choices
-- Exponential possibilities
-
-== Not just theoretical..
-
-#place(
-  center,
-  stack(
-    spacing: 1em,
-    [],
-    box(width: 30%, height: 70%, columns(2, align(left, text(2.3pt, raw(read("../presentation/llvm_passes.txt")))))),
-    [LLVM passes used in rustc],
-  ),
-)
-
-== Equality saturation
-
-#{
-  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
-  let (B1, B2) = ((1, 1), (2, 1))
-  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
-  let (E2, E3) = ((2, 4), (3, 4))
-  let (R, G, B) = (red, green, blue)
-  align(
-    center,
-    diagram(
-      spacing: (3em, 1em),
-      node-stroke: 1pt,
-      node(C0, ""),
-      node(C1, ""),
-      node(C2, ""),
-      node(C3, ""),
-      edge(C0, C1, "->", stroke: R),
-      edge(C1, C2, "->", stroke: G),
-      edge(C2, C3, "->", stroke: B),
-      node(A2, ""),
-      node(A3, ""),
-      node(A4, ""),
-      node(B1, ""),
-      node(D1, ""),
-      node(E2, ""),
-      node(E3, ""),
-      edge(C0, B1, "->", stroke: G),
-      edge(B1, A2, "->", stroke: B),
-      edge(A2, A3, "->", stroke: R),
-      edge(C0, D1, "->", stroke: B),
-      edge(D1, E2, "->", stroke: G),
-      edge(E2, E3, "->", stroke: R),
-      node(B2, ""),
-      node(D2, ""),
-      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
-      edge(B1, B2, "->", stroke: R),
-      edge(B2, A3, "->", stroke: B),
-      edge(D1, D2, "->", stroke: R),
-      edge(D2, D3, "->", stroke: G),
-      edge(A3, A4, "->", stroke: G),
-    ),
-  )
-}
-
-== Equality saturation
-
-#{
-  let (A2, A3, A4) = ((2, 0), (3, 0), (4, 0))
-  let (B1, B2) = ((1, 1), (2, 1))
-  let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-  let (D1, D2, D3) = ((1, 3), (2, 3), (3, 3))
-  let (E2, E3) = ((2, 4), (3, 4))
-  let (R, G, B) = (red, green, blue)
-  align(
-    center,
-    diagram(
-      spacing: (3em, 1em),
-      node-stroke: 1pt,
-      node(C0, ""),
-      node(C1, ""),
-      node(C2, ""),
-      node(C3, ""),
-      edge(C0, C1, "=", stroke: R),
-      edge(C1, C2, "=", stroke: G),
-      edge(C2, C3, "=", stroke: B),
-      node(A2, ""),
-      node(A3, ""),
-      node(A4, ""),
-      node(B1, ""),
-      node(D1, ""),
-      node(E2, ""),
-      node(E3, ""),
-      edge(C0, B1, "=", stroke: G),
-      edge(B1, A2, "=", stroke: B),
-      edge(A2, A3, "=", stroke: R),
-      edge(C0, D1, "=", stroke: B),
-      edge(D1, E2, "=", stroke: G),
-      edge(E2, E3, "=", stroke: R),
-      node(B2, ""),
-      node(D2, ""),
-      node(D3, "" + [#place(dx: -10pt, dy: -14pt, sym.star.stroked)], shape: circle),
-      edge(B1, B2, "=", stroke: R),
-      edge(B2, A3, "=", stroke: B),
-      edge(D1, D2, "=", stroke: R),
-      edge(D2, D3, "=", stroke: G),
-      edge(A3, A4, "=", stroke: G),
-    ),
-  )
-}
-
-Equalities!
-#pause
-Workflow:
-#grid(
-  gutter: 0pt,
-  columns: (3fr, 2fr),
-  [
-    + Initial program
-    + Find equalities (multiple rounds)
-    + Select one, using *global* heuristic
-  ],
-  [
-    #pause
-    - #strike[Order dependent]
-    - #strike[Local choices]
-    - Exponential possibilities? #place(right, dy: 10pt, text(size: 20pt)[(will revisit)])
-  ],
-)
-
-
-= E-graphs
-
-== Expression trees
-
-Representing $((a+b) dot 2) dot ((a+b)+2)$ as
-
-#place(
-  center + horizon,
-  fletcher.diagram(
-    spacing: (3em, 2em),
-    node-stroke: 1pt,
-    node-shape: circle,
-    {
-      let (A0, A1, A2, A3) = ((0, 0), (1, 0), (2, 0), (3, 0))
-      let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
-      let (C0, C1) = ((0.5, 2), (2.5, 2))
-      let D = (1.5, 3)
-      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-      node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-      node(A3, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-      edge(A0, B0, "->")
-      edge(A1, B0, "->")
-      edge(A2, B2, "->")
-      edge(A3, B2, "->")
-      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      node(B3, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-      edge(B0, C0, "->")
-      edge(B1, C0, "->")
-      edge(B2, C1, "->")
-      edge(B3, C1, "->")
-      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      edge(C0, D, "->")
-      edge(C1, D, "->")
-      node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-    },
-  ),
-)
-
-== Expression DAGs (directed acyclic graphs)
-
-#place(
-  center + horizon,
-  [#grid(
-      columns: (1fr, 1fr),
-      fletcher.diagram(
-        spacing: (3em, 2em),
-        node-stroke: 1pt,
-        node-shape: circle,
-        {
-          let (A0, A1, A2, A3) = ((0, 0), (1, 0), (2, 0), (3, 0))
-          let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
-          let (C0, C1) = ((0.5, 2), (2.5, 2))
-          let D = (1.5, 3)
-          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-          node(A2, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-          node(A3, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-          edge(A0, B0, "->")
-          edge(A1, B0, "->")
-          edge(A2, B2, "->")
-          edge(A3, B2, "->")
-          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          node(B3, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-          edge(B0, C0, "->")
-          edge(B1, C0, "->")
-          edge(B2, C1, "->")
-          edge(B3, C1, "->")
-          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          edge(C0, D, "->")
-          edge(C1, D, "->")
-          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-        },
-      ),
-      fletcher.diagram(
-        spacing: (3em, 2em),
-        node-stroke: 1pt,
-        node-shape: circle,
-        {
-          let (A0, A1) = ((0, 0), (1, 0))
-          let (B0, B1) = ((0, 1), (1, 1))
-          let (C0, C1) = ((0, 2), (1, 2))
-          let D = (0.5, 3)
-          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-          edge(A0, B0, "->")
-          edge(A1, B0, "->")
-          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-          edge(B0, C0, "->")
-          edge(B1, C0, "->")
-          edge(B0, C1, "->")
-          edge(B1, C1, "->")
-          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          edge(C0, D, "->")
-          edge(C1, D, "->")
-          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-        },
-      ),
-    )
-    Expression DAG $<==>$ merge *syntactically* identical subexpressions.
-  ],
-)
-
-== Duplication remains..
-
-A DAG represents
-$(2+(a xor b)) dot (2 dot (a xor b))$\
-#h(5.95em) and $(2+(a+b)) dot (2 dot (a+b))$ as
-
-#align(
-  center,
-  fletcher.diagram(
-    spacing: (3em, 2em),
-    node-stroke: 1pt,
-    node-shape: circle,
-    {
-      let (A0, A1) = ((2, 0), (3, 0))
-      let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
-      let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-      let (D0, D1) = ((0.5, 3), (2.5, 3))
-      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-      edge(A0, B0, "->")
-      edge(A1, B0, "->")
-      edge(A0, B1, "->")
-      edge(A1, B1, "->")
-      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$))
-      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-      edge(B0, C0, "->")
-      edge(B0, C1, "->")
-      edge(B1, C2, "->")
-      edge(B1, C3, "->")
-      edge(B2, C0, "->")
-      edge(B2, C1, "->")
-      edge(B2, C2, "->")
-      edge(B2, C3, "->")
-      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-      node(C3, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-      edge(C0, D0, "->")
-      edge(C1, D0, "->")
-      edge(C2, D1, "->")
-      edge(C3, D1, "->")
-      node(D0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-      node(D1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-    },
-  ),
-)
-
-Duplicated usages!
-
-== E-graphs
-
-E-graphs save us if $a + b = a xor b$
-
-#place(
-  center + horizon,
-  [#grid(
-      columns: (1fr, 1fr),
-      fletcher.diagram(
-        spacing: (3em, 2em),
-        node-stroke: 1pt,
-        node-shape: circle,
-        {
-          let (A0, A1) = ((2, 0), (3, 0))
-          let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
-          let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
-          let (D0, D1) = ((0.5, 3), (2.5, 3))
-          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-          edge(A0, B0, "->")
-          edge(A1, B0, "->")
-          edge(A0, B1, "->")
-          edge(A1, B1, "->")
-          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$))
-          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$))
-          edge(B0, C0, "->")
-          edge(B0, C1, "->")
-          edge(B1, C2, "->")
-          edge(B1, C3, "->")
-          edge(B2, C0, "->")
-          edge(B2, C1, "->")
-          edge(B2, C2, "->")
-          edge(B2, C3, "->")
-          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          node(C2, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-          node(C3, "" + place(bottom, dx: 6pt, dy: 4pt, $+$))
-          edge(C0, D0, "->")
-          edge(C1, D0, "->")
-          edge(C2, D1, "->")
-          edge(C3, D1, "->")
-          node(D0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-          node(D1, "" + place(bottom, dx: 6pt, dy: 4pt, $*$))
-        },
-      ),
-      fletcher.diagram(
-        spacing: (1em, 1.2em),
-        node-stroke: 1pt,
-        node-shape: circle,
-        {
-          let (A0, A1) = ((0, 0), (1, 0))
-          let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
-          let (C0, C1) = ((0.75, 2), (1.75, 2))
-          let D = (1.25, 3)
-          node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-          node(enclose: (A0,), shape: square, width: 1.6em, height: 1.5em)
-          node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-          node(enclose: (A1,), shape: square, width: 1.6em, height: 1.6em)
-          edge(A0, <xor>, "->")
-          edge(A1, <xor>, "->")
-          edge(A0, <plus>, "->")
-          edge(A1, <plus>, "->")
-          node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$), name: <xor>)
-          node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <plus>)
-          node(enclose: (B0, B1), shape: square, name: <either>, width: 5em, height: 1.6em)
-          node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), name: <two>)
-          node(enclose: (B2,), shape: square, width: 1.6em, height: 1.6em)
-          edge(<either>, <mul>, "->")
-          edge(<either>, <add>, "->")
-          edge(B2, <mul>, "->")
-          edge(B2, <add>, "->")
-          node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <mul>)
-          node(enclose: (C0,), shape: square, width: 1.6em, height: 1.6em)
-          node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <add>)
-          node(enclose: (C1,), shape: square, width: 1.6em, height: 1.6em)
-          edge(C0, <top>, "->")
-          edge(C1, <top>, "->")
-          node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <top>)
-          node(enclose: (D,), shape: square, width: 1.6em, height: 1.6em)
-        },
-      ),
-    )
-    E-graph $<==>$ merge *semantically* identical subexpressions.
-    #place(center + bottom, dy: 1.3em, text(size: 20pt)[(EqSat is all about finding equal subprograms!)])
-  ],
-)
-
-== E-graphs cont.
-
-#box(baseline: -24.2pt, ellipse(inset: (x: -14pt, y: -20pt), outset: (x: 0pt, y: 40pt), [Computations]))
-(called e-nodes) take
-#box(outset: (x: 4pt, top: 6pt, bottom: 10pt), stroke: black, [values])
-(e-classes), not other computations, as input
-
-#place(
-  center + horizon,
-  fletcher.diagram(
-    spacing: (1em, 1.2em),
-    node-stroke: 1pt,
-    node-shape: circle,
-    {
-      let (A0, A1) = ((0, 0), (1, 0))
-      let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
-      let (C0, C1) = ((0.75, 2), (1.75, 2))
-      let D = (1.25, 3)
-      node(A0, "" + place(bottom, dx: 6pt, dy: 4pt, $a$))
-      node(enclose: (A0,), shape: square, width: 1.6em, height: 1.5em)
-      node(A1, "" + place(bottom, dx: 6pt, dy: 4pt, $b$))
-      node(enclose: (A1,), shape: square, width: 1.6em, height: 1.6em)
-      edge(A0, <xor>, "->")
-      edge(A1, <xor>, "->")
-      edge(A0, <plus>, "->")
-      edge(A1, <plus>, "->")
-      node(B0, "" + place(bottom, dx: 6pt, dy: 4pt, $xor$), name: <xor>)
-      node(B1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <plus>)
-      node(enclose: (B0, B1), shape: square, name: <either>, width: 5em, height: 1.6em)
-      node(B2, "" + place(bottom, dx: 6pt, dy: 4pt, $2$), name: <two>)
-      node(enclose: (B2,), shape: square, width: 1.6em, height: 1.6em)
-      edge(<either>, <mul>, "->")
-      edge(<either>, <add>, "->")
-      edge(B2, <mul>, "->")
-      edge(B2, <add>, "->")
-      node(C0, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <mul>)
-      node(enclose: (C0,), shape: square, width: 1.6em, height: 1.6em)
-      node(C1, "" + place(bottom, dx: 6pt, dy: 4pt, $+$), name: <add>)
-      node(enclose: (C1,), shape: square, width: 1.6em, height: 1.6em)
-      edge(C0, <top>, "->")
-      edge(C1, <top>, "->")
-      node(D, "" + place(bottom, dx: 6pt, dy: 4pt, $*$), name: <top>)
-      node(enclose: (D,), shape: square, width: 1.6em, height: 1.6em)
-    },
-  ),
-)
+= How are e-graphs implemented?
 
 == Equality saturation using e-graphs
 
@@ -1154,7 +292,7 @@ E-graphs save us if $a + b = a xor b$
     )]
 }
 
-== Equality saturation using the egglog language
+== EqSat using the egglog language
 
 #{
   let (s1, s2, s3, s4, s5) = (black, red, green, blue, fuchsia)
@@ -1192,7 +330,7 @@ E-graphs save us if $a + b = a xor b$
     )
     (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
     (rewrite (Div (Mul a b) c) (Mul a (Div b c)))
-    (rewrite (Div (Const a) (Const b)) (/ a b))
+    (rewrite (Div (Const a) (Const b)) (Const (/ a b)))
     (rewrite (Mul a (Const 1)) a)
 
     (let x (Var "x"))
@@ -1203,50 +341,56 @@ E-graphs save us if $a + b = a xor b$
   ),
 )
 
-== Equality saturation using e-graphs, conclusion
+== The necessary ingredients
 
-Phase ordering problems:
-- #strike[Order dependent]
-- #strike[Local choices]
-- Exponential possibilities? (reduced through semantic deduplication)
+E-graph data structure supporting
+- Adding computations (e-nodes)
+- Adding values (e-classes)
+- Merging e-classes
+- Searching for patterns (e-matching)
 
-#pause
-Bonus!
-- high-level
-  - prototypable
-  - suitable for formal reasoning
+EqSat alternates between
+- E-matching
+- Batched insertions and merges (rebuilding)
 
-= E-graphs as databases
+== Implementation
 
-== Executing rewrite rules
+- E-classes can be merged $==>$ represent as integers, use union-find
+- E-nodes have fixed degree (arity plus one) $==>$ represent as tuples
+- Top-down (recursive) e-matching:
 
 #place(
   center + horizon,
-  dy: -1em,
+  dy: 1em,
+  align(
+    center,
+    [
+      ```egglog
+      (rewrite (Add (Mul a c) (Mul b c)) (...))
+      ```
+      #v(0.6em)
+      ```python
+      for (x, y, z) in Add():
+        for (a, c1) in Mul(x):
+          for (b, c2) in Mul(y):
+            if c1 == c2:
+              output(..)
+      ```
+    ],
+  ),
+)
+
+#place(bottom, dy: -1em, [(essentially egg)])
+
+== Relational e-matching
+
+#align(
+  center,
   ```egglog
-  (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
-           ^^^^^^^^^^^^^^^^^
-           pattern           ^^^^^^^^^^^^^^^^^^^^^^^^
-                             insertions
+  (rewrite (Add (Mul a c) (Mul b c)) (...))
   ```,
 )
-#place(
-  bottom,
-  dy: -2em,
-  dx: 2em,
-  [
-    Alternate between
-    - Pattern matching
-    - Batch insertion
-  ],
-)
-
-== Searching for patterns
-
-
-```egglog
-(rewrite (Add (Mul a c) (Mul b c)) (...))
-```
+$ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $
 #h(1em)
 #text(
   size: 20pt,
@@ -1262,44 +406,22 @@ Bonus!
             output(..)
     ```,
     ```python
-    # optimal O(n^1.5)
+    # worst-case optimal join O(n^1.5)
     for (x, y, z) in Add():
+      # semi join
       if (_, _, y) in Mul:
         for (a, c) in Mul(x):
-          for b in Mul(c, y):
+          # indexed lookup on (y, c)
+          for b in Mul(y, c):
+            # no filter needed!
             output(..)
     ```,
   ),
 )
 
-Finding optimal loop structure $=>$ query planning (joins).
+Finding optimal loop structure $==>$ relational query planning (of joins)
 
-== Oops, patterns are actually database joins
-
-```python
-# optimal query planning O(n^1.5)
-for (x, y, z) in Add():
-  # semi join
-  if (_, _, y) in Mul:
-    for (a, c) in Mul(x):
-      # indexed lookup on (y, c)
-      for b in Mul(y, c):
-        # no filter needed!
-        output(..)
-```
-#v(1em)
-#align(
-  center,
-  ```egglog
-  (Add (Mul a c) (Mul b c))
-  ```,
-)
-$ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $
-
-== Oops, patterns are actually database joins
-
-// Note that we renamed the columns
-// generalize to any pattern by renaming relation and columns.
+== Patterns are actually database joins
 
 $ "Mul"("Add"(a, b), c) <=> "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
 
@@ -1361,96 +483,11 @@ $ "Mul"("Add"(a, b), c) <=> "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text
   )
 }
 
-// [#hidden(43)],
-// [#hidden(59)],
-// [#hidden(25)],
-// [#hidden(35)],
-// [#hidden(11)],
-// [#hidden(80)],
-// [#hidden(97)],
-// [#hidden(65)],
-// [#hidden(42)],
-// [#hidden(29)],
-// [#hidden(76)],
-// [#hidden(3)],
-// [#hidden(16)],
-// [#hidden(32)],
-// [#hidden(1)],
-// [#hidden(34)],
-// [#hidden(26)],
-// [#hidden(81)],
-// [#hidden(21)],
-// [#hidden(95)],
-// [#hidden(46)],
-// [#hidden(33)],
-// [#hidden(15)],
-// [#hidden(62)],
-// [#hidden(94)],
-// [#hidden(9)],
-// [#hidden(17)],
-// [#hidden(2)],
-// [#hidden(7)],
-// [#hidden(48)],
-// [#hidden(45)],
-// [#hidden(70)],
-// [#hidden(93)],
-// [#hidden(61)],
-// [#hidden(47)],
-// [#hidden(83)],
-// [#hidden(23)],
-// [#hidden(71)],
-// [#hidden(40)],
-// [#hidden(22)],
-// [#hidden(56)],
-// [#hidden(84)],
-// [#hidden(14)],
-// [#hidden(82)],
-// [#hidden(72)],
-// [#hidden(67)],
-// [#hidden(100)],
-// [#hidden(12)],
-// [#hidden(90)],
-// [#hidden(19)],
-// [#hidden(31)],
-// [#hidden(55)],
-// [#hidden(79)],
-// [#hidden(28)],
-// [#hidden(60)],
-// [#hidden(44)],
-// [#hidden(73)],
-// [#hidden(92)],
-// [#hidden(52)],
-// [#hidden(69)],
-// [#hidden(38)],
-// [#hidden(64)],
-// [#hidden(85)],
-
 $==>$ fast e-graph engines are fast database engines
-
 
 == Hashmap joins
 $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
 
-/*
-#text(
-  15pt,
-  grid(
-    columns: (1fr, 1fr),
-    ```rust
-    // nested loop join
-    let mut out = Vec::new();
-    for add_row in add_relation {
-        for mul_row in mul_relation {
-            if add_row.x == mul_row.x {
-                out.push(foobar(add_row, mul_row));
-            }
-        }
-    }
-    return out;
-    ```,
-  ),
-)
-*/
 #text(
   20pt,
   ```rust
@@ -1485,7 +522,7 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
     #place(
       center,
       dx: 2em,
-      dy: -1em,
+      dy: -1.6em,
       text(
         18pt,
         table(
@@ -1508,26 +545,25 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
   ]
 }
 
-= Our contribution
+#place(bottom, [(relational e-matching + semi-naive evaluation $==>$ egglog, faster than egg)])
 
-== Oatlog's role within e-graph history
+= Oatlog
 
-- e-graphs for theorem proving (1980)
-- equality saturation (2009)
-- egg (2021), batched canonicalization
-- egglog (2023), full relational database
-  - both engine and theory language
+== Oatlog
 
-#pause
-Oatlog's goal:
-- compatible with egglog (language)
-- faster than egglog (engine)
+#{
+  set list(marker: ([•], [$==>$]))
+  [
+    - Oat $approx$ aot $=$ ahead of time
+      - enables new tricks
+    - Algorithmically similar to egglog
+    - Rust proc macro
+    - Implements (the core of) the egglog language
+    - Significantly faster e-matching and rebuilding compared to egglog
+  ]
+}
 
-// == Oatlog
-//
-// [figure of equality saturation workflow with parts that oatlog solve highlighted]
-
-== Oatlog (ahead of time (aot $approx$ oat) + datalog)
+== Using Oatlog
 
 // [figure of egglog DSL -> rust code]
 
@@ -1552,8 +588,16 @@ Oatlog's goal:
       #text(
         20pt,
         [
+
           - User provides schema + rewrite rules
-          - Oatlog generates Rust code to apply rewrites.
+          - Oatlog generates Rust code representing the theory.
+          #uncover(
+            "2-",
+            [
+              - Strict mode is step-by-step compatible with egglog
+              - Relaxed mode finds more rewrites in every iteration, identical saturated e-graph
+            ],
+          )
         ],
       )
     ],
@@ -1589,21 +633,10 @@ Oatlog's goal:
   ),
 )
 
-== Correctness
-
-- egglog testsuite
-  - 18 correct nonzero
-  - 7 zero-sized e-graph
-  - 3 panic in egglog
-  - 63 have features missing in oatlog (mostly minor features)
-- theory shrinking into minimal reproducing examples
-- snapshot tests
-- property testing of subcomponents
-
 == Benchmarks
 
 #box(
-  height: 11.6em,
+  height: 11.2em,
   text(
     size: 12pt,
     columns(
@@ -1646,89 +679,66 @@ Oatlog's goal:
   ),
 )
 
-== Mandelbrot set
-
-#place(center + horizon, image("mandelbrot_set.jpg", width: 80%))
-
-== Demo
-
-$ z_r <- z_r dot z_r - z_i dot z_i + c_r $
-$ z_i <- 2 dot z_r dot z_i + c_i $
-
-But CPUs can compute
-$a + b dot c$
-in the same time as
-$a + b$.\
-(fused multiply-add)
-
-```
-r = zr * zr - zi * zi + cr            -> 4 ops
-i = 2 * zr * zi + ci                  -> 3 ops
-```
-
-```
-r = fm_pp(fm_pn(cr, zi, zi), zr, zr)  -> 2 ops
-i = fm_pp(ci, zr, zi * 2)             -> 2 ops
-```
-
-// [something with extraction would be cool]
-
-= Bonus slides!
-
-== Peephole optimization
-
-#v(1em)
-#grid(
-  columns: (11fr, 15fr, 10fr),
-  gutter: 1em,
+#text(
+  22pt,
   [
-    ```c
-    mem[0] = 1
-    a = mem[0] + 2
-    mem[3] = 4
-    return mem[a] + 5
-    ```
-
-    Local rewrites to fixpoint
-
-    Optimizations are
-    - fused
-    - incremental
-    - algebraic
+    - not measuring extraction time
+    - both OOM beyond 12 steps
+    - large speedups, particularly for small e-graphs!
   ],
-  figure(
-    image("../figures/peephole_example.svg", fit: "contain", height: 82%),
-    caption: [Peephole-able IR],
-  ),
-  image("../figures/passes_vs_peepholes.svg", height: 93%),
 )
 
-== Architecture
+#place(
+  right + bottom,
+  dx: 1.3em,
+  dy: -5.5em,
+  text(
+    20pt,
+    [($approx 3$x speedup since call for papers 2 months
+      ago)],
+  ),
+)
 
-#image("../figures/architecture.svg")
+== Why is Oatlog fast?
 
-== High-level IR (HIR)
+We don't really know, because we lack an expert understanding of egglog.
 
-// Each rule is a conjuctive query, insertions and some unifications
+#pause
+- Avoid interpreter overhead, leverage rustc/LLVM #pause
+- Index implementation design choice?
+  - Oatlog conceptually `HashMap<(A, B), C>`
+  - egglog conceptually `HashMap<A, HashMap<B, C>>` #pause
+- Oatlog-specific optimizations enabled by AOT
+  - Trie query planning
+  - Invariant permutations #pause
+- Lots of performance engineering
 
-```
-(rewrite (Add (Mul a c) (Mul b c)) (Mul (Add a b) c))
-```
+== Ahead of time compilation
 
-```
-query = [(Add x y lhs), (Mul a c x), (Mul b c y)]
-insert = [(Mul z c rhs), (Add a b z)]
-unify = [{lhs, rhs}]
-```
+- Oatlog emits rust code for queries and relations.
+- Less abstract and therefore (subjectively) easier to understand, prototype and debug.
 
-- simplify/optimize
-- expand into semi-naive variants
-- exploit commutativity (novel idea!)
-  - deduplicate storage
-  - avoid some e-matching work
-  - (slightly more general than commutativity,\ "invariant permutations")
+#text(
+  20pt,
+  ```rust
+  /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+  for (v2, c, v4) in self.mul_.iter_new() {
+      for (a, b) in self.add_.iter1_2_0_1(v2) {
+          let (v5,) = self.mul_.entry2_0_1_2(a, c, ..);
+          let (v6,) = self.mul_.entry2_0_1_2(b, c, ..);
+          self.delta.insert_add((v5, v6, v4));
+      }
+  }
 
-== Trie IR (TIR)/Query planning
+  /// (constructor Add (Math Math) Math)
+  struct AddRelation { ... }
+  ```,
+)
+
+== Trie query planning
+
+- Identical query prefixes $==>$ can merge for-loops into a trie
+
 
 #text(
   size: 20pt,
@@ -1769,82 +779,154 @@ unify = [{lhs, rhs}]
   ),
 )
 
-- query-plan each according to WCOJ + some heuristics
-- merge common prefixes into a trie (novel idea!)
+== Invariant permutations
 
-== Indexes
+#let hl(x) = { text(purple)[#x] }
+#let hl2(x) = { text(olive)[#x] }
 
-- Query subset of columns
-- $"Add"(#text(purple)[3], ?, ?) -> ["Add"(#text(purple)[3], 43, 59), "Add"(#text(purple)[3], 59, 25), ..]$
-
-$"Add"(X, Y, Z)$:
-
-- $(X,Y) -> Z$:
-  - functional dependency, uniquely determined $Z$
-  - `HashMap<(X, Y), Z>`
-- $Z -> (X, Y)$:
-  - no functional dependency
-  - `HashMap<(Z), Vec<(X, Y)>>`
-  - (actually closer to `HashMap<(Z), &[(X, Y)]>>`)
-
-== Union-find datastructure
-
-- consider only e-classes
-
+Some rules provide permutation information
+```egglog
+(rewrite (Add a b) (Add b a))
 ```
-unify = {(17, 4), (13, 18), (18, 4), (20, 10)}
-```
+$==>$ $"Add"(hl(a), hl2(b), c) <=> "Add"(hl2(b), hl(a), c)$.
 
-- find representative e-class id.
+Inserting all permutations eagerly makes it an invariant
 
-```
-union-find = {
-  [17, 13, 18] -> 4,
-  [20] -> 10
+```rust
+for .. in .. {
+    self.insert_add(x, y, z);
+    self.insert_add(y, x, z); // new!
 }
-```
-
-== Canonicalizing relations
-
-$"Add" = [(47, 84, 95), (47, 92, 99), (74, 48, 69)]$
 
 ```
-union-find = {
-  [92] -> 84,
-}
-```
 
-$"Add" = [(#text(purple)[47, 84], 95), (#text(purple)[47, 84], 99), (74, 48, 69)]$
+== Invariant permutations - Queries
 
-$=> $ unify $95, 99$
+Many rules, including the distributive law, have symmetries
 
-== Canonicalization implementation
+#align(
+  center,
+  ```egglog
+  (rewrite (Add (Mul a c) (Mul b c)) (...))
+  ```,
+)
+
+$
+  "Add"(hl("x"), hl2("y"), "z")
+  join "Mul"("a", "c", hl("x"))
+  join "Mul"("b", "c", hl2("y"))
+$
+
+We can swap $hl("x")$ and $hl2("y")$!
+
+This affects semi-naive evaluation:
+
+$
+  t_1 &= "New"("Add") &join& "Add" &join& "Add" \
+  t_2 &= "Old"("Mul") &join& "New"("Mul") &join& "Mul" \
+  t_3 &= "Old"("Mul") &join& "Old"("Mul") &join& "New"("Mul")\
+$
+
+/*
+#text(
+  15pt,
+  grid(
+    columns: (auto, auto),
+    ```rust
+    // variant 1
+    for (a, c, x) in mul.new() {
+        for (b, y) in mul.old().index(c) {
+            for (z) in add.all().index(x, y) {
+                /* ... */
+            }
+        }
+    }
+    // variant 2
+    for (b, c, y) in mul.new() {
+        for (a, x) in mul.all().index(c) {
+            for (z) in add.all().index(x, y) {
+                /* ... */
+            }
+        }
+    }
+    ```,
+    ```rust
+    // variant 3
+    for (x, y, z) in add.new() {
+        for (a, c) in mul.old().index(x) {
+            for (b) in mul.old().index(y, c) {
+                /* ... */
+            }
+        }
+    }
+    ```,
+  ),
+)
+*/
+
+== Invariant permutations - Queries
+
+// equal with variable renaming
+// a <-> b
+// x <-> y
+
+Semi-naive variant 3 matches a superset of variant 2!
 
 #text(
-  18pt,
+  17pt,
   ```rust
-  let mut map: HashMap<(Eclass, Eclass), Eclass> = ..;
-  loop {
-      for (x, y, z) in to_insert.drain(..) {
-          match map[(uf.find(x), uf.find(y))] {
-              Some(old_z) => {
-                  uf.union(z, old_z);
-              }
-              None => {
-                  map[(x, y)] = z;
-              }
+  // variant 2
+  for (a, c, x) in mul.new() {
+      for (b, y) in mul.old().index(c) {
+          //            ^^^
+          for (z) in add.all().index(x, y) {
+              /* ... */
           }
       }
-      to_insert.extend(map.drain_if(|(x, y), z| {
-          !(uf.is_root(x) && uf.is_root(y) && uf.is_root(z))
-      }))
-      if to_insert.len() == 0 { break; }
+  }
+  // variant 3 (with a <-> b, x <-> y)
+  for (a, c, x) in mul.new() {
+      for (b, y) in mul.all().index(c) {
+          //            ^^^
+          for (z) in add.all().index(x, y) {
+              /* ... */
+          }
+      }
   }
   ```,
 )
 
-(not actual Oatlog code, but semantically close)
+== Invariant permutations - Indexes
 
-== Bounds on performance
+Some indexes become identical for $"Add"(hl(a), hl2(b), c)$:
 
-Slowest part is constructing indexes, but that cost can be amortized when more rewrite rules are present.
+$
+  {hl2(b)} -> {hl(a), c} <=> {hl(a)} -> {hl2(b), c}\
+  {hl(a), c} -> {hl2(b)} <=> {hl2(b), c} -> {hl(a)}\
+$
+
+Oatlog avoids storing both!
+
+== Limitations
+
+- Oatlog fails much of the egglog test suite (rulesets, containers)
+  - Nothing conceptually prevent supporting these
+  - Extraction through Rust API, not egglog code
+- Compiler/interpreter differences
+  - egglog is suitable for REPL use
+  - Oatlog/AOT is suitable for applications with fixed rewrite rules
+- Oatlog's tree extraction is not optimized or benchmarked (yet)
+
+== Implementing Oatlog's ideas in egglog proper?
+
+- Requires whole-ruleset query planning and optimization
+- Requires relaxed semantics:
+  - Trie query planning changes rule matching order (typically unobservable)
+  - Invariant permutations e-match earlier, e-graph is different until saturation (only enabled in Oatlog's relaxed mode)
+
+== Learning more about Oatlog
+
+Accessible at https://github.com/oatlog/oatlog
+
+We built Oatlog as our master's thesis, which is titled "Oatlog: A high-performance e-graph
+engine" and will be published soon.
