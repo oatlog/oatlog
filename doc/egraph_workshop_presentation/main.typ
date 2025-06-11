@@ -51,7 +51,7 @@ This work is motivated by finding constant factor improvements for e-graph engin
 
 Implement e-graph with a hashcons.
 hashcons is the "source of truth" for what is in the e-graph
-we have hashcons to maintain 
+we have hashcons to maintain
 
 = egglog implementation
 
@@ -65,7 +65,7 @@ TODO: mention that we don't have a full understanding of egglog
 
 how is oatlog implemented (canonicalization + query)
 
-apply_rules -> delta (Vec<Row=(Enode, Eclass)>) 
+apply_rules -> delta (Vec<Row=(Enode, Eclass)>)
 
 fixpoint(
     delta -> hascons -> equalities -> union-find
@@ -82,7 +82,7 @@ invariant permutations can remove some rewrite rules.
 
 problems/limitations (why egglog is probably still useful)
 
-= Future work for oatlog 
+= Future work for oatlog
 
 
 = Future work research community
@@ -102,13 +102,116 @@ AOT query planning (or a JIT-ed variant of it) is useful
 - minimal-ish indexes
 - invariant permutations
 
-
+AOT good/bad
+- easy to understand queries
+- less flexible, eg adding rules at runtime is not possible, repl is not possible.
+- invariant permutations
+- perform "optimizations" on the ruleset as a whole.
+  - eg "inline" rewrites from one rule to another.
 
 
 
 */
 
 
+
+
+
+== Ahead of time compilation
+
+- Oatlog emits rust code for queries and relations.
+- Less abstract and therefore (subjectively) easier to understand.
+
+#text(
+  20pt,
+  ```rust
+  /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
+  for (v2, c, v4) in self.mul_.iter_new() {
+      for (a, b) in self.add_.iter1_2_0_1(v2) {
+          let (v5,) = self.mul_.entry2_0_1_2(a, c, ..);
+          let (v6,) = self.mul_.entry2_0_1_2(b, c, ..);
+          self.delta.insert_add((v5, v6, v4));
+      }
+  }
+
+  /// (constructor Add (Math Math) Math)
+  struct AddRelation { ... }
+  ```,
+)
+
+== Prefix queries
+
+- prefix of query is "the same" $=>$ we want to merge into trie.
+
+
+#text(
+  size: 20pt,
+  grid(
+    columns: (auto, auto, auto, auto),
+    ```python
+    # rule 1
+    for _ in A:
+        for _ in B:
+            for _ in C:
+                X()
+                Y()
+    ```,
+    ```python
+    # rule 2
+    for _ in A:
+        for _ in B:
+            for _ in D:
+                X()
+                Z()
+    ```,
+    ```python
+    # rule 3
+    for _ in A:
+        for _ in B:
+            X()
+    ```,
+    ```python
+    # rule 1, 2 and 3
+    for _ in A:
+        for _ in B:
+            X()
+            for _ in C:
+                Y()
+            for _ in D:
+                Z()
+    ```,
+  ),
+)
+
+== Prefix queries
+- possible in linear time but tricky because we need to consider equality modulo renaming and variable reuse.
+- could be upstreamed into egglog.
+
+```python
+# rule 1
+for (x, y) in A():
+  for (z) in B(x):
+    ...
+
+# rule 2
+for (a, b) in A():
+  for (c) in B(a):
+    ...
+
+```
+
+== Comparison with other datalog engines
+
+// Datafrog: no runtime, manually perform query planning. 
+// Crepe: negation, 
+// 
+// ```rust
+// struct Relation {
+//   old: Vec<Vec<Tuple>>,
+//   new: Vec<Tuple>,
+//   delta: Vec<Tuple>,
+// }
+// ```
 
 = OLD
 

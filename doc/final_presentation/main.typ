@@ -885,7 +885,7 @@ E-graphs save us if $a + b = a xor b$
     )
     (rewrite (Mul a (Const 2)) (LeftShift a (Const 1)))
     (rewrite (Div (Mul a b) c) (Mul a (Div b c)))
-    (rewrite (Div (Const a) (Const b)) (/ a b))
+    (rewrite (Div (Const a) (Const b)) (Const (/ a b)))
     (rewrite (Mul a (Const 1)) a)
 
     (let x (Var "x"))
