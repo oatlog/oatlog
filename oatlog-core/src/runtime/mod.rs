@@ -503,7 +503,6 @@ pub fn extract<
     let mut eclass_cost: Map<Eclass, (i64, Enode)> = Map::new();
 
     // TODO: make this O(n) instead of O(n^2)
-    dbg!();
 
     while !(eclass_queue.is_empty() && enode_queue.is_empty()) {
         while let Some(eclass) = eclass_queue.pop() {
@@ -563,7 +562,6 @@ pub fn extract<
             // }
         }
     }
-    dbg!();
 
     root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
 }
