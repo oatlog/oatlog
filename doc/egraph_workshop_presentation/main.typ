@@ -39,7 +39,11 @@ TODO: mention that we made everything in like 5 months and that we are just mast
 
 TODO: send video to friends for peer review?
 
+TODO: publish thesis with video
+
 "we have made an "egglog compatible" e-graph engine that is "faster" than egglog"
+
+This work is motivated by finding constant factor improvements for e-graph engines.
 
 = Intro to e-graphs
 
@@ -61,11 +65,22 @@ TODO: mention that we don't have a full understanding of egglog
 
 how is oatlog implemented (canonicalization + query)
 
+apply_rules -> delta (Vec<Row=(Enode, Eclass)>) 
+
+fixpoint(
+    delta -> hascons -> equalities -> union-find
+    remove non-canonical from hashcons -> delta
+)
+
+reconstruct indexes
+
 mention pros/cons with AOT architecture
 
 HIR opts, TIR opts, AOT index selection.
 
 invariant permutations can remove some rewrite rules.
+
+problems/limitations (why egglog is probably still useful)
 
 = Future work for oatlog 
 
@@ -80,7 +95,12 @@ invariant permutations can remove some rewrite rules.
 
 
 
+= Reusable insights
 
+AOT query planning (or a JIT-ed variant of it) is useful
+- trie queries
+- minimal-ish indexes
+- invariant permutations
 
 
 
