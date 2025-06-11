@@ -202,9 +202,9 @@ for (a, b) in A():
 
 == Comparison with other datalog engines
 
-// Datafrog: no runtime, manually perform query planning. 
-// Crepe: negation, 
-// 
+// Datafrog: no runtime, manually perform query planning.
+// Crepe: negation,
+//
 // ```rust
 // struct Relation {
 //   old: Vec<Vec<Tuple>>,
@@ -212,6 +212,130 @@ for (a, b) in A():
 //   delta: Vec<Tuple>,
 // }
 // ```
+
+idk, they don't delete anything
+
+== Invariant permutations
+
+- some rules provide permutation information
+```egglog
+(rewrite (Add a b) (Add b a))
+```
+$=>$ `Add(a, b, c) = Add(b, a, c)`.
+
+- Inserting all permutations eagerly makes it an invariant.
+
+```rust
+for .. in .. {
+    self.insert_add(x, y, z);
+    self.insert_add(y, x, z); // new!
+}
+
+```
+
+== Invariant permutations - Queries
+
+- some semi-naive joins can be merged.
+
+#let hl(x) = { text(purple)[#x] }
+
+(rewrite (Add (Mul a c) (Mul b c)) (...))
+
+$
+  "Add"(hl("x"), hl("y"), "z") join "Mul"("a", "c", "x") join "Mul"("b", "c", "y")
+$
+
+- symmetry if we swap #hl("x") and #hl("y")!
+
+TODO: replace with for loops
+
+== Invariant permutations - Queries
+$
+  "New"( "Add"(hl("x"), hl("y"), "z") join "Mul"("a", "c", "x") join "Mul"("b", "c", "y"))
+$
+// $
+// t_1 &= "New"("Add")("x", "y", "z") &join& "Old"("Mul")("a", "c", "x") &join& "Old"("Mul")("b", "c", "y")\
+// t_2 &= "Add"("x", "y", "z")        &join& "New"("Mul")("a", "c", "x") &join& "Old"("Mul")("b", "c", "y")\
+// t_3 &= "Add"("x", "y", "z")        &join& "Mul"("a", "c", "x")        &join& "New"("Mul")("b", "c", "y")\
+// $
+
+Semi-naive variant 2 contains variant 1!
+
+#text(
+  15pt,
+  grid(
+    columns: (auto, auto),
+    ```rust
+    // variant 1
+    for (a, c, x) in mul.new() {
+        for (b, y) in mul.old().index(c) {
+            for (z) in add.all().index(x, y) {
+                /* ... */
+            }
+        }
+    }
+    // variant 2
+    for (b, c, y) in mul.new() {
+        for (a, x) in mul.all().index(c) {
+            for (z) in add.all().index(x, y) {
+                /* ... */
+            }
+        }
+    }
+    ```,
+    ```rust
+    // variant 3
+    for (x, y, z) in add.new() {
+        for (a, c) in mul.old().index(x) {
+            for (b) in mul.old().index(y, c) {
+                /* ... */
+            }
+        }
+    }
+    ```,
+  ),
+)
+
+== Invariant permutations - Queries
+
+// equal with variable renaming
+// a <-> b
+// x <-> y
+
+#text(
+  18pt,
+  ```rust
+  // variant 1
+  for (a, c, x) in mul.new() {
+      for (b, y) in mul.old().index(c) {
+          //            ^^^
+          for (z) in add.all().index(x, y) {
+              /* ... */
+          }
+      }
+  }
+  // variant 2 (with a <-> b, x <-> y)
+  for (a, c, x) in mul.new() {
+      for (b, y) in mul.all().index(c) {
+          //            ^^^
+          for (z) in add.all().index(x, y) {
+              /* ... */
+          }
+      }
+  }
+  ```,
+)
+
+== Invariant permutations - Indexes
+
+$"Add"(hl(a), hl(b), c)$ when $hl(a)$ can be swapped with $hl(b)$:
+
+$
+{hl(b)}    -> {hl(a), c} = {hl(a)}    -> {hl(b), c}\
+{hl(a), c} -> {hl(b)}    = {hl(b), c} -> {hl(a)}\
+$
+
+Fewer indexes!
 
 = OLD
 
