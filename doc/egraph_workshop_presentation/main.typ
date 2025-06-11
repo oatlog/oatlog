@@ -117,13 +117,6 @@ We have built Oatlog, an e-graph engine.
 - compatible with (a subset of) egglog (the language)
 - faster than egglog (the engine)
 
-== Outline
-
-+ E-graph implementation
-+ Oatlog's benchmarks
-+ Oatlog's techniques
-+ Practical caveats
-
 = How are e-graphs implemented?
 
 == Equality saturation using e-graphs
@@ -586,7 +579,7 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
       (rewrite (Mul a (Const 1)) a)
       ```
       #text(
-        20pt,
+        18.5pt,
         [
 
           - User provides schema + rewrite rules
@@ -596,6 +589,12 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
             [
               - Strict mode is step-by-step compatible with egglog
               - Relaxed mode finds more rewrites in every iteration, identical saturated e-graph
+            ],
+          )
+          #uncover(
+            "3-",
+            [
+              - Benefit: Rust code is easy to understand, prototype and debug
             ],
           )
         ],
@@ -699,7 +698,20 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
   ),
 )
 
-== Why is Oatlog fast?
+== Why is Oatlog faster than egglog?
+
+#place(
+  center + horizon,
+  [#alternatives[
+      Compilers are faster than interpreters
+    ][
+      #strike[Compilers are faster than interpreters]
+    ]\
+    #uncover("2-", [Not that simple])
+  ],
+)
+
+== Why is Oatlog faster than egglog?
 
 We don't really know, because we lack an expert understanding of egglog.
 
@@ -712,28 +724,6 @@ We don't really know, because we lack an expert understanding of egglog.
   - Trie query planning
   - Invariant permutations #pause
 - Lots of performance engineering
-
-== Ahead of time compilation
-
-- Oatlog emits rust code for queries and relations.
-- Less abstract and therefore (subjectively) easier to understand, prototype and debug.
-
-#text(
-  20pt,
-  ```rust
-  /// (rewrite (Mul (Add a b) c) (Add (Mul a c) (Mul b c)))
-  for (v2, c, v4) in self.mul_.iter_new() {
-      for (a, b) in self.add_.iter1_2_0_1(v2) {
-          let (v5,) = self.mul_.entry2_0_1_2(a, c, ..);
-          let (v6,) = self.mul_.entry2_0_1_2(b, c, ..);
-          self.delta.insert_add((v5, v6, v4));
-      }
-  }
-
-  /// (constructor Add (Math Math) Math)
-  struct AddRelation { ... }
-  ```,
-)
 
 == Trie query planning
 
