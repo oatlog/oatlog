@@ -341,15 +341,16 @@ E-graph data structure supporting
 - Adding values (e-classes)
 - Merging e-classes
 - Searching for patterns (e-matching)
-
+#pause
 EqSat alternates between
 - E-matching
 - Batched insertions and merges (rebuilding)
 
 == Implementation
 
-- E-classes can be merged $==>$ represent as integers, use union-find
-- E-nodes have fixed degree (arity plus one) $==>$ represent as tuples
+ #pause
+- E-classes can be merged $==>$ represent as integers, use union-find #pause
+- E-nodes have fixed degree (arity plus one) $==>$ represent as tuples #pause
 - Top-down (recursive) e-matching:
 
 #place(
@@ -372,7 +373,7 @@ EqSat alternates between
     ],
   ),
 )
-
+#pause
 #place(bottom, dy: -1em, [(essentially egg)])
 
 == Relational e-matching
@@ -383,7 +384,7 @@ EqSat alternates between
   (rewrite (Add (Mul a c) (Mul b c)) (...))
   ```,
 )
-$ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $
+#uncover("2-", $ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $)
 #h(1em)
 #text(
   size: 20pt,
@@ -393,26 +394,30 @@ $ "Add"(x, y, z) join "Mul"(a, c, x) join "Mul"(b, c, y) $
     # top-down e-matching O(n^2)
     for (x, y, z) in Add():
       for (a, c1) in Mul(x):
+        # possibly zero matches
         for (b, c2) in Mul(y):
           # filtering too late!
           if c1 == c2:
             output(..)
     ```,
-    ```python
-    # worst-case optimal join O(n^1.5)
-    for (x, y, z) in Add():
-      # semi join
-      if (_, _, y) in Mul:
-        for (a, c) in Mul(x):
-          # indexed lookup on (y, c)
-          for b in Mul(y, c):
-            # no filter needed!
-            output(..)
-    ```,
+    uncover(
+      "2-",
+      ```python
+      # worst-case optimal join O(n^1.5)
+      for (x, y, z) in Add():
+        # semi join
+        if (_, _, y) in Mul:
+          for (a, c) in Mul(x):
+            # indexed lookup on (y, c)
+            for b in Mul(y, c):
+              # no filter needed!
+              output(..)
+      ```,
+    ),
   ),
 )
 
-Finding optimal loop structure $==>$ relational query planning (of joins)
+#uncover("3-", [Finding a good loop structure $==>$ relational query planning (of joins)])
 
 == Patterns are actually database joins
 
@@ -538,7 +543,7 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
   ]
 }
 
-#place(bottom, [(relational e-matching + semi-naive evaluation $==>$ egglog, faster than egg)])
+#place(bottom, [(relational e-matching + semi-naive evaluation $==>$ egglog)])
 
 = Oatlog
 
@@ -548,10 +553,10 @@ $ "Mul"(#text(purple)[x], c, y) join "Add"(a, b, #text(purple)[x]) $
   set list(marker: ([•], [$==>$]))
   [
     - Oat $approx$ aot $=$ ahead of time
-      - enables new tricks
-    - Algorithmically similar to egglog
-    - Rust proc macro
-    - Implements (the core of) the egglog language
+      - enables new tricks #pause
+    - Algorithmically similar to egglog #pause
+    - Rust proc macro #pause
+    - Implements (the core of) the egglog language #pause
     - Significantly faster e-matching and rebuilding compared to egglog
   ]
 }
@@ -774,7 +779,7 @@ We don't really know, because we lack an expert understanding of egglog.
 #let hl(x) = { text(purple)[#x] }
 #let hl2(x) = { text(olive)[#x] }
 
-Some rules provide permutation information
+Some rules provide permutation symmetries within single relations
 ```egglog
 (rewrite (Add a b) (Add b a))
 ```
@@ -899,22 +904,26 @@ Oatlog avoids storing both!
 
 == Limitations
 
+ #pause
 - Oatlog fails much of the egglog test suite (rulesets, containers)
   - Nothing conceptually prevent supporting these
-  - Extraction through Rust API, not egglog code
+  - Extraction through Rust API, not egglog code #pause
 - Compiler/interpreter differences
   - egglog is suitable for REPL use
-  - Oatlog/AOT is suitable for applications with fixed rewrite rules
+  - Oatlog/AOT is suitable for applications with fixed rewrite rules #pause
 - Oatlog's tree extraction is not optimized or benchmarked (yet)
 
 == Implementing Oatlog's ideas in egglog proper?
 
-- Requires whole-ruleset query planning and optimization
-- Requires relaxed semantics:
-  - Trie query planning changes rule matching order (typically unobservable)
+ #pause
+- Requires whole-ruleset query planning and optimization #pause
+- Requires relaxed semantics: #pause
+  - Trie query planning changes rule matching order (typically unobservable) #pause
   - Invariant permutations e-match earlier, e-graph is different until saturation (only enabled in Oatlog's relaxed mode)
 
 == Learning more about Oatlog
+
+#v(2em)
 
 Accessible at https://github.com/oatlog/oatlog
 
