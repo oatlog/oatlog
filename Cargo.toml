@@ -9,6 +9,7 @@ members = [
     "examples/extract-demo",
     "examples/simple-forall",
     "examples/test-api",
+    "examples/lambda",
     "experiments",
     "oatlog",
     "oatlog-bench",

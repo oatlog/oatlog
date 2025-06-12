@@ -2703,11 +2703,11 @@ Need to use fewer indexes.
 = TODO: easy
 
 // (evals-to i64)
-// 
+//
 // (evals-to a b1)
 // (evals-to c b2)
 // b1 = b2
-// 
+//
 // (Add x x)
 // (Add x1 x2)
 // x1 = x2
@@ -2738,7 +2738,7 @@ Need to use fewer indexes.
 - vectorization
 - scheduling/rulesets/check
 - check if we are doing semi-naive correctly and fix it - DONE?
-    - check our performance with semi-naive disabled. - unclear results but can be done now.
+  - check our performance with semi-naive disabled. - unclear results but can be done now.
 - try to isolate other optimizations from just being AOT vs interpreter. (impossible?)
 
 = async gather??
@@ -2781,9 +2781,9 @@ pi((A join B) union Delta (A join B))
 pi((A join B)) union pi(Delta (A join B))
 
 pi(
-    Delta A join B union
-    Delta A join Delta B union
-    Delta A join Delta B 
+Delta A join B union
+Delta A join Delta B union
+Delta A join Delta B
 )
 
 pi(Delta A join B) union
@@ -3016,6 +3016,125 @@ for _ in _:
 ```
 
 IFF we output in some lexicographic ordering, then any subset of variables will be served in lexicographic ordering.
+
+= slotted impl
+
+eclasses have parameters (slots).
+Providing values for slots lets you "compute" the result of the e-class.
+
+The e-classes themselves are the "variable arity" functions.
+
+The e-nodes are made from ground terms (add, mul etc).
+
+But since e-classes are no longer fixed size (!Copy), e-nodes are no longer fixed size (!Copy)
+
+Since e-classes are quite complicated, there will not just be one e-class per ground term type.
+
+eg (a, b)(Sub((a), (b))) vs (a, b, c)(Sub((a,b),(c)))
+
+lambda introduces a binding.
+
+var is "string" -> math
+
+lambda is () -> any("string")
+
+union in non-slot:
+
+$a = b$
+
+union in slot:
+
+$a(x, y, z) = b(y, z)$
+
+"regular" e-classes (values) are just e-classes with zero inputs.
+
+```rust
+// it also has an integer id
+struct Eclass {
+  // how many slots this e-class has
+  slots: usize,
+}
+enum LangFunc {
+  Add,
+  Sub,
+  Mul,
+  Const,
+}
+
+struct Enode {
+  ty: LangFunc,
+  args: Vec<(EclassId, Vec<SlotName>)>,
+}
+
+impl Enode {
+  fn shape(&self) -> Shape;
+}
+
+struct Shape {
+  /* magic */
+}
+
+struct SlotId(usize);
+
+struct UnionFind {
+  Vec<(Id, SlotMap)>,
+}
+
+```
+
+
+```rust
+type Map<K, V> = BTreeMap<K, V>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Label {
+    Add,
+    Mul,
+}
+use Label::*;
+
+struct Egraph {
+  uf: UnionFind,
+  hashcons: HashMap<(Op, Vec<(Eclass, Map<Slot>)>), Eclass>,
+}
+
+struct Eclass {
+  id: usize,
+  // number of hidden slots.
+  hidden: usize,
+  // number of slots.
+  slots: usize,
+}
+
+struct Slot(usize);
+
+struct UnionFind {
+  // SlotMap represents the "edge" towards the parent.
+  // deleting slot introduces new eclass
+  parents: Vec<Eclass, Map<Slot, Slot>>,
+}
+impl UnionFind {
+  fn find(&self, mut x: Eclass) -> (Eclass, SlotMap) {
+    while x != self.parents[x] {
+      x = self.parents[x];
+    }
+    x
+  }
+  fn union(&mut self, a: Eclass, b: Eclass) {
+      let a = self.find(a);
+      let b = self.find(b);
+      self.parents[b] = a;
+  }
+  fn make(&mut self) -> EClass {
+      let ret = self.parents.len() as EClass;
+      self.parents.push(ret);
+      ret
+  }
+}
+
+```
+
+
 
 = TODO READ
 Papers are just under the first author i looked at.
