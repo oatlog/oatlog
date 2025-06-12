@@ -562,7 +562,7 @@ fn update_with_category(
                             (type_.kind == TypeKind::Symbolic).then(|| {
                                 let uf = ident::type_uf(type_);
                                 quote! {
-                                    uf.#uf.is_root(#ident)
+                                    uf.#uf.is_root_mut(&mut #ident)
                                 }
                             })
                         })
@@ -607,7 +607,7 @@ fn update_with_category(
                             let uf = ident::type_uf(type_);
                             let col = ident::column(c);
                             quote! {
-                                uf.#uf.is_root(#col)
+                                uf.#uf.is_root_mut(&mut #col)
                             }
                         })
                     })
@@ -645,7 +645,7 @@ fn update_with_category(
                     //         true
                     //     }
                     // });
-                    self.#field_ident.retain(|&(#(#key_ident,)*), &mut (#(#value_ident,)* _timestamp)| {
+                    self.#field_ident.retain(|&(#(mut #key_ident,)*), &mut (#(mut #value_ident,)* _timestamp)| {
                         if #is_root {
                             true
                         } else {

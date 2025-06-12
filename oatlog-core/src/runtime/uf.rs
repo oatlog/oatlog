@@ -85,6 +85,19 @@ impl<T: EclassRepr> UnionFind<T> {
             *self.repr.get_unchecked(t.inner() as usize) == t.inner()
         }
     }
+    /// Perform exactly 1 find step "for free", after already loading the memory location for
+    /// is_root
+    #[inline]
+    pub fn is_root_mut(&mut self, t: &mut T) -> bool {
+        // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
+        let expected_value = unsafe {
+            debug_assert!((t.inner() as usize) < self.repr.len());
+            *self.repr.get_unchecked(t.inner() as usize)
+        };
+        let current_value = t.inner();
+        *t = T::new(expected_value);
+        current_value == expected_value
+    }
     #[inline]
     #[allow(unsafe_code)]
     pub fn prefetch(&self, t: T) {
