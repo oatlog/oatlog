@@ -477,3 +477,10 @@ mod demo_relation {
         }
     }
 }
+
+// https://dl.acm.org/doi/pdf/10.14778/3275366.3284966?casa_token=SL57x-WGwZUAAAAA:Iavl-ocWNTM-hpr3a-ZHkQLECUyz_BvITSuK7LcqZFZK7-E9EY3jIsB-ZZHiuLH1_beWuk57fSH2hA
+// Everything You Always Wanted to Know About Compiled and Vectorized Queries But Were Afraid to Ask
+//
+// with vectorized execution we can emulate having more cache, but we kind of execute more
+// instructions.
+//
