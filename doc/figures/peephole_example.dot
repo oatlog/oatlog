@@ -11,7 +11,7 @@ digraph G {
     m0 [label="mem[0]"];
     m3 [label="mem[3]"];
     ma [label="mem[a]"];
-    q [label="mem[???]"];
+    q [label="mem[anywhere else]"];
     a [label="+"];
     ret [label="+"];
     return [label="return"];

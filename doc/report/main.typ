@@ -229,15 +229,12 @@ $O("program size" dot "applied rewrites")$ to $O("program size" + "applied rewri
 applied rewrite creates new work only in its constant-sized neighborhood rather than anywhere in
 the program.
 
-#TODO[do something to make `mem[???]` more clear]
 #figure(
-  image("../figures/peephole_example.svg", fit: "contain", width: 50%),
+  image("../figures/peephole_example.svg", fit: "contain", width: 60%),
   caption: [Representing the program fragment of @fig_intro_compiler_passes in an IR suitable for
     peephole optimization. The IR is illustrative and simplified compared to real designs.],
   placement: auto,
 ) <fig_intro_peephole_ir>
-
-#TODO[rewrite rules are Datalog ergo EXPTIME complete, so they kind-of allow all rewrites that actually terminate.]
 
 From a pure software organization perspective, the optimization passes (or now rather rewrite rules)
 must declare their inputs in sufficient detail that the peephole engine can dispatch them to parts
@@ -250,7 +247,9 @@ optimizations are applicable and how to modify the program, but other rewrite ru
 specify a syntactic rewrite performing the optimization. In this latter case we have a purely
 syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
 `Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier
-to reason about than ad-hoc passes, expressed in possibly very many lines of code.
+to reason about than ad-hoc passes, expressed in possibly very many lines of code. Many but not all
+optimizations can be implemented as single syntactic rewrites. More complicated optimizations may be
+implemented through multiple rewrites, especially with the aid of e-class analyses @egg @egglog.
 
 In summary, peephole optimization has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
