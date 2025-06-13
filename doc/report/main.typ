@@ -340,8 +340,9 @@ by eliding e-classes consisting of a single e-node.
     ),
   ),
   caption: [Illustration on how e-graphs deduplicate usages of equivalent computations. The left
-    side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
-    duplicating the addition.],
+    side is an expression DAG while the right side is a pseudo-e-graph #footnote[Interestingly,
+    acyclic e-graphs actually do rely on `union` nodes @acyclic_egraphs.] with a `union` node to avoid
+    duplicating the addition @acyclic_egraphs.],
   placement: auto,
 ) <fig_intro_baby_egraph>
 
@@ -371,7 +372,7 @@ E-graphs have, however, been used in more specialized domains such as synthesis 
 floating point expressions @herbie and optimization of linear algebra expressions @spores. They are
 also used in eggcc @eggcc, an experimental optimizing compiler, and the webassembly-oriented
 production compiler backend Cranelift @cranelift. Cranelift uses a weaker construct called acyclic
-e-graphs (aegraphs) due to performance problems of full e-graphs. A proliferation of e-graphs within
+e-graphs (aegraphs) @acyclic_egraphs due to performance problems of full e-graphs. A proliferation of e-graphs within
 compilers would require them to become faster.
 
 == Relational databases and Datalog
