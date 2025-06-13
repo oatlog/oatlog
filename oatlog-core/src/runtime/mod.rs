@@ -390,7 +390,6 @@ pub trait Relation {
     fn clear_new(&mut self);
     fn iter_new(&self) -> impl '_ + Iterator<Item = Self::Row>;
     fn len(&self) -> usize;
-    fn emit_graphviz(&self, buf: &mut String);
     fn update_begin(
         &mut self,
         insertions: &[Self::Row],
@@ -564,4 +563,33 @@ pub fn extract<
     }
 
     root.map_extract(|eclass| eclass_cost.get(&eclass).map(|x| x.1))
+}
+
+/// emit graphviz using same serialization as for extraction.
+pub fn emit_graphviz<
+    Enode: EnodeInputs<Eclass> + Copy + Clone + Hash + Eq + Debug + Ord,
+    Eclass: EclassMapExtract<Enode, ExtractExpr> + Copy + Clone + Hash + Eq + Debug,
+    ExtractExpr,
+>(
+    enode_to_eclass: impl Iterator<Item = (Enode, Eclass)>,
+) -> String {
+    use std::fmt::Write;
+
+    let mut out = String::new();
+
+    out.push_str("digraph g{\n");
+    for (enode, eclass) in enode_to_eclass {
+        let this = format!("\"{enode:?}\"");
+        let output = format!("\"{eclass:?}\"");
+
+        writeln!(&mut out, "{this} -> {output};").unwrap();
+        writeln!(&mut out, "{this} [shape = box];").unwrap();
+        for input in enode.inputs() {
+            let input = format!("\"{input:?}\"");
+            writeln!(&mut out, "{input} -> {this};").unwrap();
+        }
+    }
+
+    out.push_str("}\n");
+    out
 }

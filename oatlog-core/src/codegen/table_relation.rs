@@ -28,54 +28,6 @@ pub(crate) fn codegen_table_relation(
 
     let update_impl = update(rel, theory, index_to_info);
 
-    let emit_graphviz_impl = {
-        // NOTE: Currently arbitrary, as it is only used for counting and graphviz
-        let index = &index_to_info[IndexId(0)];
-        let field = ident::index_field(index);
-        let (key_columns, value_columns, primary_index_iter_impl) = match index {
-            IndexInfo::Fd {
-                key_columns,
-                value_columns,
-                generate_check_value_subsets: _,
-            } => (
-                key_columns,
-                value_columns.iter().map(|(&c, _)| c).collect(),
-                quote! { self.#field.iter().map(|(k, v)| ((*k), (*v))) },
-            ),
-            IndexInfo::NonFd {
-                key_columns,
-                value_columns,
-            } => (
-                key_columns,
-                value_columns.clone(),
-                quote! { self.#field.iter_key_value() },
-            ),
-        };
-
-        let (col, col_ty) = (0..rel.columns.len())
-            .map(|c| {
-                let c = ColumnId(c);
-                (
-                    ident::column(c),
-                    ident::type_name(&theory.types[rel.columns[c]]).to_string(),
-                )
-            })
-            .collect_vecs();
-        let key = key_columns.iter().map(|&c| ident::column(c));
-        let val = value_columns.iter().map(|&c| ident::column(c));
-
-        quote! {
-            fn emit_graphviz(&self, buf: &mut String) {
-                use std::fmt::Write;
-                for (i, ((#(#key,)*), (#(#val,)* _timestamp,))) in #primary_index_iter_impl.enumerate()
-                {
-                    #(writeln!(buf, "{}_{i} -> {}_{};", #relation_name, #col_ty, #col).unwrap();)*
-                    writeln!(buf, "{}_{i} [shape = box];", #relation_name).unwrap();
-                }
-            }
-        }
-    };
-
     let index_fields = index_to_info
         .iter()
         .map(|index_info| match &index_info {
@@ -217,7 +169,6 @@ pub(crate) fn codegen_table_relation(
             fn len(&self) -> usize {
                 self.all.len()
             }
-            #emit_graphviz_impl
             #update_impl
             #extract_impl
         }

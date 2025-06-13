@@ -271,13 +271,6 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
             }
             #[inline(never)]
             pub fn apply_rules(&mut self) { #rule_contents }
-            fn emit_graphviz(&self) -> String {
-                let mut buf = String::new();
-                buf.push_str("digraph G {\n");
-                #(self.#stored_relations.emit_graphviz(&mut buf);)*
-                buf.push_str("}\n");
-                buf
-            }
             pub fn get_total_relation_entry_count(&self) -> usize {
                 self.get_relation_entry_count().values().sum()
             }
@@ -315,6 +308,11 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                 runtime::extract(serialized_egraph.into_iter(), target)
 
             }
+            pub fn emit_graphviz(&self) -> String {
+                let mut serialized_egraph = Vec::new();
+                self.serialize(&mut serialized_egraph);
+                runtime::emit_graphviz(serialized_egraph.into_iter())
+            }
             #canonicalize
         }
 
@@ -342,6 +340,7 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
     let mut extract_expr_ty = TokenStream::new();
     let mut enode_inputs = TokenStream::new();
     let mut map_extract = TokenStream::new();
+
     for rel in &theory.relations {
         let Some(rel) = rel.as_ref() else {
             continue;
