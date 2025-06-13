@@ -77,8 +77,24 @@ fn main() {
     }
     */
 
+    {
+        std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
+
+        for (name, limit, oatlog, _egglog) in oatlog_bench::BENCHMARKS.into_iter() {
+            oatlog(11);
+            oatlog(11);
+            oatlog(11);
+            oatlog(11);
+            break;
+        }
+
+        // for (name, oatlog, _egglog) in oatlog_bench::SATURATING_BENCHMARKS.into_iter() {
+        //     oatlog();
+        // }
+    }
+
     // std::hint::black_box(theory);
-    record_timings();
+    // record_timings();
 }
 
 fn compare_egglog_oatlog(
