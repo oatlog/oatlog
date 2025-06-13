@@ -182,7 +182,7 @@ first part of what is called the phase ordering problem.
 
 The second part of the phase ordering problem is that optimization passes are destructive and
 noncommutative, so the optimized output program may be different based on what order passes were
-applied in even if a fixed point was reached. Concretely, we can consider the program `(x*2)/2`.
+applied in, even if a fixed point was reached. Concretely, we can consider the program `(x*2)/2`.
 Strength reduction could be applied first, giving `(x<<1)/2`, or the expression could be
 reassociated to `x*(2/2)` which constant folds to `x`. Depending on how the optimization passes are
 constructed, it is not obvious that the same simplification could be done from `(x<<1)/2`, in which
@@ -217,7 +217,7 @@ suited to peephole optimization.] are usually trees, directed acyclic graphs (DA
 graphs, with representations typically enforcing single static assignment (SSA), i.e. that variables
 are written to exactly once. @fig_intro_peephole_ir shows the program fragment of
 @fig_intro_compiler_passes represented in such an intermediate representation (IR). It is crucial
-that the IR is designed in such a way that its optimizations become local, for if optimizations need
+that the IR is designed in such a way that its optimizations become local; if optimizations need
 to mutate large sections of the IR or if the applicability of optimizations depend on non-local
 properties, then incremental processing becomes impossible. This is why a linear list of
 instructions is an unsatisfactory IR for peephole optimization -- the definition and usage of a
@@ -228,12 +228,15 @@ $O("program size" dot "applied rewrites")$ to $O("program size" + "applied rewri
 applied rewrite creates new work only in its constant-sized neighborhood rather than anywhere in
 the program.
 
+#TODO[do something to make `mem[???]` more clear]
 #figure(
   image("../figures/peephole_example.svg", fit: "contain", width: 50%),
   caption: [Representing the program fragment of @fig_intro_compiler_passes in an IR suitable for
     peephole optimization. The IR is illustrative and simplified compared to real designs.],
   placement: auto,
 ) <fig_intro_peephole_ir>
+
+#TODO[rewrite rules are Datalog ergo EXPTIME complete, so they kind-of allow all rewrites that actually terminate.]
 
 From a pure software organization perspective, the optimization passes (or now rather rewrite rules)
 must declare their inputs in sufficient detail that the peephole engine can dispatch them to parts
@@ -285,16 +288,17 @@ by eliding e-classes consisting of a single e-node.
       node-stroke: 1pt,
       node-shape: circle,
       {
-        let (A0, A1) = ((0, 0), (1, 0))
+        let (A0, A1, A2) = ((1, 0), (0, 0), (2,0))
         let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         node(A0, $a$)
         node(A1, $2$)
+        node(A2, $1$)
         node(B2, $b$)
         edge(A0, B0, "->")
         edge(A1, B0, "->")
         edge(A0, B1, "->")
-        edge(A1, B1, "->")
+        edge(A2, B1, "->")
         node(B0, $*$)
         node(B1, $<<$)
         edge(B0, C0, "->")
@@ -310,16 +314,17 @@ by eliding e-classes consisting of a single e-node.
       node-stroke: 1pt,
       node-shape: circle,
       {
-        let (A0, A1) = ((0, 0), (1, 0))
+        let (A0, A1, A2) = ((1, 0), (0, 0), (2,0))
         let (B0, B1) = ((0, 1), (1, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         let (D0) = (0, 3)
         node(A0, $a$)
         node(A1, $2$)
+        node(A2, $1$)
         edge(A0, B0, "->")
         edge(A1, B0, "->")
         edge(A0, B1, "->")
-        edge(A1, B1, "->")
+        edge(A2, B1, "->")
         node(B0, $*$)
         node(B1, $<<$)
         edge(B0, C0, "->")
@@ -348,8 +353,9 @@ implemented.
 
 In contrast, the equality saturation (EqSat) @equalitysaturation workflow involves an e-graph
 initialized with a set of expressions representing facts or computations, and rewrite rules
-corresponding to logical deductions or optimizations respectively are applied until reaching a fixed
-point or until some other criterion is met. Rewrite rules pattern match on the existing e-graph and
+corresponding to logical deductions or optimizations are applied until reaching a fixed
+point or other stopping condition. 
+Rewrite rules pattern match on the existing e-graph and
 perform actions such as inserting new e-nodes and equating existing e-nodes (and hence their
 e-classes). When equality saturation is used for program synthesis or optimization, there is a final
 extraction phase in which one globally near-optimal expression is selected from the many
@@ -381,7 +387,7 @@ characteristics of a logically identical table.
 
 Recent developments in e-graphs for equality saturation @relationalematching @eqlog_algorithm
 @egglog have identified a connection to relational databases. Adding indexes to e-graphs adds
-flexibility to its pattern-matching, effectively formulating e-matching as executing relational
+flexibility to its pattern-matching, effectively formulating e-matching (e-graph pattern matching) as executing relational
 queries. This illustrates a connection between equality saturation and Datalog @egglog, a
 declarative logic programming language implemented as relational queries iteratively inferring facts
 to add to the database. In fact, this similarity extends to the degree that e-graphs may be best
@@ -401,7 +407,7 @@ Datalog-like e-graph implementation for our master's thesis.
 == Oatlog
 
 This thesis' contribution lies in introducing Oatlog, an independently developed e-graph engine,
-which implements with the egglog language and achieves a significant speedup compared to egglog.
+which implements the egglog language and achieves a significant speedup compared to egglog.
 
 Like egglog, it can be seen as a Datalog engine with support for unification. Unlike egglog, it
 compiles rules ahead-of-time (aot$#h(2pt)approx#h(2pt)$oat) which allows query planning and index
@@ -411,11 +417,11 @@ Oatlog has limited functionality compared to egglog, implementing only a subset 
 its long tail of features. While a few features are impractical in an ahead-of-time setting, most
 egglog features could be implemented within the existing Oatlog architecture.
 
-For the language subset that Oatlog supports, it exceeeds egglog in performance. The speedups range
+For the language subset that Oatlog supports, it exceeds egglog in performance. The speedups range
 from over 100x for tiny e-graphs of less than a hundred e-nodes, gradually shrinking to a 2x speedup
-for e-graphs of about $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes. These
-results stem not from one large but rather many small improvements compared to egglog, around rule
-preprocessing, query planning, index implementation and general performance engineering.
+for e-graphs of about $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes. 
+These results are not due to one large optimization but rather many small improvements compared to egglog, 
+such as rule preprocessing, query planning, index implementation and general performance engineering.
 
 == This thesis
 
@@ -791,11 +797,11 @@ optimization involves modifying which root is merged into the other in `union()`
 smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
 guarantee an amortized $O(log n)$ time per `find()` and `union()`, with an amortized exceedingly
 slowly growing $O(alpha(n))$ time #footnote[$alpha(n)$ is roughly the inverse of the Ackermann
-function and significantly slowly than even nested logarithms.] per operation if both are applied
+function and significantly slower than even nested logarithms.] per operation if both are applied
 @fastunionfind @unionfindvariantbounds.
 
 For equality saturation the cost of different path compression and merging order choices affect not
-just the time spent within `find()` but also the time spend within the larger e-graph computation.
+just the time spent within `find()` but also the time spent within the larger e-graph computation.
 In particular, the cost of a merge is dominated not by pointer chasing within `find()` but by having
 to remove uprooted e-classes from the broader e-graph. This motivates merging smaller-to-larger not
 in terms of union-find tree size but the number of e-nodes referring to the e-class. This can either
@@ -977,7 +983,7 @@ considered standard due to egg's ubiquity.
 
 The name recursive e-matching is derived from how it recursively matches the left hand side of a
 rewrite rule. A pattern $(a dot b) + (a dot c) = d$ can be seen as a tree of three nodes, a root
-multiplication with two child additions, and it can be matched with the four functions shown in
+addition with two child multiplication, and it can be matched with the four functions shown in
 @fig_background_recursive_ematching_example.
 
 #figure(
@@ -1098,7 +1104,7 @@ be seen as sets of rows due to not containing duplicates and their order being i
 a key-value record, with every row in a table satisfying the same schema.
 
 An algorithm that reads both the order and customer tables can be expressed in terms of reading and
-mutating them individually, but it is often useful to be able to be able to access the two
+mutating them individually, but it is often useful to be able to access the two
 simultaneously, which is why the join ($join$) operation exists. A join, or more precisely an inner
 join, compares all pairs of rows in the two tables and keeps those where the attribute that we join
 on, in the figure `Cust`, matches. The output of a join is semantically another table as shown in
@@ -1163,7 +1169,7 @@ of arity differences this even has the benefit of a more uniform memory layout.
 
 After storing the e-nodes of each operator separately, each operator stores a set of e-class tuples
 and lookups are in form of one of
-+ Hashcons for insertion, with all inputs known.
++ Hashcons#footnote[A hashmap from e-node to output e-class, to ensure that any e-node belongs to exactly one e-class. This is analagous to the general concept of hash consing where structurally equal values are only stored once.] for insertion, with all inputs known.
 + Recursive e-matching case, with the output known.
 + Recursive e-matching alternative case, with the output and some inputs known.
 
@@ -1196,7 +1202,7 @@ columns according to the labels within parenthesis. This is a conjunctive query,
 tables that have their columns renamed and then naturally joined. In general, all patterns expressed
 as syntactic trees can be turned into conjunctive queries by adding temporary variables for function
 outputs. The problem of e-matching becomes a join, for which we must determine a join order (query
-planning) as well as determine how to do the actually lookups (index selection and implementation).
+planning) as well as determine how to do the actual lookups (index selection and implementation).
 
 EqSat on a high level now looks like
 1. Execute conjunctive queries
@@ -1346,7 +1352,7 @@ in @fig_background_seminaive_2.
 
 WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the
 relations @agmbound. A triangle join is a motivating example for this#footnote[Triangle joins are
-somewhat common for rewrite rules, for example is $a dot c + b dot c -> (a + b) dot c$ a triangle
+somewhat common for rewrite rules, for example $a dot c + b dot c -> (a + b) dot c$ is a triangle
 join.]:
 
 $
@@ -1558,7 +1564,7 @@ can be interacted with using the functions
 - `Theory::canonicalize(&mut self)`, applying all pending insertions, and
 - `Theory::step(&mut self)` which matches and applies all rewrite rules once.
 
-The marcros `compile_egraph_strict` and `compile_egraph_relaxed` differ in how closely they follow
+The macros `compile_egraph_strict` and `compile_egraph_relaxed` differ in how closely they follow
 egglog's semantics. Neither is exactly equivalent to deterministic egglog, which uses `IndexMap`s
 over `HashMap`s to make sure all rules are matched and hence e-classes created in a deterministic
 order. Oatlog, like egglog's nondeterministic mode, iterates hashmaps and is from run to run only
@@ -2037,7 +2043,7 @@ union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
       repr[newer] = older;
   }
   ```,
-  caption: [find function with and without path compression],
+  caption: [Union-find without path compression and with newer-to-older.],
 ) <fig_impl_oatlogs_uf>
 
 === Index implementation
