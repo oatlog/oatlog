@@ -34,7 +34,7 @@ criterion = "0.5"
 darling = "0.20"
 derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
-egglog = "0.4"
+egglog = { version = "0.4", features = ["nondeterministic"] }
 eqlog-runtime = "0.8"
 expect-test = "1"
 hashbrown = "0.15"

@@ -77,6 +77,7 @@ fn main() {
     }
     */
 
+    /*
     {
         std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).unwrap();
 
@@ -92,9 +93,10 @@ fn main() {
         //     oatlog();
         // }
     }
+    */
 
     // std::hint::black_box(theory);
-    // record_timings();
+    record_timings();
 }
 
 fn compare_egglog_oatlog(

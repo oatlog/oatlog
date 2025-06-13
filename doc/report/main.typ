@@ -34,6 +34,7 @@
 #show "e-classes": box[e-classes]
 
 #set document(title: [Oatlog])
+#set par(justify: true)
 
 #set raw(syntaxes: "egglog.sublime-syntax")
 #set raw(syntaxes: "datalog.sublime-syntax")
@@ -66,10 +67,10 @@
     performance challenges. These arise from a combinatorial explosion in rewrite possibilities,
     requiring sophisticated e-graph engines and motivating research into e-graph technology.
 
-    We introduce Oatlog, an ahead-of-time compiled e-graph engine that significantly outperforms
+    We introduce Oatlog, an ahead-of-time compiling e-graph engine that significantly outperforms
     egglog, the currently fastest mainstream e-graph engine. Oatlog achieves speedups over 100x for
-    very small e-graphs, gradually decreasing to a 2x speedup at $10^6$ e-nodes and matches egglog's
-    performance beyond $10^7$ e-nodes.
+    very small e-graphs, gradually decreasing to a 2x speedup at $10^6$ e-nodes and roughly matches
+    egglog's performance beyond $10^7$ e-nodes.
 
     Oatlog implements a subset of the egglog language and can itself be seen as a compiler from
     egglog to Rust. As a Rust procedural macro, it complements egglog by focusing on being
@@ -247,9 +248,9 @@ peephole engine is able to incrementally resolve into a set of candidate locatio
 match is found, some rewrite rules may need to run arbitrary logic to figure out whether their
 optimizations are applicable and how to modify the program, but other rewrite rules may directly
 specify a syntactic rewrite performing the optimization. In this latter case we have a purely
-syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or `Add(Mul(a,b), Mul(a,c))
-=> Mul(a, Add(b,c))`, which not only are easy to state but also easier to reason about than ad-hoc
-passes, expressed in possibly very many lines of code.
+syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
+`Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier
+to reason about than ad-hoc passes, expressed in possibly very many lines of code.
 
 In summary, peephole optimization has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
@@ -288,7 +289,7 @@ by eliding e-classes consisting of a single e-node.
       node-stroke: 1pt,
       node-shape: circle,
       {
-        let (A0, A1, A2) = ((1, 0), (0, 0), (2,0))
+        let (A0, A1, A2) = ((1, 0), (0, 0), (2, 0))
         let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         node(A0, $a$)
@@ -314,7 +315,7 @@ by eliding e-classes consisting of a single e-node.
       node-stroke: 1pt,
       node-shape: circle,
       {
-        let (A0, A1, A2) = ((1, 0), (0, 0), (2,0))
+        let (A0, A1, A2) = ((1, 0), (0, 0), (2, 0))
         let (B0, B1) = ((0, 1), (1, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         let (D0) = (0, 3)
@@ -354,7 +355,7 @@ implemented.
 In contrast, the equality saturation (EqSat) @equalitysaturation workflow involves an e-graph
 initialized with a set of expressions representing facts or computations, and rewrite rules
 corresponding to logical deductions or optimizations are applied until reaching a fixed
-point or other stopping condition. 
+point or other stopping condition.
 Rewrite rules pattern match on the existing e-graph and
 perform actions such as inserting new e-nodes and equating existing e-nodes (and hence their
 e-classes). When equality saturation is used for program synthesis or optimization, there is a final
@@ -419,9 +420,9 @@ egglog features could be implemented within the existing Oatlog architecture.
 
 For the language subset that Oatlog supports, it exceeds egglog in performance. The speedups range
 from over 100x for tiny e-graphs of less than a hundred e-nodes, gradually shrinking to a 2x speedup
-for e-graphs of about $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes. 
-These results are not due to one large optimization but rather many small improvements compared to egglog, 
-such as rule preprocessing, query planning, index implementation and general performance engineering.
+for e-graphs of about $10^6$ e-nodes and egglog performance parity beyond $10^7$ e-nodes.
+These results are not due to one large optimization but rather many small improvements compared to egglog,
+around rule preprocessing, query planning, index implementation and general performance engineering.
 
 == This thesis
 
@@ -462,8 +463,9 @@ This representation spells out $a+b$ twice, which may be acceptable for small ex
 quickly becomes cumbersome for larger expressions such as in the quadratic formula. We can avoid
 this using variable substitutions: let $t=a+b$ in $t dot 2 dot (t+2)$. The equivalent of this for
 the tree representation is allow re-use of syntactically identical expressions, which turns the tree
-into a DAG (Directed Acyclic Graph). @fig_background_expression_tree_and_dag shows the tree and DAG representations side by
-side. This transform is often called common subexpression elimination.
+into a DAG#footnote[While technically all directed trees are also DAGs, that is pedantry.] (Directed
+Acyclic Graph). @fig_background_expression_tree_and_dag shows the tree and DAG representations side
+by side. This transform is often called common subexpression elimination.
 
 #figure(
   grid(
@@ -534,10 +536,10 @@ side. This transform is often called common subexpression elimination.
 DAG representations efficiently deduplicate nodes in scenarios where syntactically identical
 subexpressions are used in multiple ways. However, they are not useful in scenarios where
 syntactically different subexpressions are processed identically. If one can represent functions,
-the expressions $(2+(a xor b)) dot (2 dot (a xor b))$ and $(2+(a+b)) dot (2 dot (a+b))$ could be
-compactly represented as $f(a xor b)$ and $f(a + b)$ with $f(x) = (2+x) dot (2 dot x)$. But this is
-not possible in expression DAGs, and they must instead duplicate the identical usage code downstream
-of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
+the expressions $(2+(a xor b)) dot (2 dot (a xor b))$ and $(2+(a+b)) dot (2 dot (a+b))$, with $xor$
+denoting bitwise xor, could be compactly represented as $f(a xor b)$ and $f(a + b)$ with $f(x) =
+(2+x) dot (2 dot x)$. But this is not possible in expression DAGs, and they must instead duplicate
+the identical usage code downstream of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
 
 #figure(
   fletcher.diagram(
@@ -1169,7 +1171,9 @@ of arity differences this even has the benefit of a more uniform memory layout.
 
 After storing the e-nodes of each operator separately, each operator stores a set of e-class tuples
 and lookups are in form of one of
-+ Hashcons#footnote[A hashmap from e-node to output e-class, to ensure that any e-node belongs to exactly one e-class. This is analagous to the general concept of hash consing where structurally equal values are only stored once.] for insertion, with all inputs known.
++ Hashcons#footnote[A hashmap from e-node to output e-class, to ensure that any e-node belongs to
+  exactly one e-class. This is analogous to the general concept of hash consing where structurally
+  equal values are only stored once.] for insertion, with all inputs known.
 + Recursive e-matching case, with the output known.
 + Recursive e-matching alternative case, with the output and some inputs known.
 
@@ -1205,8 +1209,8 @@ outputs. The problem of e-matching becomes a join, for which we must determine a
 planning) as well as determine how to do the actual lookups (index selection and implementation).
 
 EqSat on a high level now looks like
-1. Execute conjunctive queries
-2. Perform actions (e-node insertions, creating e-classes, unifying e-classes) based on matches
+1. Execute conjunctive queries.
+2. Perform actions (e-node insertions, creating e-classes, unifying e-classes) based on matches.
 3. Canonicalization, applying these mutations to the database in batches.
 
 Relational e-matching improves upon recursive e-matching by being able to join in any order, not
@@ -1350,53 +1354,75 @@ in @fig_background_seminaive_2.
 
 === Worst-case optimal join <section_background_wcoj>
 
-WCOJs (worst-case optimal joins) are asymptotically optimal if we consider only the sizes of the
-relations @agmbound. A triangle join is a motivating example for this#footnote[Triangle joins are
-somewhat common for rewrite rules, for example $a dot c + b dot c -> (a + b) dot c$ is a triangle
-join.]:
+While we have identified that e-matching can be seen as a join, we have not yet discussed how to
+determine the join order. Relational queries specify logically what tuples should be returned, but
+not how to execute the query, even algorithmically. Deciding implementation details of relational
+queries is called query planning. Since relational e-matching has only conjunctive queries, query
+planning for e-graphs is precisely determining a join order.
 
-$
-  "Foo"(a, b) join "Bar"(b, c) join "Baz"(c, a)
-$
-$
-  n = max {|"Foo"|, |"Bar"|, |"Baz"|}
-$
-
-Such a join would result in a max of $O(n^(1.5))$ elements, so we would ideally want to only perform $O(n^(1.5))$ operations.
-Consider the join in @trijoin_2.
-It will perform $O(n^2)$ operations in the worst-case, since $O(|"Foo" join "Bar"|)$ = $O(n^2)$.
-However, we can introduce a semi-join on Baz, which results in only $O(n^(1.5))$ work being performed in @trijoin_15.
+WCOJs (worst-case optimal joins) are a subset of query plans that are asymptotically optimal
+@agmbound. These are particularly important for cyclic queries, such as the distributive law which
+is commonly matched in e-graphs. The shared variable $c$ in its pattern $a dot c + b dot c$ relates
+the two multiplications, in addition to the multiplication outputs relating them with the addition.
+By query planning in an arbitrary order, always using all known variables, we get the seemingly
+reasonable implementation shown in @trijoin_slow.
 
 #figure(
   ```python
-  for (a, b) in Foo:
-    for c in Bar(b):
-      if (c, a) in Baz:
-        print(a, b, c)
+  for (x, y, z) in Add(_, _, _):
+    for (a, c) in Mul(_, _, x):
+      for (b) in Mul(_, c, y):
+        print(f"{a} * {c} + {b} dot {c}")
   ```,
-  caption: [Triangle join in $O(n^2)$],
-) <trijoin_2>
+  caption: [Triangle join with only joins.],
+) <trijoin_slow>
+
+However, it is not asymptotically optimal. The problem arises in situations where any `x` or `y`
+individually matches many rows in `Mul`, but never both at the same time. The join does not match
+any full tuples, yet the two outermost loops can each iterate proportionally to the number of rows
+in their relation. This can be solved by adding a semi-join, i.e. checking that the currently bound
+variables satisfy all constraints placed upon them without joining in any new rows in the process.
+Concretely, this means checking that there is some tuple matching both `Mul(_, _, x)` and
+`Mul(_, _, y)` as soon as `x` and `y` are bound. @trijoin_fast implements this and is asymptotically
+optimal.
 
 #figure(
   ```python
-  for (a, b) in Foo:
-    if (c, _) not in Baz:
-      continue
-    for c in Bar(b):
-      if (c, a) in Baz:
-        print(a, b, c)
+  for (x, y, z) in Add(_, _, _):
+    if (_, _, y) in Mul: # <- semi-join
+      for (a, c) in Mul(_, _, x):
+        for (b) in Mul(_, c, y):
+          print(f"{a} * {c} + {b} dot {c}")
   ```,
-  caption: [Triangle join in $O(n^1.5)$],
-) <trijoin_15>
+  caption: [A triangle join using a semi-join, making it faster than without the semi-join as in
+  @trijoin_slow.],
+) <trijoin_fast>
 
-Generic join is the first worst-case optimal join algorithm @optimaljoin. It
-works by joining all the relations at once. We first select an arbitrary
-variable ordering, for example $[a, b, c]$. We then recursively select a value
-for each variable while performing the relevant semi-joins. Presenting the
-pseudocode for the general algorithm would be very confusing since it is very
-abstract, it is therefore hard-coded for the above triangle join in @generic_join_triangle.
+The first known worst-case optimal join algorithm is the Generic join @optimaljoin. It can be
+formulated as the following:
++ First choose an arbitrary total variable ordering. We determine variables one by one in this
+  order.
++ Iterate an arbitrary relation for values to bind to the first variable.
++ Perform semi-joins, checking that this value is valid according to all other relations.
++ Repeat with the next variable.
+
+It is implemented literally in @generic_join_triangle, for a query $"Foo"(a,b) join "Bar"(b,c) join
+"Baz"(c,a)$. However, it is clearly undesirable from a constant factor point of view to require
+$("variables" - 1)$ joins rather than the $("relations"- 1)$ joins previously required in
+@trijoin_slow and @trijoin_fast, especially when the query has many variables that are only used
+once. This is addressed by the Free join algorithm @freejoin1 @freejoin2, which binds all variables
+whenever a relation is iterated, as in @trijoin_fast. It is clearly worst-case optimal since it can
+be seen as a constant-factor improvement of the Generic join binding variables in the same order.
+
+While the theory of WCOJs is quite complicated, our understanding of it is that we can select an
+arbitrary order to join our relations -- implicitly determining a variable ordering -- and we remain
+worst-case optimal as long as we introduce the relevant semi-joins whenever variables are
+bound.
+
+// https://justinjaffray.com/a-gentle-ish-introduction-to-worst-case-optimal-joins/
 
 #figure(
+  placement: auto,
   ```python
   def join():
     # select a value for `a`
@@ -1430,29 +1456,6 @@ abstract, it is therefore hard-coded for the above triangle join in @generic_joi
     Generic join algorithm for a triangle join.
   ],
 ) <generic_join_triangle>
-
-While generic join is asymptotically optimal, its constant factor is clearly
-terrible, the wrong variable ordering may result in multiple orders of
-magnitude slowdowns. This motivates free-join @freejoin1 @freejoin2, which
-presents a way to describe joins based on what variables are introduced. For
-example the join in @generic_join_triangle would be described as:
-
-$
-  [["Foo"(a), "Baz"(a)], ["Foo"(b), "Bar"(b)], ["Bar"(c), "Baz"(c)]]
-$
-And the first example would look like this:
-$
-  [["Foo"(a, b), "Bar"(b)], ["Bar"(c), "Baz"(c)], ["Bar"(b), "Baz"(c, a)]]
-$
-
-One can think of it as the first element in the list is a for loop and the
-other elements are if statements. A benefit of this is that we can introduce
-multiple variables in each step. Our understanding of this is that we can
-select an arbitrary order to join our relations which determines a variable
-ordering and we remain WCOJ as long as we introduce relevant semi-joins when
-variables are introduced.
-
-// https://justinjaffray.com/a-gentle-ish-introduction-to-worst-case-optimal-joins/
 
 === Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
 
@@ -2435,35 +2438,35 @@ performing very similarly to egglog over $10^7$ e-nodes.
       columns: (auto, auto, auto, auto, auto),
       inset: 4pt,
       table.header([*benchmark*], [*e-nodes*], [*egglog*], [*Oatlog*], [*speedup*]),
-      [`fuel1_math`, saturated], [973], [4.588 ms], [435.3 µs], table.cell(fill: green.lighten(28%))[10.54x],
-      [`fuel2_math`, saturated], [1516], [5.832 ms], [591.2 µs], table.cell(fill: green.lighten(29%))[9.87x],
-      [`fuel3_math`, saturated], [50021], [165.4 ms], [28.56 ms], table.cell(fill: green.lighten(36%))[5.79x],
-      [`math`, 0 steps], [35], [534.9 µs], [4.414 µs], table.cell(fill: green.lighten(14%))[121.18x],
-      [`math`, 1 steps], [69], [657.4 µs], [9.675 µs], table.cell(fill: green.lighten(16%))[67.95x],
-      [`math`, 2 steps], [118], [811.8 µs], [18.58 µs], table.cell(fill: green.lighten(18%))[43.69x],
-      [`math`, 3 steps], [208], [992.0 µs], [34.90 µs], table.cell(fill: green.lighten(20%))[28.43x],
-      [`math`, 4 steps], [389], [1.229 ms], [69.57 µs], table.cell(fill: green.lighten(24%))[17.66x],
-      [`math`, 5 steps], [784], [1.611 ms], [151.5 µs], table.cell(fill: green.lighten(28%))[10.64x],
-      [`math`, 6 steps], [1576], [2.259 ms], [311.5 µs], table.cell(fill: green.lighten(33%))[7.25x],
-      [`math`, 7 steps], [3160], [3.610 ms], [622.0 µs], table.cell(fill: green.lighten(36%))[5.80x],
-      [`math`, 8 steps], [8113], [6.268 ms], [1.358 ms], table.cell(fill: green.lighten(40%))[4.62x],
-      [`math`, 9 steps], [28303], [13.44 ms], [4.116 ms], table.cell(fill: green.lighten(48%))[3.27x],
-      [`math`, 10 steps], [136446], [54.03 ms], [20.16 ms], table.cell(fill: green.lighten(53%))[2.68x],
-      [`math`, 11 steps], [1047896], [437.6 ms], [254.4 ms], table.cell(fill: green.lighten(69%))[1.72x],
-      [`math`, 12 steps], [15987528], [8.347 s], [6.686 s], table.cell(fill: green.lighten(86%))[1.25x],
-      [`boolean_adder`, 0 steps], [44], [755.7 µs], [3.613 µs], table.cell(fill: green.lighten(13%))[209.17x],
-      [`boolean_adder`, 1 steps], [106], [896.6 µs], [10.23 µs], table.cell(fill: green.lighten(15%))[87.66x],
-      [`boolean_adder`, 2 steps], [241], [1.070 ms], [25.67 µs], table.cell(fill: green.lighten(18%))[41.68x],
-      [`boolean_adder`, 3 steps], [511], [1.401 ms], [69.21 µs], table.cell(fill: green.lighten(23%))[20.25x],
-      [`boolean_adder`, 4 steps], [727], [2.043 ms], [132.6 µs], table.cell(fill: green.lighten(25%))[15.40x],
-      [`boolean_adder`, 5 steps], [906], [3.167 ms], [228.9 µs], table.cell(fill: green.lighten(26%))[13.84x],
-      [`boolean_adder`, 6 steps], [1332], [4.324 ms], [342.1 µs], table.cell(fill: green.lighten(27%))[12.64x],
-      [`boolean_adder`, 7 steps], [2374], [5.733 ms], [560.0 µs], table.cell(fill: green.lighten(29%))[10.24x],
-      [`boolean_adder`, 8 steps], [5246], [8.644 ms], [1.094 ms], table.cell(fill: green.lighten(32%))[7.90x],
-      [`boolean_adder`, 9 steps], [15778], [16.74 ms], [2.773 ms], table.cell(fill: green.lighten(36%))[6.03x],
-      [`boolean_adder`, 10 steps], [77091], [43.85 ms], [12.47 ms], table.cell(fill: green.lighten(46%))[3.52x],
-      [`boolean_adder`, 11 steps], [854974], [326.7 ms], [166.8 ms], table.cell(fill: green.lighten(64%))[1.96x],
-      [`boolean_adder`, 12 steps], [24610667], [158.4 s], [149.9 s], table.cell(fill: green.lighten(96%))[1.06x],
+      [`fuel1_math`, saturated], [973], [4.614 ms], [438.0 µs], table.cell(fill: green.lighten(28%))[10.54x],
+      [`fuel2_math`, saturated], [1516], [5.864 ms], [596.8 µs], table.cell(fill: green.lighten(29%))[9.83x],
+      [`fuel3_math`, saturated], [50021], [168.1 ms], [31.50 ms], table.cell(fill: green.lighten(38%))[5.34x],
+      [`math`, 0 steps], [35], [533.7 µs], [3.141 µs], table.cell(fill: green.lighten(13%))[169.92x],
+      [`math`, 1 steps], [69], [653.3 µs], [7.197 µs], table.cell(fill: green.lighten(15%))[90.77x],
+      [`math`, 2 steps], [118], [812.1 µs], [12.97 µs], table.cell(fill: green.lighten(17%))[62.59x],
+      [`math`, 3 steps], [208], [990.0 µs], [23.12 µs], table.cell(fill: green.lighten(18%))[42.82x],
+      [`math`, 4 steps], [389], [1.223 ms], [42.04 µs], table.cell(fill: green.lighten(20%))[29.10x],
+      [`math`, 5 steps], [784], [1.605 ms], [86.52 µs], table.cell(fill: green.lighten(23%))[18.55x],
+      [`math`, 6 steps], [1576], [2.257 ms], [214.1 µs], table.cell(fill: green.lighten(28%))[10.54x],
+      [`math`, 7 steps], [3160], [3.607 ms], [497.2 µs], table.cell(fill: green.lighten(33%))[7.25x],
+      [`math`, 8 steps], [8113], [6.270 ms], [1.115 ms], table.cell(fill: green.lighten(37%))[5.62x],
+      [`math`, 9 steps], [28303], [13.50 ms], [3.387 ms], table.cell(fill: green.lighten(43%))[3.99x],
+      [`math`, 10 steps], [136446], [55.34 ms], [15.35 ms], table.cell(fill: green.lighten(45%))[3.60x],
+      [`math`, 11 steps], [1047896], [436.3 ms], [174.7 ms], table.cell(fill: green.lighten(55%))[2.50x],
+      [`math`, 12 steps], [15987528], [8.297 s], [4.733 s], table.cell(fill: green.lighten(68%))[1.75x],
+      [`boolean_adder`, 0 steps], [44], [755.3 µs], [3.232 µs], table.cell(fill: green.lighten(13%))[233.71x],
+      [`boolean_adder`, 1 steps], [106], [891.2 µs], [6.715 µs], table.cell(fill: green.lighten(14%))[132.72x],
+      [`boolean_adder`, 2 steps], [241], [1.063 ms], [16.11 µs], table.cell(fill: green.lighten(16%))[65.96x],
+      [`boolean_adder`, 3 steps], [511], [1.402 ms], [40.02 µs], table.cell(fill: green.lighten(19%))[35.03x],
+      [`boolean_adder`, 4 steps], [727], [2.033 ms], [87.96 µs], table.cell(fill: green.lighten(22%))[23.11x],
+      [`boolean_adder`, 5 steps], [906], [3.155 ms], [152.0 µs], table.cell(fill: green.lighten(23%))[20.76x],
+      [`boolean_adder`, 6 steps], [1332], [4.338 ms], [259.0 µs], table.cell(fill: green.lighten(24%))[16.75x],
+      [`boolean_adder`, 7 steps], [2374], [5.762 ms], [463.3 µs], table.cell(fill: green.lighten(27%))[12.44x],
+      [`boolean_adder`, 8 steps], [5246], [8.700 ms], [919.6 µs], table.cell(fill: green.lighten(30%))[9.46x],
+      [`boolean_adder`, 9 steps], [15778], [16.84 ms], [2.235 ms], table.cell(fill: green.lighten(32%))[7.54x],
+      [`boolean_adder`, 10 steps], [77091], [44.51 ms], [9.049 ms], table.cell(fill: green.lighten(39%))[4.92x],
+      [`boolean_adder`, 11 steps], [854974], [327.7 ms], [113.4 ms], table.cell(fill: green.lighten(51%))[2.89x],
+      [`boolean_adder`, 12 steps], [24610667], [157.2 s], [140.0 s], table.cell(fill: green.lighten(92%))[1.12x],
     ),
   ),
   caption: [Microbenchmark results comparing egglog with Oatlog. The reported timings are averages
