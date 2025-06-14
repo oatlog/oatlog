@@ -8,6 +8,7 @@ use std::{cell::RefCell, fmt::Display};
 use itertools::Itertools as _;
 
 // TODO: fuzz testing by generating egglog programs.
+// manually introduce defects in codegen to see if tests can catch it.
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Program {

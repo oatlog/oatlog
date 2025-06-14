@@ -475,79 +475,78 @@ fn update_with_category(
         }
     };
 
-    let indexes_reconstruct_impl: TokenStream =
-        {
-            index_to_info.iter_enumerate().filter_map(|(id, info)| {
-            match classification {
-                EclassToEclass(..)
-                | EclassToLattice(..)
-                | PrimitiveToEclass(..)
-                | PrimitiveToLattice(..) => {
-                    if id == primary_index {
-                        return None;
+    let indexes_reconstruct_impl: TokenStream = {
+        index_to_info
+            .iter_enumerate()
+            .filter_map(|(id, info)| {
+                match classification {
+                    EclassToEclass(..)
+                    | EclassToLattice(..)
+                    | PrimitiveToEclass(..)
+                    | PrimitiveToLattice(..) => {
+                        if id == primary_index {
+                            return None;
+                        }
                     }
+                    PrimitiveRelation(..) | EclassRelation(..) => {}
                 }
-                PrimitiveRelation(..) | EclassRelation(..) => {}
-            }
 
-            match info {
-                IndexInfo::Fd { .. } => unreachable!(),
-                IndexInfo::NonFd {
-                    key_columns,
-                    value_columns,
-                } => {
-                    let key_ident = key_columns.iter().copied().map(ident::column).collect_vec();
-                    let value_ident = value_columns
-                        .iter()
-                        .copied()
-                        .map(ident::column)
-                        .collect_vec();
+                match info {
+                    IndexInfo::Fd { .. } => unreachable!(),
+                    IndexInfo::NonFd {
+                        key_columns,
+                        value_columns,
+                    } => {
+                        let key_ident =
+                            key_columns.iter().copied().map(ident::column).collect_vec();
+                        let value_ident = value_columns
+                            .iter()
+                            .copied()
+                            .map(ident::column)
+                            .collect_vec();
 
-                    let columns = rel.columns.enumerate().map(ident::column).collect_vec();
+                        let columns = rel.columns.enumerate().map(ident::column).collect_vec();
 
-                    let sort_impl = {
-                        let all_symbolic = rel.columns.enumerate().all(is_symbolic);
+                        let sort_impl = {
+                            let all_symbolic = rel.columns.enumerate().all(is_symbolic);
 
-                        if all_symbolic && rel.columns.len() <= 3 {
-                            let mut is_key_col = tvec![false; rel.columns.len()];
-                            for c in key_columns {
-                                is_key_col[*c] = true;
-                            }
+                            if all_symbolic && rel.columns.len() <= 3 {
+                                let mut is_key_col = tvec![false; rel.columns.len()];
+                                for c in key_columns {
+                                    is_key_col[*c] = true;
+                                }
 
-                            let bit_pattern: String = is_key_col
-                                .iter()
-                                .copied()
-                                .map(|x| if x { '1' } else { '0' })
-                                .collect();
+                                let bit_pattern: String = is_key_col
+                                    .iter()
+                                    .copied()
+                                    .map(|x| if x { '1' } else { '0' })
+                                    .collect();
 
-                            let row_ident = format_ident!("RowSort{bit_pattern}");
+                                let row_ident = format_ident!("RowSort{bit_pattern}");
 
-                            if bit_pattern.chars().any(|c| c == '1') {
-                                quote! {
-                                    #row_ident :: sort ( &mut self.all );
+                                if bit_pattern.chars().any(|c| c == '1') {
+                                    quote! {
+                                        #row_ident :: sort ( &mut self.all );
+                                    }
+                                } else {
+                                    // ???
+                                    // this happens in eggcc benchmark for some reason.
+                                    quote! {}
                                 }
                             } else {
-                                // ???
-                                // this happens in eggcc benchmark for some reason.
-                                quote! {}
+                                quote! {
+                                    self.all.sort_unstable_by_key(
+                                        |&(#(#columns,)* timestamp,)|
+                                            (#(#key_ident,)*)
+                                    );
+                                }
                             }
-                        } else {
-                            quote! {
-                                self.all.sort_unstable_by_key(
-                                    |&(#(#columns,)* timestamp,)|
-                                        (#(#key_ident,)*)
-                                );
-                            }
-                        }
-                    };
+                        };
 
-                    let field = ident::index_field(info);
+                        let field = ident::index_field(info);
 
-                    let reconstruct = quote! {
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                #sort_impl
-                            });
+                        let reconstruct = quote! {
+                            #sort_impl
 
                             unsafe {
                                 self.#field.reconstruct(
@@ -556,13 +555,13 @@ fn update_with_category(
                                     |(#(#columns,)* timestamp,)| (#(#value_ident,)* timestamp,),
                                 );
                             }
-                        });
-                    };
-                    Some(reconstruct)
+                        };
+                        Some(reconstruct)
+                    }
                 }
-            }
-        }).collect()
-        };
+            })
+            .collect()
+    };
 
     let (update_finalize_impl, deferred_update_impl) = {
         let reset_num_uprooted_at_latest_retain_impl: TokenStream = rel
@@ -685,10 +684,8 @@ fn update_with_category(
             quote! {
                 assert!(self.new.is_empty());
 
-                log_duration!("fill new and all: {}", {
-                    #prepare_new_and_all_impl
-                    insertions.clear();
-                });
+                #prepare_new_and_all_impl
+                insertions.clear();
 
                 #[cfg(debug_assertions)]
                 {
@@ -735,25 +732,18 @@ fn update_with_category(
         )
     };
 
-    let relation_name = ident::rel_get(rel).to_string();
     quote! {
         // Called once at beginning of canonicalization.
         fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification, latest_timestamp: TimeStamp) {
             // everything in "insertions" is considered new.
-            log_duration!("update_begin {}: {}", #relation_name, {
-                #update_begin_impl
-            });
+            #update_begin_impl
         }
         fn update(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification, latest_timestamp: TimeStamp) -> bool {
-            log_duration!("update {}: {}", #relation_name, {
-                #update_impl
-            })
+            #update_impl
         }
         fn update_finalize(&mut self, insertions: &mut Vec<Self::Row>, uf: &mut Unification, latest_timestamp: TimeStamp) {
             // everything in "insertions" is considered new.
-            log_duration!("update_finalize {}: {}", #relation_name, {
-                #update_finalize_impl
-            });
+            #update_finalize_impl
         }
         fn deferred_update(&mut self) {
             if self.deferred {

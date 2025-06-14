@@ -154,37 +154,31 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
             #[inline(never)]
             pub fn canonicalize(&mut self) {
                 self.latest_timestamp.0 += 1;
-                log_duration!("canonicalize (total): {}", {
-                    #(self.#relation_ident.clear_new();)*
-                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                        return;
+                #(self.#relation_ident.clear_new();)*
+                if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                    return;
+                }
+
+                // initial
+                #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
+
+                // fixpoint
+                loop {
+                    let mut progress = false;
+                    #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
+                    if !progress {
+                        break;
                     }
+                }
 
-                    log_duration!("update_begin (total): {}", {
-                        #(self.#relation_ident.update_begin(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
-                    });
+                // finalize
+                #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
 
-                    log_duration!("update_loop (total): {}", {
-                        loop {
-                            let mut progress = false;
-                            #(progress |= self.#relation_ident.update(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
-                            if !progress {
-                                break;
-                            }
-                        }
-
-                    });
-
-                    log_duration!("update_finalize (total): {}", {
-                        #(self.#relation_ident.update_finalize(&mut self.delta.#delta_row, &mut self.uf, self.latest_timestamp);)*
-
-                        #(
-                            self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
-                        )*
-                        #( self.#global_type.update_finalize(); )*
-                        self.uf.reset_num_uprooted();
-                    });
-                });
+                #(
+                    self.#global_type_symbolic.update(&mut self.uf.#global_type_symbolic_uf);
+                )*
+                #( self.#global_type.update_finalize(); )*
+                self.uf.reset_num_uprooted();
             }
             fn deferred_update(&mut self) {
                 #(self.#relation_ident.deferred_update();)*
@@ -250,25 +244,10 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                 #(#theory_initial)*
                 theory
             }
-            pub fn step(&mut self) -> [std::time::Duration; 2] {
-                // TODO erik: remove log_duration from codegen
-                log_duration!("======== STEP took {} ==========", {
-                    [
-                        {
-                            let start = std::time::Instant::now();
-                            log_duration!("apply_rules: {}", {
-                                self.deferred_update();
-                                self.apply_rules();
-                            });
-                            start.elapsed()
-                        },
-                        {
-                            let start = std::time::Instant::now();
-                            self.canonicalize();
-                            start.elapsed()
-                        },
-                    ]
-                })
+            pub fn step(&mut self) {
+                self.deferred_update();
+                self.apply_rules();
+                self.canonicalize();
             }
             #[inline(never)]
             pub fn apply_rules(&mut self) { #rule_contents }

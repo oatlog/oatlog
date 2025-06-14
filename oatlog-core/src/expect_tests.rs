@@ -364,24 +364,22 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "t_nil", {
-                        for &(mut x0,) in insertions {
-                            match self.fd_index_.entry(()) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y0, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y0;
-                                    let changed = changed | (old_val != uf.type_list_.union_mut(&mut x0, y0));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.type_list_.find(x0), latest_timestamp));
+                    for &(mut x0,) in insertions {
+                        match self.fd_index_.entry(()) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y0, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y0;
+                                let changed = changed | (old_val != uf.type_list_.union_mut(&mut x0, y0));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.type_list_.find(x0), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -389,23 +387,21 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "t_nil", {
-                        if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
-                            return false;
+                    if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
+                    self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                        if uf.type_list_.is_root_mut(&mut x0) {
+                            true
+                        } else {
+                            insertions.push((x0,));
+                            false
                         }
-                        let offset = insertions.len();
-                        self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
-                            if uf.type_list_.is_root_mut(&mut x0) {
-                                true
-                            } else {
-                                insertions.push((x0,));
-                                false
-                            }
-                        });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -413,54 +409,50 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "t_nil", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new
-                                .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0,))
-                                    } else {
-                                        None
-                                    }
-                                }));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_
-                                    .iter()
-                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new
+                        .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
+                            if timestamp == latest_timestamp {
+                                Some((x0,))
+                            } else {
+                                None
+                            }
+                        }));
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_
+                            .iter()
+                            .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0,)| {
+                            assert_eq!((x0,), (uf.type_list_.find(x0),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0,)| {
-                                assert_eq!((x0,), (uf.type_list_.find(x0),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, _timestamp)| {
-                                assert_eq!((x0,), (uf.type_list_.find(x0),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.type_list_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, _timestamp)| {
+                            assert_eq!((x0,), (uf.type_list_.find(x0),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.type_list_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -540,23 +532,21 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "type_list_length", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.type_list_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    panic!("panic merge");
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((x1, latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.type_list_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                panic!("panic merge");
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((x1, latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -564,24 +554,22 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "type_list_length", {
-                        if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.type_list_.is_root_mut(&mut x0) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.type_list_num_uprooted_at_latest_retain == uf.type_list_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.type_list_.is_root_mut(&mut x0) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -589,61 +577,57 @@ fn test_edgecase3() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "type_list_length", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.type_list_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (uf.type_list_.find(x0), x1,), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.type_list_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -780,24 +764,10 @@ fn test_edgecase3() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -850,57 +820,41 @@ fn test_edgecase3() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.t_nil_.clear_new();
-                        self.type_list_length_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.t_nil_.clear_new();
+                    self.type_list_length_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.t_nil_
+                        .update_begin(&mut self.delta.t_nil_, &mut self.uf, self.latest_timestamp);
+                    self.type_list_length_.update_begin(
+                        &mut self.delta.type_list_length_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    loop {
+                        let mut progress = false;
+                        progress |=
+                            self.t_nil_
+                                .update(&mut self.delta.t_nil_, &mut self.uf, self.latest_timestamp);
+                        progress |= self.type_list_length_.update(
+                            &mut self.delta.type_list_length_,
+                            &mut self.uf,
+                            self.latest_timestamp,
+                        );
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.t_nil_.update_begin(
-                                &mut self.delta.t_nil_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.type_list_length_.update_begin(
-                                &mut self.delta.type_list_length_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |= self.t_nil_.update(
-                                    &mut self.delta.t_nil_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |= self.type_list_length_.update(
-                                    &mut self.delta.type_list_length_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.t_nil_.update_finalize(
-                                &mut self.delta.t_nil_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.type_list_length_.update_finalize(
-                                &mut self.delta.type_list_length_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_i64.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.t_nil_
+                        .update_finalize(&mut self.delta.t_nil_, &mut self.uf, self.latest_timestamp);
+                    self.type_list_length_.update_finalize(
+                        &mut self.delta.type_list_length_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.global_i64.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.t_nil_.deferred_update();
@@ -1237,24 +1191,22 @@ fn test_primitive_in_premise() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -1262,24 +1214,22 @@ fn test_primitive_in_premise() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -1287,77 +1237,69 @@ fn test_primitive_in_premise() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| ());
-                            });
-                            unsafe {
-                                self.nofd_index_.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (),
-                                    |(x0, x1, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| ());
+                        unsafe {
+                            self.nofd_index_.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (),
+                                |(x0, x1, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -1495,24 +1437,10 @@ fn test_primitive_in_premise() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -1600,40 +1528,24 @@ fn test_primitive_in_premise() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.const_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.const_.deferred_update();
@@ -2631,27 +2543,25 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -2659,27 +2569,25 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -2687,67 +2595,65 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -2835,27 +2741,25 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "pow", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -2863,27 +2767,25 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "pow", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -2891,83 +2793,77 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "pow", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -3070,24 +2966,22 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -3095,24 +2989,22 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -3120,61 +3012,57 @@ fn regression_tir2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -3354,24 +3242,10 @@ fn regression_tir2() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -3442,65 +3316,43 @@ fn regression_tir2() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.mul_.clear_new();
-                        self.pow_.clear_new();
-                        self.const_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.mul_.clear_new();
+                    self.pow_.clear_new();
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.pow_
+                        .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .pow_
+                            .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.pow_
-                                .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.pow_
-                                        .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.pow_.update_finalize(
-                                &mut self.delta.pow_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_math.update(&mut self.uf.math_);
-                            self.global_i64.update_finalize();
-                            self.global_math.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.pow_
+                        .update_finalize(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.global_math.update(&mut self.uf.math_);
+                    self.global_i64.update_finalize();
+                    self.global_math.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.mul_.deferred_update();
@@ -3688,27 +3540,25 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "sub", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -3716,27 +3566,25 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "sub", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -3744,67 +3592,65 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "sub", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -3892,24 +3738,22 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -3917,24 +3761,22 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -3942,61 +3784,57 @@ fn regression_tir1() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -4136,24 +3974,10 @@ fn regression_tir1() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -4206,52 +4030,33 @@ fn regression_tir1() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.sub_.clear_new();
-                        self.const_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.sub_.clear_new();
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.sub_
+                        .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .sub_
+                            .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.sub_
-                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.sub_
-                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.sub_.update_finalize(
-                                &mut self.delta.sub_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_i64.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.sub_
+                        .update_finalize(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.global_i64.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.sub_.deferred_update();
@@ -5299,27 +5104,25 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -5327,27 +5130,25 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -5355,95 +5156,85 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -5566,27 +5357,25 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -5594,27 +5383,25 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -5622,95 +5409,85 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -5833,24 +5610,22 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -5858,24 +5633,22 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -5883,77 +5656,69 @@ fn codegen_constant_propagation() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
+                        self.all.sort_unstable_by_key(|&(x0, x1, timestamp)| (x1,));
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x1,),
+                                |(x0, x1, timestamp)| (x0, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -6114,24 +5879,10 @@ fn codegen_constant_propagation() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -6230,62 +5981,40 @@ fn codegen_constant_propagation() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.add_.clear_new();
-                        self.mul_.clear_new();
-                        self.const_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.add_.clear_new();
+                    self.mul_.clear_new();
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.add_.deferred_update();
@@ -6394,27 +6123,25 @@ fn codegen_commutative() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -6422,27 +6149,25 @@ fn codegen_commutative() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -6450,67 +6175,65 @@ fn codegen_commutative() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -6639,24 +6362,10 @@ fn codegen_commutative() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -6699,35 +6408,24 @@ fn codegen_commutative() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.add_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.add_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.add_.deferred_update();
@@ -6888,27 +6586,25 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "sub", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -6916,27 +6612,25 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "sub", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -6944,67 +6638,65 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "sub", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -7092,24 +6784,22 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -7117,24 +6807,22 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -7142,61 +6830,57 @@ fn regression_entry2() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -7336,24 +7020,10 @@ fn regression_entry2() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -7400,52 +7070,33 @@ fn regression_entry2() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.sub_.clear_new();
-                        self.const_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.sub_.clear_new();
+                    self.const_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.sub_
+                        .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .sub_
+                            .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.sub_
-                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.sub_
-                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.sub_.update_finalize(
-                                &mut self.delta.sub_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_i64.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.sub_
+                        .update_finalize(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.global_i64.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.sub_.deferred_update();
@@ -7592,27 +7243,25 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "integral", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -7620,27 +7269,25 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "integral", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -7648,67 +7295,65 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "integral", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -7795,27 +7440,25 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -7823,27 +7466,25 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -7851,67 +7492,65 @@ fn regression_entry() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -8053,24 +7692,10 @@ fn regression_entry() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -8119,51 +7744,40 @@ fn regression_entry() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.integral_.clear_new();
-                        self.add_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.integral_.clear_new();
+                    self.add_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.integral_.update_begin(
+                        &mut self.delta.integral_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self.integral_.update(
+                            &mut self.delta.integral_,
+                            &mut self.uf,
+                            self.latest_timestamp,
+                        );
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.integral_.update_begin(
-                                &mut self.delta.integral_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |= self.integral_.update(
-                                    &mut self.delta.integral_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.integral_.update_finalize(
-                                &mut self.delta.integral_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.integral_.update_finalize(
+                        &mut self.delta.integral_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.integral_.deferred_update();
@@ -8303,27 +7917,25 @@ fn test_bind_variable_multiple_times() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "same", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.foo_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.foo_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.foo_.find(x0), uf.foo_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.foo_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.foo_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -8331,27 +7943,25 @@ fn test_bind_variable_multiple_times() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "same", {
-                        if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.foo_.is_root_mut(&mut x0)
-                                    & uf.foo_.is_root_mut(&mut x1)
-                                    & uf.foo_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.foo_num_uprooted_at_latest_retain == uf.foo_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.foo_.is_root_mut(&mut x0)
+                                & uf.foo_.is_root_mut(&mut x1)
+                                & uf.foo_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -8359,67 +7969,65 @@ fn test_bind_variable_multiple_times() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "same", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.foo_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.foo_.find(x0), uf.foo_.find(x1), uf.foo_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.foo_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -8542,24 +8150,10 @@ fn test_bind_variable_multiple_times() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -8604,37 +8198,24 @@ fn test_bind_variable_multiple_times() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.same_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
-                        }
-                        log_duration!("update_begin (total): {}", {
+                    self.same_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.same_
+                        .update_begin(&mut self.delta.same_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |=
                             self.same_
-                                .update_begin(&mut self.delta.same_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |= self.same_.update(
-                                    &mut self.delta.same_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.same_.update_finalize(
-                                &mut self.delta.same_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                                .update(&mut self.delta.same_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
+                        }
+                    }
+                    self.same_
+                        .update_finalize(&mut self.delta.same_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.same_.deferred_update();
@@ -8856,27 +8437,25 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -8884,27 +8463,25 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -8912,83 +8489,77 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x2),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort101::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x2),
+                                |(x0, x1, x2, timestamp)| (x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -9089,24 +8660,22 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "zero", {
-                        for &(mut x0,) in insertions {
-                            match self.fd_index_.entry(()) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y0, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y0;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x0, y0));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x0), latest_timestamp));
+                    for &(mut x0,) in insertions {
+                        match self.fd_index_.entry(()) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y0, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y0;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x0, y0));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x0), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -9114,23 +8683,21 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "zero", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                        if uf.math_.is_root_mut(&mut x0) {
+                            true
+                        } else {
+                            insertions.push((x0,));
+                            false
                         }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
-                            if uf.math_.is_root_mut(&mut x0) {
-                                true
-                            } else {
-                                insertions.push((x0,));
-                                false
-                            }
-                        });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -9138,54 +8705,50 @@ fn codegen_variable_reuse_bug() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "zero", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new
-                                .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0,))
-                                    } else {
-                                        None
-                                    }
-                                }));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_
-                                    .iter()
-                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new
+                        .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
+                            if timestamp == latest_timestamp {
+                                Some((x0,))
+                            } else {
+                                None
+                            }
+                        }));
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_
+                            .iter()
+                            .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0,)| {
+                            assert_eq!((x0,), (uf.math_.find(x0),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0,)| {
-                                assert_eq!((x0,), (uf.math_.find(x0),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, _timestamp)| {
-                                assert_eq!((x0,), (uf.math_.find(x0),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, _timestamp)| {
+                            assert_eq!((x0,), (uf.math_.find(x0),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -9323,24 +8886,10 @@ fn codegen_variable_reuse_bug() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -9399,50 +8948,34 @@ fn codegen_variable_reuse_bug() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.add_.clear_new();
-                        self.zero_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
-                        }
-                        log_duration!("update_begin (total): {}", {
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.add_.clear_new();
+                    self.zero_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.zero_
+                        .update_begin(&mut self.delta.zero_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        progress |=
                             self.zero_
-                                .update_begin(&mut self.delta.zero_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.zero_.update(
-                                    &mut self.delta.zero_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.zero_.update_finalize(
-                                &mut self.delta.zero_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_math.update(&mut self.uf.math_);
-                            self.global_math.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                                .update(&mut self.delta.zero_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
+                        }
+                    }
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.zero_
+                        .update_finalize(&mut self.delta.zero_, &mut self.uf, self.latest_timestamp);
+                    self.global_math.update(&mut self.uf.math_);
+                    self.global_math.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.add_.deferred_update();
@@ -9552,27 +9085,25 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -9580,27 +9111,25 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -9608,67 +9137,65 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -9755,27 +9282,25 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -9783,27 +9308,25 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -9811,67 +9334,65 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -9959,24 +9480,22 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -9984,24 +9503,22 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -10009,61 +9526,57 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -10149,24 +9662,22 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "var", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -10174,24 +9685,22 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "var", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -10199,61 +9708,57 @@ fn initial_exprs() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "var", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -10459,24 +9964,10 @@ fn initial_exprs() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -10524,77 +10015,52 @@ fn initial_exprs() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.add_.clear_new();
-                        self.mul_.clear_new();
-                        self.const_.clear_new();
-                        self.var_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.add_.clear_new();
+                    self.mul_.clear_new();
+                    self.const_.clear_new();
+                    self.var_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .var_
+                            .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_
-                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.var_
-                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_.update_finalize(
-                                &mut self.delta.var_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_math.update(&mut self.uf.math_);
-                            self.global_i64.update_finalize();
-                            self.global_string.update_finalize();
-                            self.global_math.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_finalize(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    self.global_math.update(&mut self.uf.math_);
+                    self.global_i64.update_finalize();
+                    self.global_string.update_finalize();
+                    self.global_math.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.add_.deferred_update();
@@ -10898,24 +10364,10 @@ fn codegen_bug1() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -10949,23 +10401,16 @@ fn codegen_bug1() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    loop {
+                        let mut progress = false;
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {});
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {}
             }
@@ -11055,24 +10500,10 @@ fn initial() {
                     }
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
@@ -11106,23 +10537,16 @@ fn initial() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    loop {
+                        let mut progress = false;
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {});
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {}
             }
@@ -11293,27 +10717,25 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -11321,27 +10743,25 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -11349,83 +10769,77 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -11527,27 +10941,25 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -11555,27 +10967,25 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -11583,67 +10993,65 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -11731,24 +11139,22 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -11756,24 +11162,22 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -11781,61 +11185,57 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -11926,24 +11326,22 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "var", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -11951,24 +11349,22 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "var", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -11976,61 +11372,57 @@ fn test_primitives_simple() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "var", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -12207,24 +11599,10 @@ fn test_primitives_simple() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -12339,77 +11717,52 @@ fn test_primitives_simple() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.mul_.clear_new();
-                        self.add_.clear_new();
-                        self.const_.clear_new();
-                        self.var_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.mul_.clear_new();
+                    self.add_.clear_new();
+                    self.const_.clear_new();
+                    self.var_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .var_
+                            .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_
-                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.var_
-                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_.update_finalize(
-                                &mut self.delta.var_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_math.update(&mut self.uf.math_);
-                            self.global_i64.update_finalize();
-                            self.global_string.update_finalize();
-                            self.global_math.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_finalize(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    self.global_math.update(&mut self.uf.math_);
+                    self.global_i64.update_finalize();
+                    self.global_string.update_finalize();
+                    self.global_math.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.mul_.deferred_update();
@@ -12672,7 +12025,6 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "foo", {});
                 }
                 fn update(
                     &mut self,
@@ -12680,9 +12032,7 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "foo", {
-                        return false;
-                    })
+                    return false;
                 }
                 fn update_finalize(
                     &mut self,
@@ -12690,124 +12040,110 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "foo", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            assert_eq!(self.new.len(), 0);
-                            self.new.extend(
-                                insertions
-                                    .iter()
-                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                                    .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
-                            );
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut old: Vec<_> = self
-                                    .nofd_index_0_1
-                                    .iter_key_value()
-                                    .map(|((x0, x1), _)| (x0, x1))
-                                    .collect();
-                                let n = old.len();
-                                old.sort();
-                                old.dedup();
-                                assert_eq!(n, old.len(), "old contains only unique elements");
-                            }
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.new.dedup();
-                            self.all.clear();
-                            self.all.extend(self.nofd_index_0_1.iter_key_value().map(
-                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
-                            ));
-                            self.all.sort();
-                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
-                            self.all.extend(
-                                self.new
-                                    .iter()
-                                    .copied()
-                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    assert_eq!(self.new.len(), 0);
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
+                    );
+                    #[cfg(debug_assertions)]
+                    {
+                        let mut old: Vec<_> = self
+                            .nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), _)| (x0, x1))
+                            .collect();
+                        let n = old.len();
+                        old.sort();
+                        old.dedup();
+                        assert_eq!(n, old.len(), "old contains only unique elements");
+                    }
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    self.all.clear();
+                    self.all.extend(
+                        self.nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp)),
+                    );
+                    self.all.sort();
+                    self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                    self.all.extend(
+                        self.new
+                            .iter()
+                            .copied()
+                            .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort10::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0,),
-                                    |(x0, x1, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0, x1),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
+                        RowSort10::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0,),
+                                |(x0, x1, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort11::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0, x1),
+                                |(x0, x1, timestamp)| (timestamp,),
+                            );
+                        }
+                        RowSort01::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x1,),
+                                |(x0, x1, timestamp)| (x0, timestamp),
+                            );
+                        }
                     }
                 }
             }
@@ -12896,7 +12232,6 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "bar", {});
                 }
                 fn update(
                     &mut self,
@@ -12904,9 +12239,7 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "bar", {
-                        return false;
-                    })
+                    return false;
                 }
                 fn update_finalize(
                     &mut self,
@@ -12914,124 +12247,110 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "bar", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            assert_eq!(self.new.len(), 0);
-                            self.new.extend(
-                                insertions
-                                    .iter()
-                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                                    .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
-                            );
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut old: Vec<_> = self
-                                    .nofd_index_0_1
-                                    .iter_key_value()
-                                    .map(|((x0, x1), _)| (x0, x1))
-                                    .collect();
-                                let n = old.len();
-                                old.sort();
-                                old.dedup();
-                                assert_eq!(n, old.len(), "old contains only unique elements");
-                            }
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.new.dedup();
-                            self.all.clear();
-                            self.all.extend(self.nofd_index_0_1.iter_key_value().map(
-                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
-                            ));
-                            self.all.sort();
-                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
-                            self.all.extend(
-                                self.new
-                                    .iter()
-                                    .copied()
-                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    assert_eq!(self.new.len(), 0);
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
+                    );
+                    #[cfg(debug_assertions)]
+                    {
+                        let mut old: Vec<_> = self
+                            .nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), _)| (x0, x1))
+                            .collect();
+                        let n = old.len();
+                        old.sort();
+                        old.dedup();
+                        assert_eq!(n, old.len(), "old contains only unique elements");
+                    }
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    self.all.clear();
+                    self.all.extend(
+                        self.nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp)),
+                    );
+                    self.all.sort();
+                    self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                    self.all.extend(
+                        self.new
+                            .iter()
+                            .copied()
+                            .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort10::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0,),
-                                    |(x0, x1, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0, x1),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
+                        RowSort10::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0,),
+                                |(x0, x1, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort11::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0, x1),
+                                |(x0, x1, timestamp)| (timestamp,),
+                            );
+                        }
+                        RowSort01::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x1,),
+                                |(x0, x1, timestamp)| (x0, timestamp),
+                            );
+                        }
                     }
                 }
             }
@@ -13120,7 +12439,6 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "baz", {});
                 }
                 fn update(
                     &mut self,
@@ -13128,9 +12446,7 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "baz", {
-                        return false;
-                    })
+                    return false;
                 }
                 fn update_finalize(
                     &mut self,
@@ -13138,124 +12454,110 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "baz", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            assert_eq!(self.new.len(), 0);
-                            self.new.extend(
-                                insertions
-                                    .iter()
-                                    .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
-                                    .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
-                            );
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut old: Vec<_> = self
-                                    .nofd_index_0_1
-                                    .iter_key_value()
-                                    .map(|((x0, x1), _)| (x0, x1))
-                                    .collect();
-                                let n = old.len();
-                                old.sort();
-                                old.dedup();
-                                assert_eq!(n, old.len(), "old contains only unique elements");
-                            }
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.new.dedup();
-                            self.all.clear();
-                            self.all.extend(self.nofd_index_0_1.iter_key_value().map(
-                                |((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp),
-                            ));
-                            self.all.sort();
-                            self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
-                            self.all.extend(
-                                self.new
-                                    .iter()
-                                    .copied()
-                                    .map(|(x0, x1)| (x0, x1, latest_timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    assert_eq!(self.new.len(), 0);
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1)| (uf.math_.find(x0), uf.math_.find(x1)))
+                            .filter(|&(x0, x1)| !self.nofd_index_0_1.contains_key(&(x0, x1))),
+                    );
+                    #[cfg(debug_assertions)]
+                    {
+                        let mut old: Vec<_> = self
+                            .nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), _)| (x0, x1))
+                            .collect();
+                        let n = old.len();
+                        old.sort();
+                        old.dedup();
+                        assert_eq!(n, old.len(), "old contains only unique elements");
+                    }
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    self.all.clear();
+                    self.all.extend(
+                        self.nofd_index_0_1
+                            .iter_key_value()
+                            .map(|((x0, x1), (timestamp,))| (uf.math_.find(x0), uf.math_.find(x1), timestamp)),
+                    );
+                    self.all.sort();
+                    self.all.dedup_by_key(|&mut (x0, x1, _timestamp)| (x0, x1));
+                    self.all.extend(
+                        self.new
+                            .iter()
+                            .copied()
+                            .map(|(x0, x1)| (x0, x1, latest_timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort10::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0,),
-                                    |(x0, x1, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort11::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x0, x1),
-                                    |(x0, x1, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
+                        RowSort10::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0,),
+                                |(x0, x1, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort11::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x0, x1),
+                                |(x0, x1, timestamp)| (timestamp,),
+                            );
+                        }
+                        RowSort01::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x1,),
+                                |(x0, x1, timestamp)| (x0, timestamp),
+                            );
+                        }
                     }
                 }
             }
@@ -13342,7 +12644,6 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "triangle", {});
                 }
                 fn update(
                     &mut self,
@@ -13350,9 +12651,7 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "triangle", {
-                        return false;
-                    })
+                    return false;
                 }
                 fn update_finalize(
                     &mut self,
@@ -13360,110 +12659,100 @@ fn triangle_join() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "triangle", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            assert_eq!(self.new.len(), 0);
-                            self.new.extend(
-                                insertions
-                                    .iter()
-                                    .map(|&(x0, x1, x2)| {
-                                        (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2))
-                                    })
-                                    .filter(|&(x0, x1, x2)| !self.nofd_index_0_1_2.contains_key(&(x0, x1, x2))),
-                            );
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut old: Vec<_> = self
-                                    .nofd_index_0_1_2
-                                    .iter_key_value()
-                                    .map(|((x0, x1, x2), _)| (x0, x1, x2))
-                                    .collect();
-                                let n = old.len();
-                                old.sort();
-                                old.dedup();
-                                assert_eq!(n, old.len(), "old contains only unique elements");
-                            }
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.new.dedup();
-                            self.all.clear();
-                            self.all.extend(self.nofd_index_0_1_2.iter_key_value().map(
-                                |((x0, x1, x2), (timestamp,))| {
-                                    (
-                                        uf.math_.find(x0),
-                                        uf.math_.find(x1),
-                                        uf.math_.find(x2),
-                                        timestamp,
-                                    )
-                                },
-                            ));
-                            self.all.sort();
-                            self.all
-                                .dedup_by_key(|&mut (x0, x1, x2, _timestamp)| (x0, x1, x2));
-                            self.all.extend(
-                                self.new
-                                    .iter()
-                                    .copied()
-                                    .map(|(x0, x1, x2)| (x0, x1, x2, latest_timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    assert_eq!(self.new.len(), 0);
+                    self.new.extend(
+                        insertions
+                            .iter()
+                            .map(|&(x0, x1, x2)| (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2)))
+                            .filter(|&(x0, x1, x2)| !self.nofd_index_0_1_2.contains_key(&(x0, x1, x2))),
+                    );
+                    #[cfg(debug_assertions)]
+                    {
+                        let mut old: Vec<_> = self
+                            .nofd_index_0_1_2
+                            .iter_key_value()
+                            .map(|((x0, x1, x2), _)| (x0, x1, x2))
+                            .collect();
+                        let n = old.len();
+                        old.sort();
+                        old.dedup();
+                        assert_eq!(n, old.len(), "old contains only unique elements");
+                    }
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.new.dedup();
+                    self.all.clear();
+                    self.all.extend(self.nofd_index_0_1_2.iter_key_value().map(
+                        |((x0, x1, x2), (timestamp,))| {
+                            (
+                                uf.math_.find(x0),
+                                uf.math_.find(x1),
+                                uf.math_.find(x2),
+                                timestamp,
+                            )
+                        },
+                    ));
+                    self.all.sort();
+                    self.all
+                        .dedup_by_key(|&mut (x0, x1, x2, _timestamp)| (x0, x1, x2));
+                    self.all.extend(
+                        self.new
+                            .iter()
+                            .copied()
+                            .map(|(x0, x1, x2)| (x0, x1, x2, latest_timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort111::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_1_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x1, x2),
-                                    |(x0, x1, x2, timestamp)| (timestamp,),
-                                );
-                            }
-                        });
+                        RowSort111::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_1_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x1, x2),
+                                |(x0, x1, x2, timestamp)| (timestamp,),
+                            );
+                        }
                     }
                 }
             }
@@ -13577,24 +12866,10 @@ fn triangle_join() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -13673,73 +12948,56 @@ fn triangle_join() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.foo_.clear_new();
-                        self.bar_.clear_new();
-                        self.baz_.clear_new();
-                        self.triangle_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.foo_.clear_new();
+                    self.bar_.clear_new();
+                    self.baz_.clear_new();
+                    self.triangle_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.foo_
+                        .update_begin(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
+                    self.bar_
+                        .update_begin(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
+                    self.baz_
+                        .update_begin(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
+                    self.triangle_.update_begin(
+                        &mut self.delta.triangle_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .foo_
+                            .update(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .bar_
+                            .update(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .baz_
+                            .update(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
+                        progress |= self.triangle_.update(
+                            &mut self.delta.triangle_,
+                            &mut self.uf,
+                            self.latest_timestamp,
+                        );
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.foo_
-                                .update_begin(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
-                            self.bar_
-                                .update_begin(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
-                            self.baz_
-                                .update_begin(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
-                            self.triangle_.update_begin(
-                                &mut self.delta.triangle_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.foo_
-                                        .update(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.bar_
-                                        .update(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.baz_
-                                        .update(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.triangle_.update(
-                                    &mut self.delta.triangle_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.foo_.update_finalize(
-                                &mut self.delta.foo_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.bar_.update_finalize(
-                                &mut self.delta.bar_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.baz_.update_finalize(
-                                &mut self.delta.baz_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.triangle_.update_finalize(
-                                &mut self.delta.triangle_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.foo_
+                        .update_finalize(&mut self.delta.foo_, &mut self.uf, self.latest_timestamp);
+                    self.bar_
+                        .update_finalize(&mut self.delta.bar_, &mut self.uf, self.latest_timestamp);
+                    self.baz_
+                        .update_finalize(&mut self.delta.baz_, &mut self.uf, self.latest_timestamp);
+                    self.triangle_.update_finalize(
+                        &mut self.delta.triangle_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.foo_.deferred_update();
@@ -14010,27 +13268,25 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -14038,27 +13294,25 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -14066,107 +13320,93 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x2),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort101::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x2),
+                                |(x0, x1, x2, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -14307,27 +13547,25 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -14335,27 +13573,25 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -14363,95 +13599,85 @@ fn edgecase0() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -14627,24 +13853,10 @@ fn edgecase0() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -14726,46 +13938,32 @@ fn edgecase0() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.mul_.clear_new();
-                        self.add_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.mul_.clear_new();
+                    self.add_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.mul_.deferred_update();
@@ -15040,27 +14238,25 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -15068,27 +14264,25 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -15096,107 +14290,93 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x2),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort101::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x2),
+                                |(x0, x1, x2, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -15336,27 +14516,25 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -15364,27 +14542,25 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -15392,83 +14568,77 @@ fn edgecase0_no_egglog_compat() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -15625,24 +14795,10 @@ fn edgecase0_no_egglog_compat() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -15722,46 +14878,32 @@ fn edgecase0_no_egglog_compat() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.mul_.clear_new();
-                        self.add_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.mul_.clear_new();
+                    self.add_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.mul_.deferred_update();
@@ -15876,27 +15018,25 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -15904,27 +15044,25 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -15932,83 +15070,77 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -16111,27 +15243,25 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -16139,27 +15269,25 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -16167,83 +15295,77 @@ fn test_into_codegen() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -16400,24 +15522,10 @@ fn test_into_codegen() {
                     let mut theory = Self::default();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -16483,46 +15591,32 @@ fn test_into_codegen() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.mul_.clear_new();
-                        self.add_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
+                    self.mul_.clear_new();
+                    self.add_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
                         }
-                        log_duration!("update_begin (total): {}", {
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                    }
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.mul_.deferred_update();
@@ -18926,24 +18020,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "fuel", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.fuel_unit_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.fuel_unit_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.fuel_unit_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.fuel_unit_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -18951,24 +18043,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "fuel", {
-                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.fuel_unit_.is_root_mut(&mut x0) & uf.fuel_unit_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.fuel_unit_.is_root_mut(&mut x0) & uf.fuel_unit_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -18976,85 +18066,77 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "fuel", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.fuel_unit_.find(x0), uf.fuel_unit_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort01::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, timestamp)| (x1,),
-                                    |(x0, x1, timestamp)| (x0, timestamp),
-                                );
-                            }
-                        });
+                        RowSort01::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, timestamp)| (x1,),
+                                |(x0, x1, timestamp)| (x0, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -19145,24 +18227,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "zero_fuel", {
-                        for &(mut x0,) in insertions {
-                            match self.fd_index_.entry(()) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y0, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y0;
-                                    let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x0, y0));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.fuel_unit_.find(x0), latest_timestamp));
+                    for &(mut x0,) in insertions {
+                        match self.fd_index_.entry(()) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y0, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y0;
+                                let changed = changed | (old_val != uf.fuel_unit_.union_mut(&mut x0, y0));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.fuel_unit_.find(x0), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -19170,23 +18250,21 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "zero_fuel", {
-                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
-                            return false;
+                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                    self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                        if uf.fuel_unit_.is_root_mut(&mut x0) {
+                            true
+                        } else {
+                            insertions.push((x0,));
+                            false
                         }
-                        let offset = insertions.len();
-                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
-                            if uf.fuel_unit_.is_root_mut(&mut x0) {
-                                true
-                            } else {
-                                insertions.push((x0,));
-                                false
-                            }
-                        });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -19194,54 +18272,50 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "zero_fuel", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new
-                                .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0,))
-                                    } else {
-                                        None
-                                    }
-                                }));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_
-                                    .iter()
-                                    .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new
+                        .extend(self.fd_index_.iter().filter_map(|(&(), &(x0, timestamp))| {
+                            if timestamp == latest_timestamp {
+                                Some((x0,))
+                            } else {
+                                None
+                            }
+                        }));
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_
+                            .iter()
+                            .map(|(&(), &(x0, timestamp))| (x0, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0,)| {
+                            assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0,)| {
-                                assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, _timestamp)| {
-                                assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, _timestamp)| {
+                            assert_eq!((x0,), (uf.fuel_unit_.find(x0),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self.all.iter().map(|&(x0, _timestamp)| (x0,)).collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -19321,27 +18395,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "diff", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -19349,27 +18421,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "diff", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -19377,83 +18447,77 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "diff", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -19560,28 +18624,26 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "integral", {
-                        for &(mut x0, mut x1, mut x2, mut x3) in insertions {
-                            match self.fd_index_0_1_2.entry((
-                                uf.fuel_unit_.find(x0),
-                                uf.math_.find(x1),
-                                uf.math_.find(x2),
-                            )) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y3, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y3;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x3, y3));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x3), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2, mut x3) in insertions {
+                        match self.fd_index_0_1_2.entry((
+                            uf.fuel_unit_.find(x0),
+                            uf.math_.find(x1),
+                            uf.math_.find(x2),
+                        )) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y3, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y3;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x3, y3));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x3), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -19589,31 +18651,29 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "integral", {
-                        if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
-                            && self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted()
-                        {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1_2
-                            .retain(|&(mut x0, mut x1, mut x2), &mut (mut x3, _timestamp)| {
-                                if uf.fuel_unit_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                    & uf.math_.is_root_mut(&mut x3)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2, x3));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.fuel_unit_num_uprooted_at_latest_retain == uf.fuel_unit_.num_uprooted()
+                        && self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted()
+                    {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1_2
+                        .retain(|&(mut x0, mut x1, mut x2), &mut (mut x3, _timestamp)| {
+                            if uf.fuel_unit_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                                & uf.math_.is_root_mut(&mut x3)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2, x3));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -19621,134 +18681,114 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "integral", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1_2.iter().filter_map(
-                                |(&(x0, x1, x2), &(x3, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2, x3))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1_2
-                                    .iter()
-                                    .map(|(&(x0, x1, x2), &(x3, timestamp))| (x0, x1, x2, x3, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2, x3)| {
-                                assert_eq!(
-                                    (x0, x1, x2, x3,),
-                                    (
-                                        uf.fuel_unit_.find(x0),
-                                        uf.math_.find(x1),
-                                        uf.math_.find(x2),
-                                        uf.math_.find(x3),
-                                    ),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, x3, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2, x3,),
-                                    (
-                                        uf.fuel_unit_.find(x0),
-                                        uf.math_.find(x1),
-                                        uf.math_.find(x2),
-                                        uf.math_.find(x3),
-                                    ),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, x3, _timestamp)| (x0, x1, x2, x3))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(self.fd_index_0_1_2.iter().filter_map(
+                        |(&(x0, x1, x2), &(x3, timestamp))| {
+                            if timestamp == latest_timestamp {
+                                Some((x0, x1, x2, x3))
+                            } else {
+                                None
+                            }
+                        },
+                    ));
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1_2
+                            .iter()
+                            .map(|(&(x0, x1, x2), &(x3, timestamp))| (x0, x1, x2, x3, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2, x3)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2, x3,),
+                                (
+                                    uf.fuel_unit_.find(x0),
+                                    uf.math_.find(x1),
+                                    uf.math_.find(x2),
+                                    uf.math_.find(x3),
+                                ),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.fuel_unit_num_uprooted_at_latest_retain = 0;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, x3, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2, x3,),
+                                (
+                                    uf.fuel_unit_.find(x0),
+                                    uf.math_.find(x1),
+                                    uf.math_.find(x2),
+                                    uf.math_.find(x3),
+                                ),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, x3, _timestamp)| (x0, x1, x2, x3))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.fuel_unit_num_uprooted_at_latest_retain = 0;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all
-                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0,));
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, x3, timestamp)| (x0,),
-                                    |(x0, x1, x2, x3, timestamp)| (x1, x2, x3, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all
-                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0, x1));
-                            });
-                            unsafe {
-                                self.nofd_index_0_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, x3, timestamp)| (x0, x1),
-                                    |(x0, x1, x2, x3, timestamp)| (x2, x3, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all
-                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1,));
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, x3, timestamp)| (x1,),
-                                    |(x0, x1, x2, x3, timestamp)| (x0, x2, x3, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                self.all
-                                    .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1, x2));
-                            });
-                            unsafe {
-                                self.nofd_index_1_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, x3, timestamp)| (x1, x2),
-                                    |(x0, x1, x2, x3, timestamp)| (x0, x3, timestamp),
-                                );
-                            }
-                        });
+                        self.all
+                            .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0,));
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, x3, timestamp)| (x0,),
+                                |(x0, x1, x2, x3, timestamp)| (x1, x2, x3, timestamp),
+                            );
+                        }
+                        self.all
+                            .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x0, x1));
+                        unsafe {
+                            self.nofd_index_0_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, x3, timestamp)| (x0, x1),
+                                |(x0, x1, x2, x3, timestamp)| (x2, x3, timestamp),
+                            );
+                        }
+                        self.all
+                            .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1,));
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, x3, timestamp)| (x1,),
+                                |(x0, x1, x2, x3, timestamp)| (x0, x2, x3, timestamp),
+                            );
+                        }
+                        self.all
+                            .sort_unstable_by_key(|&(x0, x1, x2, x3, timestamp)| (x1, x2));
+                        unsafe {
+                            self.nofd_index_1_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, x3, timestamp)| (x1, x2),
+                                |(x0, x1, x2, x3, timestamp)| (x0, x3, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -19935,27 +18975,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "add", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -19963,27 +19001,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "add", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -19991,95 +19027,85 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "add", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -20201,27 +19227,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "sub", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -20229,27 +19253,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "sub", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -20257,83 +19279,77 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "sub", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -20438,27 +19454,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "mul", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -20466,27 +19480,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "mul", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -20494,107 +19506,93 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "mul", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x2),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort101::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x2),
+                                |(x0, x1, x2, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -20733,27 +19731,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "div", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -20761,27 +19757,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "div", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -20789,67 +19783,65 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "div", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -20940,27 +19932,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "pow", {
-                        for &(mut x0, mut x1, mut x2) in insertions {
-                            match self
-                                .fd_index_0_1
-                                .entry((uf.math_.find(x0), uf.math_.find(x1)))
-                            {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y2, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y2;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x2), latest_timestamp));
+                    for &(mut x0, mut x1, mut x2) in insertions {
+                        match self
+                            .fd_index_0_1
+                            .entry((uf.math_.find(x0), uf.math_.find(x1)))
+                        {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y2, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y2;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x2, y2));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x2), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -20968,27 +19958,25 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "pow", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0_1
-                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0)
-                                    & uf.math_.is_root_mut(&mut x1)
-                                    & uf.math_.is_root_mut(&mut x2)
-                                {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1, x2));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0_1
+                        .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0)
+                                & uf.math_.is_root_mut(&mut x1)
+                                & uf.math_.is_root_mut(&mut x2)
+                            {
+                                true
+                            } else {
+                                insertions.push((x0, x1, x2));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -20996,119 +19984,101 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "pow", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(self.fd_index_0_1.iter().filter_map(
-                                |(&(x0, x1), &(x2, timestamp))| {
-                                    if timestamp == latest_timestamp {
-                                        Some((x0, x1, x2))
-                                    } else {
-                                        None
-                                    }
-                                },
-                            ));
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0_1
-                                    .iter()
-                                    .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1, x2)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1, x2,),
-                                    (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .filter_map(|(&(x0, x1), &(x2, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1, x2))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0_1
+                            .iter()
+                            .map(|(&(x0, x1), &(x2, timestamp))| (x0, x1, x2, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1, x2)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, x2, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1, x2,),
+                                (uf.math_.find(x0), uf.math_.find(x1), uf.math_.find(x2),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, x2, _timestamp)| (x0, x1, x2))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
                         self.deferred = false;
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort100::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0,),
-                                    |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort101::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_0_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x0, x2),
-                                    |(x0, x1, x2, timestamp)| (x1, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort010::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_1.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x1,),
-                                    |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
-                                );
-                            }
-                        });
-                        log_duration!("reconstruct index: {}", {
-                            log_duration!("reconstruct sort: {}", {
-                                RowSort001::sort(&mut self.all);
-                            });
-                            unsafe {
-                                self.nofd_index_2.reconstruct(
-                                    &mut self.all,
-                                    |(x0, x1, x2, timestamp)| (x2,),
-                                    |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
-                                );
-                            }
-                        });
+                        RowSort100::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0,),
+                                |(x0, x1, x2, timestamp)| (x1, x2, timestamp),
+                            );
+                        }
+                        RowSort101::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_0_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x0, x2),
+                                |(x0, x1, x2, timestamp)| (x1, timestamp),
+                            );
+                        }
+                        RowSort010::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_1.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x1,),
+                                |(x0, x1, x2, timestamp)| (x0, x2, timestamp),
+                            );
+                        }
+                        RowSort001::sort(&mut self.all);
+                        unsafe {
+                            self.nofd_index_2.reconstruct(
+                                &mut self.all,
+                                |(x0, x1, x2, timestamp)| (x2,),
+                                |(x0, x1, x2, timestamp)| (x0, x1, timestamp),
+                            );
+                        }
                     }
                 }
                 fn serialize(&self, out: &mut Vec<(Self::Enode, Self::Eclass)>) {
@@ -21266,24 +20236,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "ln", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.math_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.math_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -21291,24 +20259,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "ln", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -21316,69 +20282,65 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "ln", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -21458,24 +20420,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "sqrt", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.math_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.math_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -21483,24 +20443,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "sqrt", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -21508,69 +20466,65 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "sqrt", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -21650,24 +20604,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "sin", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.math_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.math_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -21675,24 +20627,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "sin", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -21700,69 +20650,65 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "sin", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -21847,24 +20793,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "cos", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((uf.math_.find(x0),)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((uf.math_.find(x0),)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -21872,24 +20816,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "cos", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -21897,69 +20839,65 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "cos", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            RadixSortable::wrap(&mut self.new).voracious_sort();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
-                        });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "new is canonical"
-                                );
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!(
-                                    (x0, x1,),
-                                    (uf.math_.find(x0), uf.math_.find(x1),),
-                                    "all is canonical"
-                                );
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    RadixSortable::wrap(&mut self.new).voracious_sort();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
                             assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "new is canonical"
                             );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!(
+                                (x0, x1,),
+                                (uf.math_.find(x0), uf.math_.find(x1),),
+                                "all is canonical"
+                            );
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -22045,24 +20983,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "const", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -22070,24 +21006,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "const", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -22095,61 +21029,57 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "const", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -22240,24 +21170,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_begin {}: {}", "var", {
-                        for &(mut x0, mut x1) in insertions {
-                            match self.fd_index_0.entry((x0,)) {
-                                runtime::HashMapEntry::Occupied(mut entry) => {
-                                    let (y1, timestamp) = entry.get_mut();
-                                    let changed = false;
-                                    let old_val = *y1;
-                                    let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
-                                    if changed {
-                                        *timestamp = latest_timestamp;
-                                    }
-                                }
-                                runtime::HashMapEntry::Vacant(entry) => {
-                                    entry.insert((uf.math_.find(x1), latest_timestamp));
+                    for &(mut x0, mut x1) in insertions {
+                        match self.fd_index_0.entry((x0,)) {
+                            runtime::HashMapEntry::Occupied(mut entry) => {
+                                let (y1, timestamp) = entry.get_mut();
+                                let changed = false;
+                                let old_val = *y1;
+                                let changed = changed | (old_val != uf.math_.union_mut(&mut x1, y1));
+                                if changed {
+                                    *timestamp = latest_timestamp;
                                 }
                             }
+                            runtime::HashMapEntry::Vacant(entry) => {
+                                entry.insert((uf.math_.find(x1), latest_timestamp));
+                            }
                         }
-                    });
+                    }
                 }
                 fn update(
                     &mut self,
@@ -22265,24 +21193,22 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) -> bool {
-                    log_duration!("update {}: {}", "var", {
-                        if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
-                            return false;
-                        }
-                        let offset = insertions.len();
-                        self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0
-                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
-                                if uf.math_.is_root_mut(&mut x1) {
-                                    true
-                                } else {
-                                    insertions.push((x0, x1));
-                                    false
-                                }
-                            });
-                        self.update_begin(&insertions[offset..], uf, latest_timestamp);
-                        true
-                    })
+                    if self.math_num_uprooted_at_latest_retain == uf.math_.num_uprooted() {
+                        return false;
+                    }
+                    let offset = insertions.len();
+                    self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
+                    self.fd_index_0
+                        .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x1) {
+                                true
+                            } else {
+                                insertions.push((x0, x1));
+                                false
+                            }
+                        });
+                    self.update_begin(&insertions[offset..], uf, latest_timestamp);
+                    true
                 }
                 fn update_finalize(
                     &mut self,
@@ -22290,61 +21216,57 @@ fn lir_math() {
                     uf: &mut Unification,
                     latest_timestamp: TimeStamp,
                 ) {
-                    log_duration!("update_finalize {}: {}", "var", {
-                        assert!(self.new.is_empty());
-                        log_duration!("fill new and all: {}", {
-                            self.new.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .filter_map(|(&(x0,), &(x1, timestamp))| {
-                                        if timestamp == latest_timestamp {
-                                            Some((x0, x1))
-                                        } else {
-                                            None
-                                        }
-                                    }),
-                            );
-                            self.new.sort_unstable();
-                            self.all.clear();
-                            self.all.extend(
-                                self.fd_index_0
-                                    .iter()
-                                    .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
-                            );
-                            insertions.clear();
+                    assert!(self.new.is_empty());
+                    self.new.extend(
+                        self.fd_index_0
+                            .iter()
+                            .filter_map(|(&(x0,), &(x1, timestamp))| {
+                                if timestamp == latest_timestamp {
+                                    Some((x0, x1))
+                                } else {
+                                    None
+                                }
+                            }),
+                    );
+                    self.new.sort_unstable();
+                    self.all.clear();
+                    self.all.extend(
+                        self.fd_index_0
+                            .iter()
+                            .map(|(&(x0,), &(x1, timestamp))| (x0, x1, timestamp)),
+                    );
+                    insertions.clear();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.new.iter().for_each(|&(x0, x1)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
                         });
-                        #[cfg(debug_assertions)]
-                        {
-                            self.new.iter().for_each(|&(x0, x1)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "new is canonical");
-                            });
-                            let mut new = self.new.clone();
-                            new.sort();
-                            new.dedup();
-                            assert_eq!(new.len(), self.new.len(), "new only has unique elements");
-                            self.all.iter().for_each(|&(x0, x1, _timestamp)| {
-                                assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
-                            });
-                            let mut all_: Vec<_> = self.all.clone();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
-                            let mut all_: Vec<_> = self
-                                .all
-                                .iter()
-                                .map(|&(x0, x1, _timestamp)| (x0, x1))
-                                .collect();
-                            all_.sort();
-                            all_.dedup();
-                            assert_eq!(
-                                all_.len(),
-                                self.all.len(),
-                                "all does not have duplicate timestamps"
-                            );
-                        }
-                        self.deferred = true;
-                        self.math_num_uprooted_at_latest_retain = 0;
-                    });
+                        let mut new = self.new.clone();
+                        new.sort();
+                        new.dedup();
+                        assert_eq!(new.len(), self.new.len(), "new only has unique elements");
+                        self.all.iter().for_each(|&(x0, x1, _timestamp)| {
+                            assert_eq!((x0, x1,), (x0, uf.math_.find(x1),), "all is canonical");
+                        });
+                        let mut all_: Vec<_> = self.all.clone();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(all_.len(), self.all.len(), "all only has unique elements");
+                        let mut all_: Vec<_> = self
+                            .all
+                            .iter()
+                            .map(|&(x0, x1, _timestamp)| (x0, x1))
+                            .collect();
+                        all_.sort();
+                        all_.dedup();
+                        assert_eq!(
+                            all_.len(),
+                            self.all.len(),
+                            "all does not have duplicate timestamps"
+                        );
+                    }
+                    self.deferred = true;
+                    self.math_num_uprooted_at_latest_retain = 0;
                 }
                 fn deferred_update(&mut self) {
                     if self.deferred {
@@ -22914,24 +21836,10 @@ fn lir_math() {
                     theory.canonicalize();
                     theory
                 }
-                pub fn step(&mut self) -> [std::time::Duration; 2] {
-                    log_duration!("======== STEP took {} ==========", {
-                        [
-                            {
-                                let start = std::time::Instant::now();
-                                log_duration!("apply_rules: {}", {
-                                    self.deferred_update();
-                                    self.apply_rules();
-                                });
-                                start.elapsed()
-                            },
-                            {
-                                let start = std::time::Instant::now();
-                                self.canonicalize();
-                                start.elapsed()
-                            },
-                        ]
-                    })
+                pub fn step(&mut self) {
+                    self.deferred_update();
+                    self.apply_rules();
+                    self.canonicalize();
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {
@@ -23643,213 +22551,158 @@ fn lir_math() {
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
-                    log_duration!("canonicalize (total): {}", {
-                        self.fuel_.clear_new();
-                        self.zero_fuel_.clear_new();
-                        self.diff_.clear_new();
-                        self.integral_.clear_new();
-                        self.add_.clear_new();
-                        self.sub_.clear_new();
-                        self.mul_.clear_new();
-                        self.div_.clear_new();
-                        self.pow_.clear_new();
-                        self.ln_.clear_new();
-                        self.sqrt_.clear_new();
-                        self.sin_.clear_new();
-                        self.cos_.clear_new();
-                        self.const_.clear_new();
-                        self.var_.clear_new();
-                        if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
-                            return;
-                        }
-                        log_duration!("update_begin (total): {}", {
+                    self.fuel_.clear_new();
+                    self.zero_fuel_.clear_new();
+                    self.diff_.clear_new();
+                    self.integral_.clear_new();
+                    self.add_.clear_new();
+                    self.sub_.clear_new();
+                    self.mul_.clear_new();
+                    self.div_.clear_new();
+                    self.pow_.clear_new();
+                    self.ln_.clear_new();
+                    self.sqrt_.clear_new();
+                    self.sin_.clear_new();
+                    self.cos_.clear_new();
+                    self.const_.clear_new();
+                    self.var_.clear_new();
+                    if !self.delta.has_new_inserts() && self.uf.num_uprooted() == 0 {
+                        return;
+                    }
+                    self.fuel_
+                        .update_begin(&mut self.delta.fuel_, &mut self.uf, self.latest_timestamp);
+                    self.zero_fuel_.update_begin(
+                        &mut self.delta.zero_fuel_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.diff_
+                        .update_begin(&mut self.delta.diff_, &mut self.uf, self.latest_timestamp);
+                    self.integral_.update_begin(
+                        &mut self.delta.integral_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.add_
+                        .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.sub_
+                        .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.div_
+                        .update_begin(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
+                    self.pow_
+                        .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                    self.ln_
+                        .update_begin(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                    self.sqrt_
+                        .update_begin(&mut self.delta.sqrt_, &mut self.uf, self.latest_timestamp);
+                    self.sin_
+                        .update_begin(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
+                    self.cos_
+                        .update_begin(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_begin(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    loop {
+                        let mut progress = false;
+                        progress |=
                             self.fuel_
-                                .update_begin(&mut self.delta.fuel_, &mut self.uf, self.latest_timestamp);
-                            self.zero_fuel_.update_begin(
-                                &mut self.delta.zero_fuel_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
+                                .update(&mut self.delta.fuel_, &mut self.uf, self.latest_timestamp);
+                        progress |= self.zero_fuel_.update(
+                            &mut self.delta.zero_fuel_,
+                            &mut self.uf,
+                            self.latest_timestamp,
+                        );
+                        progress |=
                             self.diff_
-                                .update_begin(&mut self.delta.diff_, &mut self.uf, self.latest_timestamp);
-                            self.integral_.update_begin(
-                                &mut self.delta.integral_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_
-                                .update_begin(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                            self.sub_
-                                .update_begin(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                            self.mul_
-                                .update_begin(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                            self.div_
-                                .update_begin(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
-                            self.pow_
-                                .update_begin(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
-                            self.ln_
-                                .update_begin(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                                .update(&mut self.delta.diff_, &mut self.uf, self.latest_timestamp);
+                        progress |= self.integral_.update(
+                            &mut self.delta.integral_,
+                            &mut self.uf,
+                            self.latest_timestamp,
+                        );
+                        progress |= self
+                            .add_
+                            .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .sub_
+                            .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .mul_
+                            .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .div_
+                            .update(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .pow_
+                            .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .ln_
+                            .update(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                        progress |=
                             self.sqrt_
-                                .update_begin(&mut self.delta.sqrt_, &mut self.uf, self.latest_timestamp);
-                            self.sin_
-                                .update_begin(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
-                            self.cos_
-                                .update_begin(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
-                            self.const_.update_begin(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_
-                                .update_begin(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                        });
-                        log_duration!("update_loop (total): {}", {
-                            loop {
-                                let mut progress = false;
-                                progress |= self.fuel_.update(
-                                    &mut self.delta.fuel_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |= self.zero_fuel_.update(
-                                    &mut self.delta.zero_fuel_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |= self.diff_.update(
-                                    &mut self.delta.diff_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |= self.integral_.update(
-                                    &mut self.delta.integral_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.add_
-                                        .update(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.sub_
-                                        .update(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.mul_
-                                        .update(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.div_
-                                        .update(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.pow_
-                                        .update(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.ln_
-                                        .update(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.sqrt_.update(
-                                    &mut self.delta.sqrt_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.sin_
-                                        .update(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
-                                progress |=
-                                    self.cos_
-                                        .update(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
-                                progress |= self.const_.update(
-                                    &mut self.delta.const_,
-                                    &mut self.uf,
-                                    self.latest_timestamp,
-                                );
-                                progress |=
-                                    self.var_
-                                        .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
-                                if !progress {
-                                    break;
-                                }
-                            }
-                        });
-                        log_duration!("update_finalize (total): {}", {
-                            self.fuel_.update_finalize(
-                                &mut self.delta.fuel_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.zero_fuel_.update_finalize(
-                                &mut self.delta.zero_fuel_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.diff_.update_finalize(
-                                &mut self.delta.diff_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.integral_.update_finalize(
-                                &mut self.delta.integral_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.add_.update_finalize(
-                                &mut self.delta.add_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.sub_.update_finalize(
-                                &mut self.delta.sub_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.mul_.update_finalize(
-                                &mut self.delta.mul_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.div_.update_finalize(
-                                &mut self.delta.div_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.pow_.update_finalize(
-                                &mut self.delta.pow_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.ln_
-                                .update_finalize(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
-                            self.sqrt_.update_finalize(
-                                &mut self.delta.sqrt_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.sin_.update_finalize(
-                                &mut self.delta.sin_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.cos_.update_finalize(
-                                &mut self.delta.cos_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.const_.update_finalize(
-                                &mut self.delta.const_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.var_.update_finalize(
-                                &mut self.delta.var_,
-                                &mut self.uf,
-                                self.latest_timestamp,
-                            );
-                            self.global_fuel_unit.update(&mut self.uf.fuel_unit_);
-                            self.global_math.update(&mut self.uf.math_);
-                            self.global_i64.update_finalize();
-                            self.global_string.update_finalize();
-                            self.global_fuel_unit.update_finalize();
-                            self.global_math.update_finalize();
-                            self.uf.reset_num_uprooted();
-                        });
-                    });
+                                .update(&mut self.delta.sqrt_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .sin_
+                            .update(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .cos_
+                            .update(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
+                        progress |=
+                            self.const_
+                                .update(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                        progress |= self
+                            .var_
+                            .update(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                        if !progress {
+                            break;
+                        }
+                    }
+                    self.fuel_
+                        .update_finalize(&mut self.delta.fuel_, &mut self.uf, self.latest_timestamp);
+                    self.zero_fuel_.update_finalize(
+                        &mut self.delta.zero_fuel_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.diff_
+                        .update_finalize(&mut self.delta.diff_, &mut self.uf, self.latest_timestamp);
+                    self.integral_.update_finalize(
+                        &mut self.delta.integral_,
+                        &mut self.uf,
+                        self.latest_timestamp,
+                    );
+                    self.add_
+                        .update_finalize(&mut self.delta.add_, &mut self.uf, self.latest_timestamp);
+                    self.sub_
+                        .update_finalize(&mut self.delta.sub_, &mut self.uf, self.latest_timestamp);
+                    self.mul_
+                        .update_finalize(&mut self.delta.mul_, &mut self.uf, self.latest_timestamp);
+                    self.div_
+                        .update_finalize(&mut self.delta.div_, &mut self.uf, self.latest_timestamp);
+                    self.pow_
+                        .update_finalize(&mut self.delta.pow_, &mut self.uf, self.latest_timestamp);
+                    self.ln_
+                        .update_finalize(&mut self.delta.ln_, &mut self.uf, self.latest_timestamp);
+                    self.sqrt_
+                        .update_finalize(&mut self.delta.sqrt_, &mut self.uf, self.latest_timestamp);
+                    self.sin_
+                        .update_finalize(&mut self.delta.sin_, &mut self.uf, self.latest_timestamp);
+                    self.cos_
+                        .update_finalize(&mut self.delta.cos_, &mut self.uf, self.latest_timestamp);
+                    self.const_
+                        .update_finalize(&mut self.delta.const_, &mut self.uf, self.latest_timestamp);
+                    self.var_
+                        .update_finalize(&mut self.delta.var_, &mut self.uf, self.latest_timestamp);
+                    self.global_fuel_unit.update(&mut self.uf.fuel_unit_);
+                    self.global_math.update(&mut self.uf.math_);
+                    self.global_i64.update_finalize();
+                    self.global_string.update_finalize();
+                    self.global_fuel_unit.update_finalize();
+                    self.global_math.update_finalize();
+                    self.uf.reset_num_uprooted();
                 }
                 fn deferred_update(&mut self) {
                     self.fuel_.deferred_update();
