@@ -27,7 +27,6 @@ use std::{
     num::NonZeroU64,
 };
 
-use derive_more::From;
 use itertools::Itertools as _;
 use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
@@ -70,10 +69,9 @@ impl<A: Clone, B, E> VecExtClone<A, B, E> for [A] {
 pub(crate) fn parse_str_to_sexps(s: &'static str) -> MResult<Vec<ParseInput>> {
     let span = QSpan::new(Span::call_site(), s.to_string());
     let sexp = SexpSpan::parse_string(Some(span), s)?;
-    Ok(vec![sexp.into()])
+    Ok(vec![ParseInput::Sexp(sexp)])
 }
 
-#[derive(From)]
 pub(crate) enum ParseInput {
     Sexp(Vec<SexpSpan>),
     Rust(proc_macro2::TokenStream),
@@ -97,11 +95,11 @@ pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<ParseIn
                 match group.delimiter() {
                     Delimiter::Parenthesis => {
                         // compile_egraph!(((datatype Math (Add Math Math) (Sub Math Math))));
-                        Ok(vec![SexpSpan::parse_stream(stream)?.into()])
+                        Ok(vec![ParseInput::Sexp(SexpSpan::parse_stream(stream)?)])
                     }
                     Delimiter::Brace => {
                         // compile_egraph!({ rust code });
-                        Ok(vec![stream.into()])
+                        Ok(vec![ParseInput::Rust(stream)])
                     },
                     Delimiter::Bracket => err!("brace not expected"),
                     Delimiter::None => {
@@ -114,7 +112,7 @@ pub(crate) fn parse_to_sexps(x: proc_macro2::TokenStream) -> MResult<Vec<ParseIn
                 match syn::Lit::new(literal) {
                     syn::Lit::Str(literal) => {
                         // compile_egraph!("(datatype Math (Add Math Math) (Sub Math Math))");
-                        Ok(vec![SexpSpan::parse_string(span!(), literal.value().leak())?.into()])
+                        Ok(vec![ParseInput::Sexp(SexpSpan::parse_string(span!(), literal.value().leak())?)])
                     }
                     _ => err!("expected a string literal"),
                 }

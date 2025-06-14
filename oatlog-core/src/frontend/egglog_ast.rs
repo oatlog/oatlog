@@ -3,7 +3,10 @@ use crate::frontend::{
     Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _, err_,
     register_span,
 };
-use std::fmt::Display;
+use std::{
+    cell::{LazyCell, RefCell},
+    fmt::Display,
+};
 
 use itertools::Itertools as _;
 
@@ -1165,6 +1168,7 @@ type It<T> = Box<dyn Iterator<Item = T>>;
 pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
     #[deprecated = "use shrink"]
     fn impl_shrink(&self) -> Box<dyn Iterator<Item = Self>>;
+
     // writing bad shrink impls is easier and this just makes sure that the shrinks are unique and
     // distinct from self.
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
@@ -1184,23 +1188,33 @@ pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
     }
 }
 
+thread_local! {
+    static RNG: RefCell<oorandom::Rand64> = RefCell::new(oorandom::Rand64::new({
+        let mut bytes = [0u8; 16];
+        getrandom::fill(&mut bytes).expect("seeding rng");
+        u128::from_le_bytes(bytes)
+    }));
+}
 trait ShuffleExt<T>: Iterator<Item = T> + Sized + 'static {
     fn chain_rand(self, other: impl Iterator<Item = T> + 'static) -> impl Iterator<Item = T> {
-        use rand::prelude::*;
-        let mut rng = rand::rng();
         let mut lhs: Box<dyn Iterator<Item = T>> = Box::new(self);
         let mut rhs: Box<dyn Iterator<Item = T>> = Box::new(other);
         std::iter::from_fn(move || {
-            if rng.random() {
+            if RNG.with_borrow_mut(|rng| rng.rand_u64() & 1 == 0) {
                 std::mem::swap(&mut lhs, &mut rhs);
             }
             lhs.next().or_else(|| rhs.next())
         })
     }
     fn shuffle(self) -> impl Iterator<Item = T> {
-        use rand::{rng, seq::SliceRandom as _};
         let mut elems: Vec<_> = self.collect();
-        elems.shuffle(&mut rng());
+        // Shuffle
+        RNG.with_borrow_mut(|rng| {
+            let n = elems.len() as u64;
+            for i in 0..(n - 1) {
+                elems.swap(i as usize, rng.rand_range(i..n) as usize);
+            }
+        });
         elems.into_iter()
     }
 }

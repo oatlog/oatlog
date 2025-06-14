@@ -32,11 +32,10 @@ blake3 = "1"
 clap = { version = "4", features = ["derive"] }
 criterion = "0.5"
 darling = "0.20"
-derive_more = { version = "2", features = ["full"] }
 educe = "0.6"
 egglog = { version = "0.4", features = ["nondeterministic"] }
-eqlog-runtime = "0.8"
 expect-test = "1"
+getrandom = "0.3"
 hashbrown = "0.15"
 hashbrown_14 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 heck = "0.5"
@@ -45,12 +44,8 @@ oorandom = "11"
 paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"], default-features = false }
 proptest = "1"
-proptest-derive = "0.5"
 quote = "1"
-rand = "0.9"
-rayon = "1"
 regex = "1"
-smallvec = { version = "1", features = ["union"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -68,6 +63,8 @@ opt-level = 3
 [profile.test.package.rand_chacha]
 opt-level = 3
 
+# Apply optimizations to the code that takes egglog and outputs Rust code,
+# which is then called as a proc macro.
 [profile.dev.package.oatlog-core]
 opt-level = 3
 

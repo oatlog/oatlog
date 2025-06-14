@@ -27,22 +27,16 @@ pub use crate::{
     },
 };
 pub use hashbrown_14::{HashMap, hash_map::Entry as HashMapEntry};
-pub use smallvec::SmallVec;
 pub use std::{
+    cmp::Ordering,
     convert::Infallible,
     hash::Hash,
+    iter::once,
     mem::{swap, take},
-};
-use std::{
-    fmt::Debug,
-    hash::{BuildHasherDefault, Hasher},
-    mem::replace,
 };
 pub use voracious_radix_sort::{RadixSort, Radixable};
 
-pub use std::cmp::Ordering;
-
-pub use std::iter::once;
+use std::{fmt::Debug, hash::Hasher};
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub struct OrdF64(pub f64);

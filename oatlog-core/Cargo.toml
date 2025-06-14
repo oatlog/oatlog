@@ -6,25 +6,23 @@ edition = "2024"
 [dependencies]
 blake3.workspace = true
 darling.workspace = true
-derive_more.workspace = true
 educe.workspace = true
+getrandom.workspace = true
 hashbrown.workspace = true
+hashbrown_14.workspace = true
 heck.workspace = true
 itertools.workspace = true
+oorandom.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
-rand.workspace = true
 regex.workspace = true
-smallvec.workspace = true
 syn.workspace = true
-tracing.workspace = true
 tracing-subscriber.workspace = true
+tracing.workspace = true
 voracious_radix_sort.workspace = true
-hashbrown_14.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-proptest-derive.workspace = true
 proptest.workspace = true
 
 [features]

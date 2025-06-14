@@ -1,12 +1,3 @@
-//! Proptests are very slow, so they are behind a feature flag.
-//!
-//! You should probably also run them in release mode:
-//! ```
-//! RUSTFLAGS="-C debug-assertions=true" cargo t --release --features proptest-intense
-//! ```
-
-#![allow(unused)]
-
 use crate::{
     decl_row,
     runtime::{
@@ -20,7 +11,6 @@ use crate::{
 use expect_test::expect;
 use itertools::Itertools as _;
 use proptest::prelude::*;
-use proptest_derive::Arbitrary;
 use std::{fmt::Debug, hash::Hash, ops::RangeInclusive};
 
 mod macro_gen {
