@@ -251,6 +251,7 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                 theory
             }
             pub fn step(&mut self) -> [std::time::Duration; 2] {
+                // TODO erik: remove log_duration from codegen
                 log_duration!("======== STEP took {} ==========", {
                     [
                         {

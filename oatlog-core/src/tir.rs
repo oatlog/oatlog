@@ -95,8 +95,12 @@ impl<'a> IndexEstimate<'a> {
     }
 }
 
-// SEMANTICS:
-// actions then unify then perform queries for each map.
+/// # Semantics
+///
+/// Runs in this order:
+/// 1. Actions (insert/entry)
+/// 2. Unify
+/// 3. Perform queries for each element in map.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub(crate) struct Trie {
     meta: Vec<hir::RuleMeta>,

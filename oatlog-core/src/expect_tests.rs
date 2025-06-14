@@ -222,13 +222,15 @@ inv_in_new_loop(Subst assum(SubTuple(Arg new_input_type assum) 0 len) inv))
     );
 }
 
-// TODO erik: This is expressible when we have custom implicit functionality rules.
+// TODO: This is expressible when we have custom implicit functionality rules.
 //
 // Premise: (Add a b c)
 // Action: (Neg a b), (Neg a c)
 //
 // Premise: (Add a b b)
 // Action: (Neg a b), (Neg a c)
+//
+// in other words, if we unify b, c then we might mutate premise.
 
 #[test]
 fn test_edgecase3() {

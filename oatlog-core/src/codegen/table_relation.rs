@@ -192,6 +192,9 @@ pub(crate) fn codegen_table_relation(
 // fill all/new from FD
 // reconstruct non-fd
 
+// TODO: relations such as (i64, i64) should have incremental/persistent indexes, since elements
+// will never be removed from them.
+
 fn update_with_category(
     rel: &RelationData,
     theory: &Theory,
@@ -326,6 +329,14 @@ fn update_with_category(
                             }
                         }
                         MergeTy::Panic => {
+                            // TODO: the semantics should be that we only panic IFF the values are
+                            // different.
+                            //
+                            // If the lhs/rhs are sets, we might want to do something like
+                            // ```rust
+                            // if lhs.find() == rhs.find() {
+                            // }
+                            // ```
                             quote!{
                                 panic!("panic merge");
                             }
@@ -577,6 +588,7 @@ fn update_with_category(
         let columns = rel.columns.enumerate().map(ident::column).collect_vec();
         let cols_find = find_cols(Box::new(rel.columns.enumerate()));
 
+        // TODO: we can move most of this part to deferred_update too
         let prepare_new_and_all_impl = match classification {
             EclassToEclass(key_columns, value_columns)
             | EclassToLattice(key_columns, value_columns)

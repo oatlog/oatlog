@@ -76,7 +76,6 @@ pub(crate) struct QSpan {
     pub(crate) span: Span,
     /// Output of `TokenStream.to_string`.
     pub(crate) text_compact: &'static str,
-    // TODO: include filename to make referring to identifiers in other files correct.
 }
 impl QSpan {
     pub(crate) fn new(span: Span, text_compact: String) -> Self {
@@ -220,7 +219,7 @@ enum MaybeResolved {
         span: Option<QSpan>,
     },
     Resolved {
-        // None => toplevel, emit actual spans.
+        /// None => toplevel, emit actual spans.
         filename: Option<&'static str>,
         /// Source text of entire file.
         #[allow(unused, reason = "better to have it and not need it")]

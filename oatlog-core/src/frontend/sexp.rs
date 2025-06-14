@@ -1,4 +1,4 @@
-//! Sexp struct and parse to Sexp.
+//! S-expression struct definition, and parsing to s-expressions.
 
 use std::cmp::Ordering;
 use std::hash::Hash;

@@ -7,6 +7,8 @@ use std::{cell::RefCell, fmt::Display};
 
 use itertools::Itertools as _;
 
+// TODO: fuzz testing by generating egglog programs.
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Program {
     pub(crate) statements: Vec<Spanned<Statement>>,
@@ -210,8 +212,25 @@ pub(crate) enum Statement {
     Relation { name: Str, input: Vec<Str> },
     /// Declare a function.
     /// ```egglog
-    /// (function Add (Math Math) Math)
+    /// (function lower-bound (Math) i64 :merge (max old new))
     /// ```
+    ///
+    /// For deterministic results, the merge function must form a semilattice, meaning:
+    ///
+    /// ```ignore
+    /// f(x, y) = f(y, x)
+    /// f(x, f(y, z)) = f(f(x, y), z)
+    /// f(x, x) = x
+    /// ```
+    ///
+    /// In other words, merges can occur in any order and possibly repeat.
+    ///
+    /// Some examples include:
+    /// * max/min
+    /// * bitand/bitor
+    /// * set union/set intersection
+    /// * a tuple where all fields are merged according to a lattice.
+    ///
     Function {
         name: Str,
         input: Vec<Str>,
@@ -233,6 +252,7 @@ pub(crate) enum Statement {
     /// ```egglog
     /// (rule ((= e (Add a b))) ((union e (Add a b))))
     /// ```
+    /// If the lhs matches the database, the actions in the rhs are run.
     Rule {
         name: Option<Str>,
         ruleset: Option<Str>,
@@ -242,6 +262,9 @@ pub(crate) enum Statement {
     /// ```egglog
     /// (rewrite (Add a b) (Add b a))
     /// ```
+    /// If the lhs matches the database, the rhs is inserted and equated with lhs
+    ///
+    /// Note that this is a *directional* rewrite, it will never rewrite the rhs to the lhs.
     Rewrite {
         ruleset: Option<Str>,
         rewrite: Rewrite,
@@ -337,8 +360,14 @@ pub(crate) struct RunConfig {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Fact {
     /// The following expressions are equal.
+    /// ```egglog
+    /// (= a b)
+    /// ```
     Eq(Spanned<Expr>, Spanned<Expr>),
     /// The following expression exists in the database.
+    /// ```egglog
+    /// (Add a b)
+    /// ```
     Expr(Spanned<Expr>),
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

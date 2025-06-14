@@ -186,6 +186,13 @@ fn parse_ty(x: &syn::Type) -> Str {
 pub(crate) fn runtime_primitive_functions() -> proc_macro2::TokenStream {
     use quote::quote;
     quote! {
+        // TODO: unclear if checked_add is potentially useful to avoid panics other than for premise.
+        // In other words, panic free constant propagation must be done within premise itself.
+        // Entry will just panic, but I guess that is fine.
+
+        // TODO: add alias annotations between these relations when that is supported in the
+        // backend.
+
         #[prim_func(name = "+", id = "i64_add", index = [0, 1, 2], fd = true)]
         fn i64_add012(a: i64, b: i64) -> impl Iterator<Item = (i64,)> { a.checked_add(b).map(|x| (x,)).into_iter() }
 
@@ -270,12 +277,6 @@ mod tests {
         use expect_test::expect;
         use quote::quote;
         let prim_funcs = quote! {
-
-            // TODO: unclear if checked_add is potentially useful to avoid panics other than for premise.
-            // In other words, panic free constant propagation must be done within premise itself.
-            // Entry will just panic, but I guess that is fine.
-
-            // TODO: longterm, add alias annotations between these relations.
 
             #[prim_func(name = "testpermute", id = "testpermute", index = [0, 1, 2, 3], fd = false)]
             fn testpermute0(a: T0, b: T1, c: T2, d: T3) -> impl Iterator<Item = ()> { }

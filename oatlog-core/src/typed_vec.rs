@@ -1,3 +1,5 @@
+//! TVec: Vec with typed indexes
+
 use crate::ids::Id;
 use itertools::Itertools as _;
 use std::{cmp::Eq, fmt::Debug, marker::PhantomData};

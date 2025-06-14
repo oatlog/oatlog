@@ -71,6 +71,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
                 let uses = &mut table_uses[relation_id];
 
                 // If we lack any FD, we require a key on all columns to construct `new` in `update_finalize`.
+                // TODO: think about how this can be relaxed.
                 if relation.implicit_rules.len() == 0 {
                     let _: IndexId =
                         uses.insert(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
@@ -155,6 +156,7 @@ fn remove_variable_collisions(s: &mut [lir::VariableData]) {
 
     for s in s {
         // to handle variable names like "__42" that would get turned into literals.
+        // TODO: do something nicer here.
         let base = format!("q{}", s.name).leak();
         s.name = base;
         if used.insert((*base).to_string()) {

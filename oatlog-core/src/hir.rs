@@ -84,6 +84,7 @@ pub(crate) enum TypeKind {
 /// If there is not a conflict, the rule is not run at all.
 ///
 /// TODO: add optimization pass to turn symbolic rules to implicit rules.
+/// TODO: add optimization pass to introduce alias relations.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) struct ImplicitRule {
     /// If all columns other than the ones mentioned here are equal, trigger rule for each column.

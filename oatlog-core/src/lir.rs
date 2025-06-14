@@ -269,6 +269,9 @@ pub(crate) enum Inclusion {
     // New?
 }
 
+// TODO: make semantics of RuleTrie match TIR (make premise part of the edge rather than the node),
+// specifically to allow rules without premises to enable top-level actions more easily.
+
 #[derive(Debug)]
 pub(crate) struct RuleTrie {
     pub(crate) premise: Premise,

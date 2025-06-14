@@ -1,3 +1,5 @@
+//! Union-find for use when compiling rules (not at runtime).
+
 use crate::ids::Id;
 use std::{
     cell::Cell,
@@ -89,10 +91,6 @@ impl<K: Id, V> UFData<K, V> {
             }
         }
     }
-    // /// The set that this element belongs to
-    // pub(crate) fn set(&self, i: K) -> &[K] {
-    //     self.find_root(i).2
-    // }
 
     /// Iterate the root representatives and their data
     pub(crate) fn iter_roots(&self) -> impl Iterator<Item = (K, &V)> + use<'_, K, V> {
