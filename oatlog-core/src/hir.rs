@@ -9,7 +9,6 @@ use crate::{
     union_find::{UF, UFData},
 };
 
-use educe::Educe;
 use itertools::Itertools as _;
 use quote::ToTokens as _;
 
@@ -248,7 +247,7 @@ impl InvariantPermutationSubgroup {
 /// All relations have some notion of "new" and "all"
 /// "new" is never indexed, only iteration is possible.
 /// "all" is sometimes indexed.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Relation {
     /// name from egglog (eg `Add`)
     pub(crate) name: &'static str,
@@ -313,7 +312,7 @@ impl Relation {
                 .map(|out_col| tvec![ImplicitRule::new_panic(out_col, columns.len())])
                 .unwrap_or_else(|| tvec![ImplicitRule::new_empty(columns.len())]),
             kind: RelationTy::Primitive {
-                syn: WrapIgnore(syn.to_token_stream()),
+                syn: syn.to_token_stream(),
                 ident,
             },
             invariant_permutations: InvariantPermutationSubgroup::new_identity(),
@@ -382,11 +381,7 @@ impl Relation {
     }
 }
 
-#[derive(Educe, Clone, Debug)]
-#[educe(Ord, PartialOrd, Hash, Eq, PartialEq)]
-pub(crate) struct WrapIgnore<T>(#[educe(Ord(ignore), Hash(ignore), Eq(ignore))] pub(crate) T);
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum RelationTy {
     /// An actual table with arbitrarily many indexes.
     /// Supports inserts, iteration, lookup for arbitrary indexes
@@ -405,7 +400,7 @@ pub(crate) enum RelationTy {
     Global { id: GlobalId },
     Primitive {
         /// Rust function as tokens.
-        syn: WrapIgnore<proc_macro2::TokenStream>,
+        syn: proc_macro2::TokenStream,
         /// Name of rust function to call.
         ident: &'static str,
     },

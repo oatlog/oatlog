@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 blake3.workspace = true
 darling.workspace = true
-educe.workspace = true
 getrandom.workspace = true
 hashbrown.workspace = true
 hashbrown_14.workspace = true

@@ -3,7 +3,6 @@
 use std::{collections::BTreeSet, mem::take};
 
 use darling::FromMeta;
-use educe::Educe;
 use quote::ToTokens as _;
 use syn::spanned::Spanned as _;
 
@@ -37,16 +36,31 @@ pub(crate) struct PrimFunc {
     pub(crate) indexes: TVec<ImplicitRuleId, PrimIndex>,
 }
 
-#[derive(Clone, Educe)]
-#[educe(Debug)]
+#[derive(Clone)]
 pub(crate) struct PrimIndex {
     // out does not imply fd.
     pub(crate) out: BTreeSet<ColumnId>,
     pub(crate) index_to_main: TVec<ColumnId, ColumnId>,
     pub(crate) fd: bool,
-    #[educe(Debug(ignore))]
     pub(crate) syn: syn::ItemFn,
     pub(crate) ident: String,
+}
+impl std::fmt::Debug for PrimIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let Self {
+            out,
+            index_to_main,
+            fd,
+            syn,
+            ident,
+        } = self;
+        f.debug_struct("PrimIndex")
+            .field("out", out)
+            .field("index_to_main", index_to_main)
+            .field("fd", fd)
+            .field("ident", ident)
+            .finish()
+    }
 }
 
 pub(crate) fn parse_prim_funcs(
@@ -246,98 +260,6 @@ pub(crate) fn runtime_primitive_functions() -> proc_macro2::TokenStream {
 
     }
 }
-
-/*
-
-// primitive functions => restrictions on variable ordering.
-
-struct Math(u32);
-// type MathSet = Set<Math>;
-
-// without PhantomData for easier codegen at the cost of some type safety.
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct SetId<T>(u32, PhantomData<T>);
-
-// once someone writes (sort MathSet (Set Math)), we add it's primitive functions to the
-// typechecking system.
-
-// overall strategy is to emit everything mostly as-is.
-
-// this somehow just works in egglog:
-//
-// (datatype Math (Num i64))
-// (sort MathSet (Set Math))
-// (let v1 (set-of (Num 1) (Num 2)))
-// (let v2 (set-of (Num 1) (Num 3)))
-// (fail (check (= v1 v2)))
-// (union (Num 2) (Num 3))
-// (check (= v1 v2))
-//
-
-simple_collection! {
-
-
-    // Set<T> => (sort MathSet (Set Math)) creates Set<Math> instance
-    // type MathSet = Set<Math>;
-
-    #[collection(name = "Set")]
-    struct Set<T> {
-        _marker: PhantomData<T>,
-        sets: HashMap<SetId<T>, HashSet<T>>,
-        /* ... */
-    }
-
-    impl<T> Relation for Set<T> {
-        type Row = (SetId<T>, T);
-    }
-
-    // egglog does not support Set<Set<Math>>, but I think that should be supported.
-    //
-    // but we can do: Set<T> = eqsort iff T = eqsort.
-
-    impl<T: Copy> Set<T> {
-        // args need to be something like "eclassprovider"
-        fn update(/* ... */) {}
-
-        // #[name = "set-contains"]
-        // #[index2 = [0, 1]]
-        #[prim_func(name = "+", id = "i64_add", cost = 0, index = [0, 1, 2])]
-        fn set_contains2_0_1(&self, set: SetId<T>, element: T) -> impl Iterator<Item = ()> {
-            once(todo!())
-        }
-
-        // maybe makes it require new...
-        // #[name = "set-contains"]
-        // #[index1 = [0, 1]]
-        fn set_contains1_0_1(&self, set: SetId<T>) -> impl Iterator<Item = T> {
-            once(todo!())
-        }
-
-        // #[name = "set-contains"]
-        // #[new]
-        //
-        // TODO: we need to figure out how to do new first.
-        //
-        // fn set_contains_new(&self) -> &[(SetId<T>, T)] {
-        //     once(todo!())
-        // }
-
-        // rebuild
-    }
-
-}
-*/
-// set-of
-// set-empty
-// set-insert
-// set-not-contains
-// set-contains
-// set-remove
-// set-union
-// set-diff
-// set-intersect
-// set-get
-// set-length
 
 #[cfg(test)]
 mod tests {

@@ -1,11 +1,12 @@
 //! Span, span errors, and span macros.
 
-use std::ops::{Deref, DerefMut, Range};
-
-use educe::Educe;
 use itertools::Itertools as _;
 use proc_macro2::Span;
 use quote::quote;
+use std::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut, Range},
+};
 
 #[rustfmt::skip]
 macro_rules! bare_ {
@@ -248,15 +249,28 @@ impl MaybeResolved {
 
 /// Including span information in a way that makes it act like a T
 /// in terms of equality, functions, etc.
-#[derive(Educe, Copy, Clone)]
-#[educe(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone)]
 pub(crate) struct Spanned<T> {
     pub(crate) x: T,
-    #[educe(Eq(ignore))]
-    #[educe(Ord(ignore))]
-    #[educe(Hash(ignore))]
     pub(crate) span: Option<QSpan>,
 }
+impl<T: PartialEq> PartialEq for Spanned<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.x.eq(&other.x)
+    }
+}
+impl<T: Eq> Eq for Spanned<T> {}
+impl<T: PartialOrd> PartialOrd for Spanned<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.x.partial_cmp(&other.x)
+    }
+}
+impl<T: Ord> Ord for Spanned<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.x.cmp(&other.x)
+    }
+}
+
 impl<T> Spanned<T> {
     pub(crate) fn new(x: T, span: Option<QSpan>) -> Self {
         Self { x, span }

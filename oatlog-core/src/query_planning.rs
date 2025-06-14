@@ -60,7 +60,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
                 let lir_relation = lir::RelationData::new_primitive(
                     ident,
                     relation.columns.clone(),
-                    syn.0.clone(),
+                    syn.clone(),
                     out_col,
                 );
                 lir_relations.push_expected(relation_id, Some(lir_relation));

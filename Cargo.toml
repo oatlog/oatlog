@@ -32,7 +32,6 @@ blake3 = "1"
 clap = { version = "4", features = ["derive"] }
 criterion = "0.5"
 darling = "0.20"
-educe = "0.6"
 egglog = { version = "0.4", features = ["nondeterministic"] }
 expect-test = "1"
 getrandom = "0.3"
