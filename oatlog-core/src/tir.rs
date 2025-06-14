@@ -986,7 +986,7 @@ mod construction {
                         let implicit_rule = &ctx.relations[atom.relation].implicit_rules[entry];
 
                         for (c, v) in atom.columns.iter_enumerate() {
-                            let is_output = implicit_rule.out.get(&c).is_some();
+                            let is_output = implicit_rule.out.contains_key(&c);
                             let is_bound = ctx.bound_premise.contains(v);
                             if is_output {
                                 if is_bound {
