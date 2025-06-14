@@ -1,16 +1,7 @@
-use crate::runtime::{HashMap, IndexRow as _, IndexedSortedList, index::RowCtx as _};
+use crate::runtime::{HashMap, IndexedSortedList};
 use itertools::Itertools as _;
 use proptest::prelude::*;
 use std::{fmt::Debug, hash::Hash};
-
-mod macro_gen {
-    use crate::runtime::*;
-    decl_row!(
-        Row3_0_1<T0 first 0, T1, T2> (T0 0, T1 1) (T2 2) (0 1 2) (2 1 0)
-        where u128 = s => (u128::from(s.0.inner()) << 64) + (u128::from(s.1.inner()) << 32) + u128::from(s.2.inner())
-    );
-    eclass_wrapper_ty!(Math);
-}
 
 // to make sure that tests are not accidentally run without debug asserts.
 #[should_panic]
@@ -115,8 +106,8 @@ fn index_test<
             Action::Reconstruct(items) => {
                 let mut rows = items.clone();
                 unsafe {
-                    rows.sort_by_key(|&(key, value)| key);
-                    index1.reconstruct(&mut rows, |(key, value)| key, |(key, value)| value);
+                    rows.sort_by_key(|&(key, _)| key);
+                    index1.reconstruct(&mut rows, |(key, _)| key, |(_, value)| value);
                 }
 
                 index2.clear();

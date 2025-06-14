@@ -346,12 +346,6 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
             continue;
         };
 
-        // let col_ty = rel
-        //     .columns
-        //     .iter()
-        //     .map(|ty| ident::type_ty(&theory.types[ty]))
-        //     .collect_vec();
-
         let RelationKind::Table { index_to_info } = &rel.kind else {
             continue;
         };
@@ -360,7 +354,7 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
             let IndexInfo::Fd {
                 key_columns,
                 value_columns,
-                generate_check_value_subsets,
+                generate_check_value_subsets: _,
             } = info
             else {
                 continue;
@@ -370,22 +364,8 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
                 continue;
             }
 
-            let value_columns: Vec<ColumnId> = value_columns.iter().map(|x| *x.0).collect();
-
-            let &[out_col] = value_columns.as_slice() else {
-                continue;
-            };
-
             let is_symbolic = |x: ColumnId| theory.types[rel.columns[x]].kind == TypeKind::Symbolic;
 
-            let map_symbolic = |x: ColumnId| -> TokenStream {
-                if is_symbolic(x) {
-                    quote!(Eclass)
-                } else {
-                    let ty = &theory.types[rel.columns[x]];
-                    ident::type_ty(ty)
-                }
-            };
             let rel_ty = ident::rel_enode_ty(rel);
 
             enode_ty.extend({
@@ -572,11 +552,6 @@ fn codegen_globals_and_initial(
                     RelationKind::Table { index_to_info: _ } => {
                         // TODO: this just assumes that the last type in the relation is the output and also an eqsort.
 
-                        // let [others @ .., last] = relation_.param_types.inner().as_slice()
-                        // else {
-                        //     panic!()
-                        // };
-
                         let (row, compute_row) = args
                             .iter()
                             .enumerate()
@@ -758,10 +733,6 @@ mod ident {
             }
             TypeKind::Primitive { type_path } => type_path.parse().unwrap(),
         }
-    }
-    /// `math`
-    pub(crate) fn type_name(ty: &TypeData) -> Ident {
-        format_ident!("{}", ty.name.to_snake_case())
     }
     pub(crate) fn type_global(ty: &TypeData) -> Ident {
         format_ident!("global_{}", ty.name.to_snake_case())

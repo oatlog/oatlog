@@ -22,12 +22,6 @@ struct IndexEstimate<'a> {
     relations: &'a TVec<RelationId, hir::Relation>,
 }
 impl<'a> IndexEstimate<'a> {
-    fn score(&self) -> (usize, usize) {
-        (
-            self.iter.iter().map(BTreeSet::len).sum(),
-            self.check.iter().map(BTreeSet::len).sum(),
-        )
-    }
     fn new(relations: &'a TVec<RelationId, hir::Relation>) -> Self {
         let base_index_usage: TVec<RelationId, BTreeSet<BTreeSet<ColumnId>>> = relations.map(|x| {
             x.implicit_rules
@@ -211,17 +205,6 @@ impl TrieLink {
         match self {
             Primary(_) => None,
             Semi(atom) => Some(atom),
-        }
-    }
-    fn atom(self) -> Atom {
-        match self {
-            Primary(atom) | Semi(atom) => atom,
-        }
-    }
-    fn dbg_compact(&self) -> String {
-        match self {
-            Primary(atom) => format!("Primary({})", atom.dbg_compact()),
-            Semi(atom) => format!("Semi({})", atom.dbg_compact()),
         }
     }
 }
@@ -441,7 +424,7 @@ mod construction {
         };
 
         tracing::info!(
-            "trie construction finished in {} ms",
+            "trie construction finished in {:.2} ms",
             start.elapsed().as_secs_f64() * 1000.0
         );
 
@@ -693,175 +676,7 @@ mod construction {
             }
         }
 
-        // keep old votes selection to compare.
-        // TODO: eventually remove.
         fn make_votes(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
-            return self.make_votes2(ctx);
-            (match self.semi.as_slice() {
-                [] => {
-                    #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
-                    enum RelationScore {
-                        NoQuery,
-                        IndexedAll,
-                        IndexedOld,
-                        SingleElement,
-                        AllBound,
-                        Global,
-                        New,
-                    }
-                    #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
-                    enum IsConnected {
-                        Disconnected,
-                        Connected,
-                    }
-
-                    #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
-                    enum CompoundRelationScore {
-                        NoQuery,
-                        IndexedDisconnected,
-                        SingleElementDisconnected,
-                        IndexedAllConnected,
-                        IndexedOldConnected,
-                        SingleElementConnected,
-                        AllBound,
-                        Global,
-                        New,
-                    }
-
-                    let scores = self
-                        .premise
-                        .iter()
-                        .map(|atom| {
-                            use IsConnected::{Connected, Disconnected};
-                            use RelationScore::{
-                                AllBound, Global, IndexedAll, IndexedOld, New, NoQuery,
-                                SingleElement,
-                            };
-                            let connected =
-                                if atom.columns.iter().any(|x| ctx.bound_premise.contains(x)) {
-                                    Connected
-                                } else {
-                                    Disconnected
-                                };
-
-                            let mut score = NoQuery;
-
-                            match atom.incl {
-                                hir::Inclusion::New => {
-                                    score = score.max(New);
-                                }
-                                hir::Inclusion::Old | hir::Inclusion::All => (),
-                            }
-                            let relation = &ctx.relations[atom.relation];
-                            match &relation.kind {
-                                hir::RelationTy::Table => {
-                                    score = score.max(if atom.incl == hir::Inclusion::Old {
-                                        IndexedOld
-                                    } else {
-                                        IndexedAll
-                                    });
-                                }
-                                hir::RelationTy::Alias {} => {
-                                    unreachable!();
-                                }
-                                hir::RelationTy::Global { id: _ } => {
-                                    score = score.max(Global);
-                                }
-                                hir::RelationTy::Primitive { syn: _, ident: _ } => {
-                                    panic!("primitive premise not implemented")
-                                }
-                                hir::RelationTy::Forall { ty: _ } => panic!("forall unimplemented"),
-                            }
-                            for im in &relation.implicit_rules {
-                                if im
-                                    .key_columns()
-                                    .into_iter()
-                                    .all(|c| ctx.bound_premise.contains(&atom.columns[c]))
-                                {
-                                    score = score.max(SingleElement);
-                                }
-                            }
-                            if atom.columns.iter().all(|v| ctx.bound_premise.contains(v)) {
-                                score = score.max(AllBound);
-                            }
-
-                            let score = match (score, connected) {
-                                (NoQuery, _) => CompoundRelationScore::NoQuery,
-                                (IndexedAll | IndexedOld, Disconnected) => {
-                                    CompoundRelationScore::IndexedDisconnected
-                                }
-                                (SingleElement, Disconnected) => {
-                                    CompoundRelationScore::SingleElementDisconnected
-                                }
-                                (IndexedAll, Connected) => {
-                                    CompoundRelationScore::IndexedAllConnected
-                                }
-                                (IndexedOld, Connected) => {
-                                    CompoundRelationScore::IndexedOldConnected
-                                }
-                                (SingleElement, Connected) => {
-                                    CompoundRelationScore::SingleElementConnected
-                                }
-                                (AllBound, _) => CompoundRelationScore::AllBound,
-                                (New, _) => CompoundRelationScore::New,
-                                (Global, _) => CompoundRelationScore::Global,
-                            };
-
-                            (score, atom)
-                        })
-                        .collect_multimap();
-
-                    scores
-                        .into_iter()
-                        .max()
-                        .map(|(score, best)| {
-                            match score {
-                                CompoundRelationScore::NoQuery => {
-                                    panic!("NoQuery: could not pick a vote")
-                                }
-                                CompoundRelationScore::IndexedDisconnected => {
-                                    panic!("query is disconnected (valid but surprising)")
-                                }
-                                CompoundRelationScore::SingleElementDisconnected => {
-                                    panic!("query is disconnected (valid but surprising)")
-                                }
-                                CompoundRelationScore::IndexedAllConnected
-                                | CompoundRelationScore::IndexedOldConnected
-                                | CompoundRelationScore::SingleElementConnected
-                                | CompoundRelationScore::AllBound
-                                | CompoundRelationScore::New
-                                | CompoundRelationScore::Global => (),
-                            }
-                            best.into_iter().cloned().map(TrieLink::Primary).collect()
-                        })
-                        .unwrap_or(vec![])
-                }
-                [atom] => {
-                    // if there is a single semi-join left, it's better to just iterate that then to do
-                    // a check, since otherwise we have an unnecessary semi-join before a join.
-                    // also, the apply code assumes this is being run.
-                    vec![Primary(atom.clone())]
-                }
-                _ => self.semi.iter().cloned().map(Semi).collect(),
-            })
-            .into_iter()
-            .map(|x| (self.salt(), x))
-            .flat_map(|(salt, link)| match link {
-                Primary(atom) => atom
-                    .equivalent_atoms(ctx.relations)
-                    .into_iter()
-                    .map(move |atom| (salt.clone(), Primary(atom)))
-                    .collect::<Vec<_>>(),
-                Semi(atom) => atom
-                    .equivalent_atoms(ctx.relations)
-                    .into_iter()
-                    .map(move |atom| (salt.clone(), Semi(atom)))
-                    .collect::<Vec<_>>(),
-            })
-            .collect()
-        }
-
-        fn make_votes2(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
             let salt = self.salt();
             #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
             enum RelationScore {
@@ -873,6 +688,7 @@ mod construction {
                 Global,
                 /// If we only have the index (a, b) -> c, and (a, b, c) is bound, we can solve it
                 /// by doing a linear scan and filtering, but it's potentially slow.
+                #[allow(unused)]
                 PrimitiveAll,
                 /// we want to apply this VERY early since it is fragile in terms of what bound
                 /// columns exist
@@ -975,7 +791,7 @@ mod construction {
                     hir::RelationTy::Global { id: _ } => {
                         score = score.max(Global);
                     }
-                    hir::RelationTy::Primitive { syn: _, ident } => {
+                    hir::RelationTy::Primitive { syn: _, ident: _ } => {
                         let Some(entry) = atom.entry else {
                             panic!("primitive premise atoms must use entry");
                         };
@@ -1073,7 +889,7 @@ mod construction {
     ///
     /// If we want to do random sampling, we might want to use a PDF here or something.
     fn election(
-        estimate: &mut IndexEstimate<'_>,
+        _estimate: &mut IndexEstimate<'_>,
         ctx: &Ctx<'_>,
         rules: &[Rule],
     ) -> (Vec<Rule>, BTreeMap<TrieLink, Vec<Rule>>) {

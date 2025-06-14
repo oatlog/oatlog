@@ -570,10 +570,6 @@ impl Atom {
     pub(crate) fn dbg_compact(&self) -> String {
         self.dbg_compact_annotated(|v, _| format!("{v}"))
     }
-
-    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
-        self.columns.iter().copied().collect()
-    }
 }
 
 #[must_use]

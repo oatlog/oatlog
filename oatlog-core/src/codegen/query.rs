@@ -45,7 +45,7 @@ impl CodegenRuleTrieCtx<'_> {
     ) -> (BTreeSet<ColumnId>, Vec<Ident>) {
         let (bound, bound_): (BTreeSet<ColumnId>, _) = args
             .iter_enumerate()
-            .filter(|&(column, variable)| self.is_bound(variable))
+            .filter(|&(_, variable)| self.is_bound(variable))
             .map(|(column, variable)| (column, ident::var_var(self.var_of(variable))))
             .collect();
 
@@ -366,7 +366,10 @@ impl CodegenRuleTrieCtx<'_> {
                             for (#(#new_columns_,)*) in self.#relation_ident.#iter_ident(#(#bound_columns_,)* #(#maybe_timestamp)*)
                         }
                     }
-                    RelationKind::Primitive { codegen, out_col } => {
+                    RelationKind::Primitive {
+                        codegen: _,
+                        out_col,
+                    } => {
                         // NOTE: assumes a single index on this primitive index
 
                         let (_, bound_columns, _, new_columns) = self.bind_columns(args, None);

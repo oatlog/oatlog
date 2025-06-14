@@ -100,15 +100,6 @@ impl<T: EclassRepr> UnionFind<T> {
     }
     #[inline]
     #[allow(unsafe_code)]
-    pub fn prefetch(&self, t: T) {
-        // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
-        debug_assert!((t.inner() as usize) < self.repr.len());
-        let reference: &u32 = unsafe { self.repr.get_unchecked(t.inner() as usize) };
-
-        crate::runtime::prefetch_ptr(std::ptr::from_ref::<u32>(reference).cast::<i8>());
-    }
-    #[inline]
-    #[allow(unsafe_code)]
     fn find_inner(&mut self, mut i: u32) -> u32 {
         // Curiously, it is not beneficial to
         // 1. Unroll this loop

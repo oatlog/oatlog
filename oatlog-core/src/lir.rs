@@ -190,25 +190,6 @@ pub(crate) enum IndexInfo {
         value_columns: BTreeSet<ColumnId>,
     },
 }
-impl IndexInfo {
-    pub(crate) fn has_union_fd(&self) -> bool {
-        match self {
-            Self::Fd { value_columns, .. } => {
-                assert!(!value_columns.is_empty());
-                let union = value_columns
-                    .iter()
-                    .filter(|&(_, m)| *m == MergeTy::Union)
-                    .count();
-                assert!(
-                    union == 0 || union == value_columns.len(),
-                    "TODO: Revise this assumption"
-                );
-                union == value_columns.len()
-            }
-            Self::NonFd { .. } => false,
-        }
-    }
-}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum MergeTy {
