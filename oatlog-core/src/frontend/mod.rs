@@ -677,7 +677,8 @@ impl Parser {
                 // ignored
             }
             egglog_ast::Statement::Include(filepath) => {
-                let working_directory = dbg!(std::env::current_dir().unwrap());
+                let working_directory = std::env::current_dir().unwrap();
+                tracing::info!(?working_directory, "include relative to");
                 let working_directory = &working_directory;
                 let span = filepath.span;
                 let filepath = filepath.x;
