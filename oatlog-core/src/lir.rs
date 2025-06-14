@@ -457,7 +457,7 @@ impl Theory {
                                         generate_check_value_subsets,
                                     } => {
                                         let mut s = fmt(key_columns);
-                                        use std::fmt::Write;
+                                        use std::fmt::Write as _;
                                         if !value_columns.is_empty() {
                                             write!(
                                                 s,

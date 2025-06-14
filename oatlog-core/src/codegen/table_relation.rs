@@ -227,7 +227,10 @@ fn update_with_category(
         /// `(Math, *)`
         EclassRelation(&'a BTreeSet<ColumnId>),
     }
-    use PrimaryCategory::*;
+    use PrimaryCategory::{
+        EclassRelation, EclassToEclass, EclassToLattice, PrimitiveRelation, PrimitiveToEclass,
+        PrimitiveToLattice,
+    };
 
     let is_symbolic = |x: ColumnId| theory.types[rel.columns[x]].kind == TypeKind::Symbolic;
 
@@ -275,8 +278,7 @@ fn update_with_category(
                 let Some((id, key_columns, value_columns)) = non_fd_indexes
                     .iter()
                     .copied()
-                    .filter(|&(_id, _key_columns, value_columns)| value_columns.is_empty())
-                    .next()
+                    .find(|&(_id, _key_columns, value_columns)| value_columns.is_empty())
                 else {
                     panic!("if there is no FD index we need some \"all\" index");
                 };
@@ -908,9 +910,7 @@ fn update(
     theory: &Theory,
     index_to_info: &TVec<IndexId, IndexInfo>,
 ) -> TokenStream {
-    use itertools::Itertools as _;
-
-    return update_with_category(rel, theory, index_to_info);
+    update_with_category(rel, theory, index_to_info)
     /*
 
     let (reset_num_uprooted_at_latest_retain_impl, update_num_uprooted_at_latest_retain_impl): (

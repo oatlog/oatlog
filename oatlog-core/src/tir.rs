@@ -229,7 +229,7 @@ impl TrieLink {
 #[allow(unused)]
 struct DbgCompact<'a, T>(&'a T);
 
-impl<'a> std::fmt::Debug for DbgCompact<'a, Trie> {
+impl std::fmt::Debug for DbgCompact<'_, Trie> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut x = f.debug_struct("Trie");
 
@@ -239,12 +239,12 @@ impl<'a> std::fmt::Debug for DbgCompact<'a, Trie> {
     }
 }
 
-impl<'a> std::fmt::Debug for DbgCompact<'a, (&Trie, &BTreeMap<TrieLink, Trie>)> {
+impl std::fmt::Debug for DbgCompact<'_, (&Trie, &BTreeMap<TrieLink, Trie>)> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut x = f.debug_map();
         let mut x = &mut x;
 
-        for (link, trie) in self.0.1.iter() {
+        for (link, trie) in self.0.1 {
             x = x.entry(&DbgCompact(&(self.0.0, link)), &DbgCompact(trie));
         }
 
@@ -252,7 +252,7 @@ impl<'a> std::fmt::Debug for DbgCompact<'a, (&Trie, &BTreeMap<TrieLink, Trie>)> 
     }
 }
 
-impl<'a> std::fmt::Debug for DbgCompact<'a, (&Trie, &TrieLink)> {
+impl std::fmt::Debug for DbgCompact<'_, (&Trie, &TrieLink)> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let process_atom = |atom: &Atom| -> String {
             atom.dbg_compact_annotated(|v, _| {
@@ -325,13 +325,13 @@ mod construction {
         #[allow(unused)]
         fn dbg_compact(&self) -> String {
             let primary: String = itertools::Itertools::intersperse(
-                self.premise.iter().map(|x| x.dbg_compact()),
-                format!(", "),
+                self.premise.iter().map(Atom::dbg_compact),
+                ", ".to_string(),
             )
             .collect();
             let semi: String = itertools::Itertools::intersperse(
-                self.semi.iter().map(|x| x.dbg_compact()),
-                format!(", "),
+                self.semi.iter().map(Atom::dbg_compact),
+                ", ".to_string(),
             )
             .collect();
             format!("Rule {{ primary: [{primary}], semi: [{semi}] }}")
@@ -861,7 +861,7 @@ mod construction {
             .collect()
         }
 
-        fn make_votes2<'a>(&'a self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
+        fn make_votes2(&self, ctx: &Ctx<'_>) -> Vec<(Salt, TrieLink)> {
             let salt = self.salt();
             #[derive(Copy, Clone, Ord, PartialOrd, PartialEq, Eq, Debug)]
             enum RelationScore {
@@ -992,10 +992,8 @@ mod construction {
                                 if is_bound {
                                     primitive_output_column_bound = true;
                                 }
-                            } else {
-                                if !is_bound {
-                                    ok = false;
-                                }
+                            } else if !is_bound {
+                                ok = false;
                             }
                         }
 
@@ -1295,8 +1293,8 @@ mod lowering {
             .filter_map(|(link, inner_trie)| {
                 lowering_rec(
                     &BTreeSet::new(),
-                    &link,
-                    &inner_trie,
+                    link,
+                    inner_trie,
                     variables,
                     relations,
                     table_uses,
@@ -1355,7 +1353,7 @@ mod lowering {
         table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
         types: &TVec<TypeId, hir::Type>,
     ) -> Option<lir::RuleTrie> {
-        let action_schedule = action_topo_resolve(&actions, &bound_premise, relations);
+        let action_schedule = action_topo_resolve(actions, bound_premise, relations);
         let actions: Vec<lir::Action> = action_schedule
             .into_iter()
             .map(
@@ -1396,7 +1394,7 @@ mod lowering {
                     }
                 },
             )
-            .chain(unify.into_iter().map(|&(a, b)| lir::Action::Equate(a, b)))
+            .chain(unify.iter().map(|&(a, b)| lir::Action::Equate(a, b)))
             .collect();
 
         let mut premises = match link {
@@ -1590,10 +1588,10 @@ mod lowering {
         };
 
         let then: Vec<lir::RuleTrie> = map
-            .into_iter()
+            .iter()
             .filter_map(|(link, trie)| {
                 lowering_rec(
-                    &bound_premise,
+                    bound_premise,
                     link,
                     trie,
                     variables,
@@ -1611,7 +1609,7 @@ mod lowering {
         }
 
         // We can elide a `SemiJoin` just before its corresponding `Join` (or additional `SemiJoin`).
-        match (&actions[..], &premises[..], &then[..]) {
+        match ((&*actions), (&*premises), (&*then)) {
             (
                 [],
                 [

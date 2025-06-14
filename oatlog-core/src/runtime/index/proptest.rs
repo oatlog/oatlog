@@ -1,17 +1,7 @@
-use crate::{
-    decl_row,
-    runtime::{
-        HashMap, IndexRow as _, IndexedSortedList, UnionFind,
-        index::{
-            EclassCtx, GeneralCtx, IndexStatic, RowCtx, fallback_static::FallbackStatic,
-            sorted_vec::SortedVec,
-        },
-    },
-};
-use expect_test::expect;
+use crate::runtime::{HashMap, IndexRow as _, IndexedSortedList, index::RowCtx as _};
 use itertools::Itertools as _;
 use proptest::prelude::*;
-use std::{fmt::Debug, hash::Hash, ops::RangeInclusive};
+use std::{fmt::Debug, hash::Hash};
 
 mod macro_gen {
     use crate::runtime::*;
@@ -21,7 +11,6 @@ mod macro_gen {
     );
     eclass_wrapper_ty!(Math);
 }
-use macro_gen::{Math, Row3_0_1};
 
 // to make sure that tests are not accidentally run without debug asserts.
 #[should_panic]
@@ -99,9 +88,9 @@ where
 #[rustfmt::skip]
 proptest! {
     // #![proptest_config(ProptestConfig::with_cases(1000))]
-    #[test] fn test_index_1_0(actions in actions_strategy((0..ELEM), Just(()))) { index_test(actions); }
-    #[test] fn test_index_0_1(actions in actions_strategy(Just(()), (0..ELEM))) { index_test(actions); }
-    #[test] fn test_index_1_1(actions in actions_strategy((0..ELEM), (0..ELEM))) { index_test(actions); }
+    #[test] fn test_index_1_0(actions in actions_strategy(0..ELEM, Just(()))) { index_test(actions); }
+    #[test] fn test_index_0_1(actions in actions_strategy(Just(()), 0..ELEM)) { index_test(actions); }
+    #[test] fn test_index_1_1(actions in actions_strategy(0..ELEM, 0..ELEM)) { index_test(actions); }
     // #[test] fn test_index_1_2(actions in actions_strategy((0..ELEM), (0..ELEM, 0..ELEM))) { index_test(actions); }
     // #[test] fn test_index_1_3(actions in actions_strategy((0..ELEM), (0..ELEM, 0..ELEM, 0..ELEM))) { index_test(actions); }
     // #[test] fn test_index_2_1(actions in actions_strategy((0..ELEM, 0..ELEM), (0..ELEM))) { index_test(actions); }

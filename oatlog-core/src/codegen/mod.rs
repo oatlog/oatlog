@@ -437,11 +437,10 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
                 let input_columns: TokenStream = key_columns
                     .iter()
                     .copied()
-                    .filter_map(|x| {
-                        is_symbolic(x).then(|| {
-                            let c = ident::column(x);
-                            quote!(#c)
-                        })
+                    .filter(|&x| is_symbolic(x))
+                    .map(|x| {
+                        let c = ident::column(x);
+                        quote!(#c)
                     })
                     .reduce(|a, b| quote!(#a, #b))
                     .unwrap_or(quote!());
@@ -502,7 +501,7 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
                     Eclass::#ty_ident(self)
                 }
             }
-        })
+        });
     }
 
     quote! {
@@ -849,10 +848,7 @@ mod ident {
                 key_columns,
                 value_columns,
                 ..
-            } => (
-                key_columns,
-                value_columns.into_iter().map(|(&k, _)| k).collect(),
-            ),
+            } => (key_columns, value_columns.iter().map(|(&k, _)| k).collect()),
             IndexInfo::NonFd {
                 key_columns,
                 value_columns,

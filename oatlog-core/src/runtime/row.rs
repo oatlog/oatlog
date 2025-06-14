@@ -184,20 +184,20 @@ macro_rules! mk_rowsort {
 /// assumes last column is timestamp
 #[rustfmt::skip]
 pub mod mk_rowsort {
-    use super::*;
+    use super::{EclassRepr as _, IndexRow as _, RelationElement, ReprU32};
     mk_rowsort!((A, B), (u32, u32,), RowSort1, u32, |s| s.0, |s| s.0);
 
     mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort10, u32, |s| s.0, |s| s.0);
     mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort01, u32, |s| s.1, |s| s.1);
-    mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort11, u64, |s| (s.1 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.1));
+    mk_rowsort!((A, B, C), (u32, u32, u32,), RowSort11, u64, |s| u64::from(s.1) | (u64::from(s.0) << 32), |s| (s.0, s.1));
 
     mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort100, u32, |s| s.0, |s| s.0);
     mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort010, u32, |s| s.1, |s| s.1);
     mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort001, u32, |s| s.2, |s| s.2);
-    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort110, u64, |s| (s.1 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.1));
-    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort101, u64, |s| (s.2 as u64) | ((s.0 as u64) << 32), |s| (s.0, s.2));
-    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort011, u64, |s| (s.2 as u64) | ((s.1 as u64) << 32), |s| (s.1, s.2));
-    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort111, u128, |s| (s.2 as u128) | ((s.1 as u128) << 32) | ((s.0 as u128) << 64), |s| (s.0, s.1, s.2));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort110, u64, |s| u64::from(s.1) | (u64::from(s.0) << 32), |s| (s.0, s.1));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort101, u64, |s| u64::from(s.2) | (u64::from(s.0) << 32), |s| (s.0, s.2));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort011, u64, |s| u64::from(s.2) | (u64::from(s.1) << 32), |s| (s.1, s.2));
+    mk_rowsort!((A, B, C, D), (u32, u32, u32, u32,), RowSort111, u128, |s| u128::from(s.2) | (u128::from(s.1) << 32) | (u128::from(s.0) << 64), |s| (s.0, s.1, s.2));
 }
 
 macro_rules! radix_sortable_raw_row {

@@ -260,7 +260,7 @@ pub(crate) struct Relation {
     pub(crate) columns: TVec<ColumnId, TypeId>,
 }
 impl Relation {
-    /// Given the variables in two atoms, and the functional dependencies (implicit_rules)
+    /// Given the variables in two atoms, and the functional dependencies (`implicit_rules`)
     /// in this relation, what pairs of atoms should be unified?
     pub(crate) fn implied_variable_equalities(
         &self,
@@ -280,7 +280,7 @@ impl Relation {
                         value_columns
                             .iter()
                             .map(|col| (cols1[col], cols2_prime[col])),
-                    )
+                    );
                 }
             }
         }
@@ -308,9 +308,10 @@ impl Relation {
     ) -> Self {
         Self {
             name,
-            implicit_rules: out_col
-                .map(|out_col| tvec![ImplicitRule::new_panic(out_col, columns.len())])
-                .unwrap_or_else(|| tvec![ImplicitRule::new_empty(columns.len())]),
+            implicit_rules: out_col.map_or_else(
+                || tvec![ImplicitRule::new_empty(columns.len())],
+                |out_col| tvec![ImplicitRule::new_panic(out_col, columns.len())],
+            ),
             kind: RelationTy::Primitive {
                 syn: syn.to_token_stream(),
                 ident,
@@ -500,7 +501,7 @@ impl Atom {
             .map(|columns| Atom {
                 is_premise: self.is_premise,
                 relation: self.relation,
-                columns: columns.into(),
+                columns,
                 entry: self.entry,
                 incl: self.incl,
             })
@@ -559,7 +560,7 @@ impl Atom {
             },
             itertools::Itertools::intersperse(
                 self.columns.iter_enumerate().map(|(c, &v)| annotate(v, c)),
-                format!(", ")
+                ", ".to_string()
             )
             .collect::<String>()
         )
@@ -662,7 +663,7 @@ impl SymbolicRule {
                     (atom.is_premise == Action)
                         .then(|| {
                             // Additional atoms should be insertions, not entry
-                            let mut atoms = atom.equivalent_atoms(&relations);
+                            let mut atoms = atom.equivalent_atoms(relations);
                             atoms.iter_mut().skip(1).for_each(|a| a.entry = None);
                             atoms
                         })
@@ -760,8 +761,8 @@ impl SymbolicRule {
                             for (&a, &b) in
                                 Iterator::zip(perm_dom_columns.iter(), sub.columns.iter())
                             {
-                                if var_map[a].map_or(false, |a_mapped| a_mapped != b)
-                                    || var_unmap[b].map_or(false, |b_unmapped| b_unmapped != a)
+                                if var_map[a].is_some_and(|a_mapped| a_mapped != b)
+                                    || var_unmap[b].is_some_and(|b_unmapped| b_unmapped != a)
                                 {
                                     return None;
                                 }
@@ -771,8 +772,8 @@ impl SymbolicRule {
                             for (&a, &b) in
                                 Iterator::zip(perm_dom_columns.iter(), sub.columns.iter())
                             {
-                                assert!(var_map[a].map_or(true, |a_mapped| a_mapped == b));
-                                assert!(var_unmap[b].map_or(true, |b_unmapped| b_unmapped == a));
+                                assert!(var_map[a].is_none_or(|a_mapped| a_mapped == b));
+                                assert!(var_unmap[b].is_none_or(|b_unmapped| b_unmapped == a));
                                 var_map[a] = Some(b);
                                 var_unmap[b] = Some(a);
                             }
@@ -846,7 +847,7 @@ impl SymbolicRule {
                     }
                 }
             }
-            return false;
+            false
         }
     }
 
@@ -859,7 +860,7 @@ impl SymbolicRule {
             .atoms
             .iter()
             .enumerate()
-            .filter(|(_, atom)| newable(*atom))
+            .filter(|(_, atom)| newable(atom))
             .map(|(i, _)| {
                 let mut rule_new = self.clone();
                 rule_new.atoms = rule_new
@@ -950,11 +951,8 @@ impl SymbolicRule {
                         atom.entry = None;
                     }
                 }
-                match relations[atom.relation].kind {
-                    RelationTy::Primitive { .. } => {
-                        atom.entry = Some(ImplicitRuleId(0));
-                    }
-                    _ => (),
+                if let RelationTy::Primitive { .. } = relations[atom.relation].kind {
+                    atom.entry = Some(ImplicitRuleId(0));
                 }
                 atom
             })
@@ -1009,7 +1007,7 @@ impl SymbolicRule {
                     if to_merge.find(a) != to_merge.find(b) {
                         tracing::trace!(
                             "eagerly merging {a} and {b} because they are in unify and at most one of them is mentioned in premise",
-                        )
+                        );
                     }
                     to_merge.union_merge(a, b, &merge);
                 }
@@ -1056,9 +1054,9 @@ impl SymbolicRule {
             // A(r, x -> y), A(r, x -> z) => union(action_unify, y, z)
             // union(premise_unify, x, y) => union(action_unify, x, y)
             //
-            for ((relation, _incl), inner) in working_atoms.iter() {
-                for (cols1, meta1) in inner.iter() {
-                    for (cols2, meta2) in inner.iter() {
+            for ((relation, _incl), inner) in &working_atoms {
+                for (cols1, meta1) in inner {
+                    for (cols2, meta2) in inner {
                         for (a, b) in relations[relation].implied_variable_equalities(cols1, cols2)
                         {
                             let implied_at = IsPremise::merge_prefer_action(meta1.0, meta2.0);
@@ -1184,7 +1182,7 @@ impl SymbolicRule {
                     //
                     // P(r, equal_modulo(action_unify, x)), A(r, x) => remove(A(r, x))
                     //
-                    for (premise_cols, premise_meta) in ret.clone().into_iter() {
+                    for (premise_cols, premise_meta) in ret.clone() {
                         if premise_meta.0 == Premise {
                             let premise_cols_modulo_unify = premise_cols.map(|&v| self.unify.find(v));
                             if premise_cols != premise_cols_modulo_unify {
@@ -1466,7 +1464,7 @@ impl Theory {
                 ..
             } = initial
             {
-                relations_to_keep[relation] = true
+                relations_to_keep[relation] = true;
             }
         });
         let mut fixpoint = false;
@@ -1529,7 +1527,7 @@ impl Theory {
         }
         self.relations = TVec::from_iter_ordered(self.relations.into_iter_enumerate().filter_map(
             |(relation_id, mut relation)| {
-                remap_relations[relation_id].clone().map(|new_relation_id| {
+                remap_relations[relation_id].map(|new_relation_id| {
                     for col_ty in &mut relation.columns {
                         *col_ty = remap_types[*col_ty].unwrap();
                     }
@@ -1801,9 +1799,9 @@ mod debug_print {
                     (0..*columns)
                         .map(ColumnId)
                         .map(|i| {
-                            DbgStr([out.get(&i).map_or(format!("_"), |x| match x {
-                                ImplicitRuleAction::Panic => format!("!"),
-                                ImplicitRuleAction::Union => format!("U"),
+                            DbgStr([out.get(&i).map_or("_".to_string(), |x| match x {
+                                ImplicitRuleAction::Panic => "!".to_string(),
+                                ImplicitRuleAction::Union => "U".to_string(),
                                 ImplicitRuleAction::Lattice { call } => format!("+{call}"),
                             })])
                         })

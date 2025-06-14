@@ -3,10 +3,7 @@ use crate::frontend::{
     Literal, MError, MResult, QSpan, Sexp, SexpSpan, Spanned, Str, VecExtClone as _, err_,
     register_span,
 };
-use std::{
-    cell::{LazyCell, RefCell},
-    fmt::Display,
-};
+use std::{cell::RefCell, fmt::Display};
 
 use itertools::Itertools as _;
 
@@ -1190,7 +1187,7 @@ pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
 
 thread_local! {
     static RNG: RefCell<oorandom::Rand64> = RefCell::new(oorandom::Rand64::new({
-        let mut bytes = [0u8; 16];
+        let mut bytes = [0_u8; 16];
         getrandom::fill(&mut bytes).expect("seeding rng");
         u128::from_le_bytes(bytes)
     }));

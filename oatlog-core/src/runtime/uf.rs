@@ -86,7 +86,7 @@ impl<T: EclassRepr> UnionFind<T> {
         }
     }
     /// Perform exactly 1 find step "for free", after already loading the memory location for
-    /// is_root
+    /// `is_root`
     #[inline]
     pub fn is_root_mut(&mut self, t: &mut T) -> bool {
         // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
@@ -101,13 +101,11 @@ impl<T: EclassRepr> UnionFind<T> {
     #[inline]
     #[allow(unsafe_code)]
     pub fn prefetch(&self, t: T) {
-        use core::arch::x86_64::{_MM_HINT_T1, _mm_prefetch};
-
         // SAFETY: The only way to construct `T` is using `add_eclass` below, which also push to `repr`.
         debug_assert!((t.inner() as usize) < self.repr.len());
         let reference: &u32 = unsafe { self.repr.get_unchecked(t.inner() as usize) };
 
-        crate::runtime::prefetch_ptr(reference as *const u32 as *const i8);
+        crate::runtime::prefetch_ptr(std::ptr::from_ref::<u32>(reference).cast::<i8>());
     }
     #[inline]
     #[allow(unsafe_code)]

@@ -141,7 +141,7 @@ fn shrink_cases() {
     )
     */
     shrink_err(
-        expect![[r#"
+        expect![[r"
 
 (sort Expr)
 
@@ -217,9 +217,9 @@ inv_in_new_loop(Subst assum(SubTuple(Arg new_input_type assum) 0 len) inv))
 (union loop wrapper) (DoWhile in pred_out)
 (set(hoisted-loop in pred_out) true)) :ruleset loop-inv-motion)
 
-        "#]],
+        "]],
         expect!["DOES NOT ERROR?"],
-    )
+    );
 }
 
 // TODO erik: This is expressible when we have custom implicit functionality rules.
@@ -266,14 +266,14 @@ fn test_edgecase3() {
                     r2: g0 { columns: [i64], kind: Global(g0), implicit_rules: {n0: [!]} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r0_New(*v0*)): Trie {
                         map: {},
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -928,14 +928,14 @@ fn test_edgecase3() {
                 }
             }
         "#]]),
-    }.check()
+    }.check();
 }
 
 #[test]
 fn test_primitive_in_premise() {
     Steps {
         strict_egglog_compat: true,
-        code: r#"
+        code: r"
             (datatype Math
                 (Const i64)
             )
@@ -955,7 +955,7 @@ fn test_primitive_in_premise() {
             ) (
                 (Const (- a b))
             ))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -1012,7 +1012,7 @@ fn test_primitive_in_premise() {
                     r3: Const { columns: [i64, Math], kind: Table, implicit_rules: {n0: [_, U]} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r3_New(*v0*, *v1*)): Trie {
@@ -1055,7 +1055,7 @@ fn test_primitive_in_premise() {
                         },
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -1661,7 +1661,7 @@ fn test_primitive_in_premise() {
             }
         "#]]),
     }
-    .check()
+    .check();
 }
 
 #[test]
@@ -1753,14 +1753,14 @@ fn test_multi_insert_lattice() {
         expected_lir: None,
         expected_codegen: None,
     }
-    .check()
+    .check();
 }
 
 #[test]
 fn test_lattice_function() {
     Steps {
         strict_egglog_compat: true,
-        code: r#"
+        code: r"
             (datatype Math
                 (Const i64)
             )
@@ -1773,7 +1773,7 @@ fn test_lattice_function() {
                 (set (lower-bound eclass) val)
                 (set (upper-bound eclass) val)
             ))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -1807,20 +1807,20 @@ fn test_lattice_function() {
         expected_lir: None,
         expected_codegen: None,
     }
-    .check()
+    .check();
 }
 
 #[test]
 fn test_frontend_function() {
     Steps {
         strict_egglog_compat: true,
-        code: r#"
+        code: r"
             (datatype Math (Const i64) (Add Math Math))
 
             (function evals-to (Math) i64 :no-merge)
 
             (rule ((= value (evals-to eclass))) ((union eclass (Const value))))
-        "#,
+        ",
         expected_hir: Some(expect![[r#"
             Theory {
                 types: {
@@ -1846,14 +1846,14 @@ fn test_frontend_function() {
                     r1: evals-to { columns: [Math, i64], kind: Table, implicit_rules: {n0: [_, !]} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r1_New(*v1*, *v0*)): Trie {
                         map: {},
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -1893,7 +1893,7 @@ fn test_frontend_function() {
             }"#]]),
         expected_codegen: None,
     }
-    .check()
+    .check();
 }
 
 #[test]
@@ -9485,7 +9485,7 @@ fn initial_exprs() {
 
             (Mul (Var "x") (Var "y"))
         "#,
-        expected_hir: Some(expect![[r#"
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {
                     [t0, i64]: std::primitive::i64,
@@ -9509,7 +9509,7 @@ fn initial_exprs() {
                     r12: g8 { columns: [Math], kind: Global(g8), implicit_rules: {n0: [!]} },
                     r13: g9 { columns: [Math], kind: Global(g9), implicit_rules: {n0: [!]} },
                 },
-            }"#]]),
+            }"]]),
         expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
@@ -10839,12 +10839,12 @@ fn codegen_bug1() {
             (sort T2)
             (relation Foo (T0 T1 T2))
         ",
-        expected_hir: Some(expect![[r#"
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {},
                 symbolic_rules: [],
                 relations: {},
-            }"#]]),
+            }"]]),
         expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
@@ -10993,12 +10993,12 @@ fn initial() {
             )
             (run 42)
         ",
-        expected_hir: Some(expect![[r#"
+        expected_hir: Some(expect![[r"
             Theory {
                 types: {},
                 symbolic_rules: [],
                 relations: {},
-            }"#]]),
+            }"]]),
         expected_tir: None,
         expected_lir: None,
         expected_codegen: Some(expect![[r#"
@@ -12486,7 +12486,7 @@ fn triangle_join() {
                     r3: Triangle { columns: [Math, Math, Math], kind: Table, implicit_rules: {} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r0_New(*v0*, *v1*)): Trie {
@@ -12535,7 +12535,7 @@ fn triangle_join() {
                         },
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -13829,7 +13829,7 @@ fn edgecase0() {
                     r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r0_New(*v0*, *v1*, *v2*)): Trie {
@@ -13874,7 +13874,7 @@ fn edgecase0() {
                         },
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,
@@ -14871,7 +14871,7 @@ fn edgecase0_no_egglog_compat() {
                     r1: Add { columns: [Math, Math, Math], kind: Table, implicit_rules: {n0: [_, _, U]}, invariant_permutations: {[0, 1, 2], [1, 0, 2]} },
                 },
             }"#]]),
-        expected_tir: Some(expect![[r#"
+        expected_tir: Some(expect![[r"
             Trie {
                 map: {
                     Primary(r0_New(*v3*, *v4*, *v5*)): Trie {
@@ -14905,7 +14905,7 @@ fn edgecase0_no_egglog_compat() {
                         },
                     },
                 },
-            }"#]]),
+            }"]]),
         expected_lir: Some(expect![[r#"
             Theory {
                 name: None,

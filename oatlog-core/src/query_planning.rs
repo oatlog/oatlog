@@ -87,7 +87,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
                 ) = index_selection::index_selection(
                     relation.columns.len(),
                     uses.to_set(),
-                    &relation.implicit_rules.inner(),
+                    relation.implicit_rules.inner(),
                 );
 
                 let lir_relation =
@@ -162,7 +162,7 @@ fn remove_variable_collisions(s: &mut [lir::VariableData]) {
         // to handle variable names like "__42" that would get turned into literals.
         let base = format!("q{}", s.name).leak();
         s.name = base;
-        if used.insert(base.to_string()) {
+        if used.insert((*base).to_string()) {
             continue;
         }
         for i in 2.. {

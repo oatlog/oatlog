@@ -51,7 +51,7 @@ impl<K: Id, V> TVec<K, V> {
     }
     /// `.iter().enumerate()` with typed indexes
     pub(crate) fn into_iter_enumerate(self) -> impl Iterator<Item = (K, V)> {
-        (0..).map(K::from).zip(self.x.into_iter())
+        (0..).map(K::from).zip(self.x)
     }
     pub(crate) fn iter_enumerate(&self) -> impl Iterator<Item = (K, &V)> {
         (0..).map(K::from).zip(self.x.iter())

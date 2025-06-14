@@ -57,7 +57,7 @@ pub(crate) fn index_selection(
                         continue 'outer;
                     } else if key_columns.is_subset(&colset) {
                         generate_check_value_subsets
-                            .insert(colset.difference(&key_columns).copied().collect());
+                            .insert(colset.difference(key_columns).copied().collect());
                         assignment.insert(colset, ir_index);
                         continue 'outer;
                     }
@@ -77,7 +77,7 @@ pub(crate) fn index_selection(
             key_columns: colset.clone(),
             value_columns: (0..columns)
                 .map(ColumnId)
-                .filter(|c| !colset.contains(&c))
+                .filter(|c| !colset.contains(c))
                 .collect(),
         });
         assignment.insert(colset, index_id);

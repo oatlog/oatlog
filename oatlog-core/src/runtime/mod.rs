@@ -77,7 +77,7 @@ pub fn prefetch_ptr<T>(ptr: *const T) {
 
     // SAFETY: we are on an x86_64 system.
     // Prefetching out of bounds is safe.
-    unsafe { _mm_prefetch(ptr as *const i8, _MM_HINT_T0) };
+    unsafe { _mm_prefetch(ptr.cast::<i8>(), _MM_HINT_T0) };
 }
 
 #[inline(always)]
@@ -203,7 +203,7 @@ pub fn reinsert_hashmap<Key: Hash + Copy + Eq, Val: Copy, Row: Copy + Default>(
     }
     */
 
-    for &row in insertions.iter() {
+    for &row in insertions {
         map_insert(map, row, latest_timestamp);
     }
 }
@@ -221,7 +221,7 @@ fn foo(lhs, rhs, lhs_time, rhs_time, latest) {
 
 #[inline(always)]
 pub fn prefetch_map<K: Hash, V>(map: &hashbrown_14::HashMap<K, V>, key: K) {
-    use std::hash::BuildHasher;
+    use std::hash::BuildHasher as _;
 
     if map.is_empty() {
         // required by safety invariant of `RawTable::bucket`.
@@ -270,7 +270,7 @@ pub fn prefetch_map<K: Hash, V>(map: &hashbrown_14::HashMap<K, V>, key: K) {
     prefetch_ptr(metadata_start.wrapping_add(idx));
 }
 
-/// semantically a HashMap<Key, Vec<Value>>
+/// semantically a `HashMap<Key, Vec<Value>>`
 #[derive(Debug, Default)]
 pub struct IndexedSortedList<Key, Value> {
     // (start, end), exclusive range
@@ -281,8 +281,8 @@ pub struct IndexedSortedList<Key, Value> {
 }
 impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
     /// SAFETY:
-    /// * all_rows is sorted based on some total order on extract_key(row)
-    /// * meaning we don't care about the blocks of rows that are equal based on extract_key.
+    /// * `all_rows` is sorted based on some total order on `extract_key(row)`
+    /// * meaning we don't care about the blocks of rows that are equal based on `extract_key`.
     pub unsafe fn reconstruct<Row: Copy>(
         &mut self,
         all_rows: &mut [Row],
@@ -366,6 +366,7 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
     pub fn contains_key(&self, key: &Key) -> bool {
         self.map.contains_key(key)
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.list.len()
     }
@@ -471,7 +472,7 @@ pub fn extract<
     let mut eclass_to_enode: Map<Eclass, Vec<Enode>> = Map::new();
 
     let mut eclass_readers: Map<Eclass, Vec<Enode>> = Map::new();
-    for (&enode, &eclass) in enode_to_eclass.iter() {
+    for (&enode, &eclass) in &enode_to_eclass {
         eclass_to_enode.entry(eclass).or_default().push(enode);
         *eclass_in_deg.entry(eclass).or_default() += 1;
 
@@ -486,7 +487,7 @@ pub fn extract<
     let mut eclass_queue: Vec<Eclass> = Vec::new();
     let mut enode_queue: Vec<Enode> = Vec::new();
 
-    for (&enode, &eclass) in enode_to_eclass.iter() {
+    for (&enode, &eclass) in &enode_to_eclass {
         if enode_in_deg[&enode] == 0 {
             enode_queue.push(enode);
         }
@@ -567,7 +568,7 @@ pub fn emit_graphviz<
 >(
     enode_to_eclass: impl Iterator<Item = (Enode, Eclass)>,
 ) -> String {
-    use std::fmt::Write;
+    use std::fmt::Write as _;
 
     let mut out = String::new();
 

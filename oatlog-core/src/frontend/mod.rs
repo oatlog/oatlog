@@ -1576,8 +1576,7 @@ mod compile_rule {
                         let is_entry_ok = parser
                             .lang_relations
                             .get(&relation)
-                            .map(|x| !x.insert_only)
-                            .unwrap_or(true);
+                            .is_none_or(|x| !x.insert_only);
                         (relation, args, is_entry_ok)
                     }
                 })

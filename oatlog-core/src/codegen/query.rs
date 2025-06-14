@@ -45,10 +45,8 @@ impl CodegenRuleTrieCtx<'_> {
     ) -> (BTreeSet<ColumnId>, Vec<Ident>) {
         let (bound, bound_): (BTreeSet<ColumnId>, _) = args
             .iter_enumerate()
-            .filter_map(|(column, variable)| {
-                self.is_bound(variable)
-                    .then(|| (column, ident::var_var(self.var_of(variable))))
-            })
+            .filter(|&(column, variable)| self.is_bound(variable))
+            .map(|(column, variable)| (column, ident::var_var(self.var_of(variable))))
             .collect();
 
         match index {
@@ -128,7 +126,7 @@ impl CodegenRuleTrieCtx<'_> {
         if let Some(meta) = meta {
             tracing::trace!("meta = {meta}");
         }
-        let meta = meta.into_iter();
+        let meta = meta.iter();
         let actions = actions
             .iter()
             .map(|action| self.codegen_action(action))
