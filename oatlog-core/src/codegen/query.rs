@@ -24,19 +24,19 @@ pub(crate) struct CodegenRuleTrieCtx<'a> {
 }
 
 impl CodegenRuleTrieCtx<'_> {
-    fn type_of(&self, x: &VariableId) -> &TypeData {
+    fn type_of(&self, x: VariableId) -> &TypeData {
         &self.types[self.variables[x].type_]
     }
-    fn var_of(&self, x: &VariableId) -> &VariableData {
+    fn var_of(&self, x: VariableId) -> &VariableData {
         &self.variables[x]
     }
-    fn is_bound(&self, x: &VariableId) -> bool {
+    fn is_bound(&self, x: VariableId) -> bool {
         self.variables_bound[x]
     }
-    fn bind_var(&mut self, x: &VariableId) {
+    fn bind_var(&mut self, x: VariableId) {
         assert!(!self.variables_bound[x], "output var already bound?");
         self.variables_bound[x] = true;
-        self.variable_bindings.push(*x);
+        self.variable_bindings.push(x);
     }
     fn bound_columns(
         &self,
@@ -45,8 +45,8 @@ impl CodegenRuleTrieCtx<'_> {
     ) -> (BTreeSet<ColumnId>, Vec<Ident>) {
         let (bound, bound_): (BTreeSet<ColumnId>, _) = args
             .iter_enumerate()
-            .filter(|&(_, variable)| self.is_bound(variable))
-            .map(|(column, variable)| (column, ident::var_var(self.var_of(variable))))
+            .filter(|&(_, variable)| self.is_bound(*variable))
+            .map(|(column, variable)| (column, ident::var_var(self.var_of(*variable))))
             .collect();
 
         match index {
@@ -74,13 +74,13 @@ impl CodegenRuleTrieCtx<'_> {
         let mut new = BTreeSet::new();
         let mut new_ = Vec::new();
         for (column, variable) in args.iter_enumerate() {
-            if self.is_bound(variable) {
+            if self.is_bound(*variable) {
                 bound.insert(column);
-                bound_.push(ident::var_var(self.var_of(variable)));
+                bound_.push(ident::var_var(self.var_of(*variable)));
             } else {
-                self.bind_var(variable);
+                self.bind_var(*variable);
                 new.insert(column);
-                new_.push(ident::var_var(self.var_of(variable)));
+                new_.push(ident::var_var(self.var_of(*variable)));
             }
         }
         if let Some(index) = index {
@@ -159,7 +159,7 @@ impl CodegenRuleTrieCtx<'_> {
         match action {
             Action::Insert { relation, args } => {
                 args.iter()
-                    .for_each(|a| assert!(self.is_bound(a), "action={action:?}"));
+                    .for_each(|a| assert!(self.is_bound(*a), "action={action:?}"));
 
                 let relation = &self.relations[relation]
                     .as_ref()
@@ -168,7 +168,7 @@ impl CodegenRuleTrieCtx<'_> {
                 match &relation.kind {
                     RelationKind::Table { .. } => {
                         let insert_ident = ident::delta_insert_row(relation);
-                        let row = args.iter().map(|x| ident::var_var(self.var_of(x)));
+                        let row = args.iter().map(|x| ident::var_var(self.var_of(*x)));
                         quote! { self.delta.#insert_ident((#(#row,)*)); }
                     }
                     RelationKind::Global { .. } => {
@@ -180,14 +180,14 @@ impl CodegenRuleTrieCtx<'_> {
                 }
             }
             Action::Equate(a, b) => {
-                assert!(self.is_bound(a));
-                assert!(self.is_bound(b));
-                assert_eq!(self.var_of(a).type_, self.var_of(b).type_);
+                assert!(self.is_bound(*a));
+                assert!(self.is_bound(*b));
+                assert_eq!(self.var_of(*a).type_, self.var_of(*b).type_);
 
-                let ty = self.type_of(a);
+                let ty = self.type_of(*a);
                 let uf_ident = ident::type_uf(ty);
-                let a = ident::var_var(self.var_of(a));
-                let b = ident::var_var(self.var_of(b));
+                let a = ident::var_var(self.var_of(*a));
+                let b = ident::var_var(self.var_of(*b));
                 quote! { self.uf.#uf_ident.union(#a, #b); }
             }
             Action::Entry {
@@ -213,16 +213,16 @@ impl CodegenRuleTrieCtx<'_> {
                             .iter()
                             .map(|col| {
                                 let var = &args[col];
-                                assert!(self.is_bound(var));
-                                ident::var_var(self.var_of(var))
+                                assert!(self.is_bound(*var));
+                                ident::var_var(self.var_of(*var))
                             })
                             .collect_vec();
                         let val = value_columns
                             .iter()
                             .map(|(col, _)| {
                                 let var = &args[col];
-                                self.bind_var(var);
-                                ident::var_var(self.var_of(var))
+                                self.bind_var(*var);
+                                ident::var_var(self.var_of(*var))
                             })
                             .collect_vec();
 
@@ -239,12 +239,12 @@ impl CodegenRuleTrieCtx<'_> {
                         let idx = self.global_idx[id];
                         let global_ty = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
-                        if self.is_bound(&var) {
+                        if self.is_bound(var) {
                             quote! {
                                 let #name = #name;
                             }
                         } else {
-                            self.bind_var(&var);
+                            self.bind_var(var);
                             quote! {
                                 let #name = self.#global_ty.get(#idx);
                             }
@@ -256,9 +256,9 @@ impl CodegenRuleTrieCtx<'_> {
                     } => {
                         args.iter_enumerate()
                             .filter_map(|(c, v)| (Some(c) != *out_col).then_some(v))
-                            .for_each(|a| assert!(self.is_bound(a)));
+                            .for_each(|a| assert!(self.is_bound(*a)));
                         if let Some(out_col) = out_col {
-                            self.bind_var(&args[out_col]);
+                            self.bind_var(args[out_col]);
                             assert_eq!(out_col.0 + 1, args.len());
                         }
 
@@ -300,7 +300,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let idx = self.global_idx[id];
                         let global_type = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
-                        self.bind_var(&var);
+                        self.bind_var(var);
                         quote! {
                             if let Some(#name) = self.#global_type.get_new(#idx)
                         }
@@ -310,8 +310,8 @@ impl CodegenRuleTrieCtx<'_> {
                         let vars = args
                             .iter()
                             .map(|arg| {
-                                self.bind_var(arg);
-                                ident::var_var(self.var_of(arg))
+                                self.bind_var(*arg);
+                                ident::var_var(self.var_of(*arg))
                             })
                             .collect_vec();
                         quote! {
@@ -341,7 +341,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let global_type = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
 
-                        self.bind_var(var);
+                        self.bind_var(*var);
                         quote! {
                             if let #name = self.#global_type.get(#idx)
                         }
@@ -402,7 +402,7 @@ impl CodegenRuleTrieCtx<'_> {
                         let idx = self.global_idx[id];
                         let global_ty = ident::type_global(ty_);
                         let name = ident::var_var(&self.variables[var]);
-                        assert!(self.is_bound(&var));
+                        assert!(self.is_bound(var));
                         quote! {
                             if #name == self.#global_ty.get(#idx)
                         }
@@ -424,19 +424,19 @@ impl CodegenRuleTrieCtx<'_> {
             Premise::Forall { variable: x, new } => {
                 assert!(new, "forall is only supported to iterate new");
 
-                let xx = ident::var_var(self.var_of(x));
-                let type_uf = ident::type_uf(self.type_of(x));
+                let xx = ident::var_var(self.var_of(*x));
+                let type_uf = ident::type_uf(self.type_of(*x));
 
-                self.bind_var(x);
+                self.bind_var(*x);
                 quote! {
                     for #xx in self.uf.#type_uf.take_new()
                 }
             }
             Premise::IfEq(a, b) => {
-                assert!(self.is_bound(a));
-                assert!(self.is_bound(b));
-                let a = ident::var_var(self.var_of(a));
-                let b = ident::var_var(self.var_of(b));
+                assert!(self.is_bound(*a));
+                assert!(self.is_bound(*b));
+                let a = ident::var_var(self.var_of(*a));
+                let b = ident::var_var(self.var_of(*b));
                 quote! {
                     if #a == #b
                 }

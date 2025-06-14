@@ -6,7 +6,8 @@ pub trait PreReqs: Copy + Eq + Ord + Default + std::fmt::Debug {}
 impl<T: Copy + Eq + Ord + Default + std::fmt::Debug> PreReqs for T {}
 
 /// Implemented lazily, otherwise `O^*(n!)` implementations would be needed.
-/// SAFETY: `Self` is `repr(transparent)` around `Self::Repr`.
+/// # Safety
+/// * `Self` is `repr(transparent)` around `Self::Repr`.
 #[allow(unsafe_code)]
 pub unsafe trait IndexRow: PreReqs {
     /// The memory representation.

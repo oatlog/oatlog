@@ -52,6 +52,15 @@ pub fn format_program(program: String) -> String {
     from_egglog_ast(to_egglog_ast(&program))
 }
 
+/// Try to compile egglog program into a string
+///
+/// # Errors
+///
+/// This function will return an error if some parsing error occurs.
+///
+/// # Panics
+///
+/// Internal error or unsupported feature.
 pub fn try_compile(input: &str) -> Result<(), String> {
     let input = Input::String(input.to_string().leak());
     let config = Configuration {

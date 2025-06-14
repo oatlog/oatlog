@@ -1,7 +1,7 @@
 use crate::{
     MultiMapCollect as _,
     hir::{self, Atom, IsPremise, Relation, SymbolicRule, VariableMeta},
-    ids::{ColumnId, IndexId, RelationId, TypeId, VariableId},
+    ids::{ColumnId, IndexId, RelationId, VariableId},
     lir,
     typed_set::TSet,
     typed_vec::{TVec, tvec},
@@ -664,14 +664,11 @@ mod construction {
                         }
                         true
                     });
-                    if semi.len() < n {
+                    (semi.len() < n).then(|| {
                         let mut this = self.clone();
                         this.semi = semi;
-                        Some(this)
-                    } else {
-                        // assert!(!supported.contains(other));
-                        None
-                    }
+                        this
+                    })
                 }
             }
         }
@@ -871,6 +868,7 @@ mod construction {
         }
 
         fn salt(&self) -> Salt {
+            let _: &Self = self;
             Salt {
                 inner: (), //self.clone(), // self.premise.iter().map(|x| x.relation).collect(),
             }
@@ -1027,7 +1025,7 @@ mod construction {
 
 mod lowering {
     use super::*;
-    fn action_topo_resolve<'a>(
+    fn action_topo_resolve(
         actions: &[Atom],
         bound_premise: &BTreeSet<VariableId>,
         relations: &TVec<RelationId, hir::Relation>,
@@ -1091,7 +1089,6 @@ mod lowering {
         variables: &mut TVec<VariableId, VariableMeta>,
         relations: &TVec<RelationId, hir::Relation>,
         table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
-        types: &TVec<TypeId, hir::Type>,
     ) -> (Vec<lir::RuleTrie>, TVec<VariableId, lir::VariableData>) {
         assert_eq!(
             &trie.actions,
@@ -1114,7 +1111,6 @@ mod lowering {
                     variables,
                     relations,
                     table_uses,
-                    types,
                 )
             })
             .collect();
@@ -1167,7 +1163,6 @@ mod lowering {
         variables: &mut TVec<VariableId, VariableMeta>,
         relations: &TVec<RelationId, hir::Relation>,
         table_uses: &mut TVec<RelationId, TSet<IndexId, BTreeSet<ColumnId>>>,
-        types: &TVec<TypeId, hir::Type>,
     ) -> Option<lir::RuleTrie> {
         let action_schedule = action_topo_resolve(actions, bound_premise, relations);
         let actions: Vec<lir::Action> = action_schedule
@@ -1406,15 +1401,7 @@ mod lowering {
         let then: Vec<lir::RuleTrie> = map
             .iter()
             .filter_map(|(link, trie)| {
-                lowering_rec(
-                    bound_premise,
-                    link,
-                    trie,
-                    variables,
-                    relations,
-                    table_uses,
-                    types,
-                )
+                lowering_rec(bound_premise, link, trie, variables, relations, table_uses)
             })
             .collect();
 

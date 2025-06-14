@@ -51,6 +51,9 @@ pub trait EclassProvider<T: EclassRepr> {
 macro_rules! relation_element_wrapper_ty {
     ($($(#[$($tt:tt)*])* $name:ident),*) => {
         $(
+
+            /// # Safety
+            /// * we are wrapping a u32.
             $(#[$($tt)*])*
             #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Hash, Debug)]
             #[repr(transparent)]

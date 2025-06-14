@@ -21,7 +21,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         writeln!(f)?;
         for i in 0..self.repr.len() {
             let repr = self.repr[i];
-            if repr == i as u32 {
+            if repr == u32::try_from(i).unwrap() {
                 writeln!(f, "{i}")?;
             } else {
                 writeln!(f, "{i}: {repr}")?;
@@ -30,6 +30,7 @@ impl<T> std::fmt::Debug for UnionFind<T> {
         Ok(())
     }
 }
+
 impl<T: EclassRepr> UnionFind<T> {
     #[inline]
     #[must_use]

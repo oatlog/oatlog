@@ -1175,7 +1175,8 @@ pub(crate) trait Shrink: Eq + Ord + Clone + 'static {
         use std::collections::BTreeSet;
         let mut dedup = BTreeSet::new();
         Box::new(std::iter::from_fn(move || {
-            for nxt in iter.by_ref() {
+            #[allow(clippy::while_let_on_iterator)]
+            while let Some(nxt) = iter.next() {
                 if dedup.insert(nxt.clone()) && nxt != this {
                     return Some(nxt);
                 }

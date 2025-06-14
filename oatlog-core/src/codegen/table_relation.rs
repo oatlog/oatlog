@@ -80,11 +80,7 @@ pub(crate) fn codegen_table_relation(
     let extract_impl = {
         let mut implementation = quote!();
 
-        loop {
-            let RelationKind::Table { index_to_info } = &rel.kind else {
-                break;
-            };
-
+        if let RelationKind::Table { index_to_info } = &rel.kind {
             for info in index_to_info {
                 let IndexInfo::Fd {
                     key_columns,
@@ -122,11 +118,9 @@ pub(crate) fn codegen_table_relation(
                         }
                     }
                 };
-                break;
             }
-
-            break;
         }
+
         implementation
     };
     quote! {
@@ -341,9 +335,8 @@ fn update_with_category(
                             let val_x = ident::column(column);
 
                             let relation = theory.relations[*call].as_ref().unwrap();
-                            match relation.kind {
-                                RelationKind::Primitive {..} => { },
-                                _ => panic!("lattice function is not primitive?")
+                            let RelationKind::Primitive {..} = relation.kind else {
+                                panic!("lattice function is not primitive?")
                             };
                             let ident = format_ident!("{}", relation.name);
 

@@ -124,8 +124,7 @@ impl ImplicitRule {
         self.out
             .iter()
             .filter_map(|(c, action)| match action {
-                ImplicitRuleAction::Panic => Some(*c),
-                ImplicitRuleAction::Union => Some(*c),
+                ImplicitRuleAction::Panic | ImplicitRuleAction::Union => Some(*c),
                 ImplicitRuleAction::Lattice { .. } => None,
             })
             .collect()
@@ -349,13 +348,11 @@ impl Relation {
                 // TODO erik: think about requirements
                 true
             }
-            RelationTy::Alias { .. } => unreachable!(),
-            RelationTy::Global { .. } => false,
-            RelationTy::Primitive { .. } => {
+            RelationTy::Alias { .. } | RelationTy::Forall { .. } => unreachable!(),
+            RelationTy::Global { .. } | RelationTy::Primitive { .. } => {
                 // for collections, inserts would be through entry.
                 false
             }
-            RelationTy::Forall { .. } => unreachable!(),
         }
     }
     pub(crate) fn must_become_insert(&self, im: ImplicitRuleId) -> bool {
@@ -364,10 +361,8 @@ impl Relation {
                 ImplicitRuleAction::Panic | ImplicitRuleAction::Union => false,
                 ImplicitRuleAction::Lattice { .. } => true,
             }),
-            RelationTy::Alias { .. } => unreachable!(),
-            RelationTy::Global { .. } => false,
-            RelationTy::Primitive { .. } => false,
-            RelationTy::Forall { .. } => unreachable!(),
+            RelationTy::Alias { .. } | RelationTy::Forall { .. } => unreachable!(),
+            RelationTy::Global { .. } | RelationTy::Primitive { .. } => false,
         }
     }
     pub(crate) fn has_new(&self) -> bool {
@@ -390,7 +385,7 @@ pub(crate) enum RelationTy {
     Table,
     /// Points to another relation along with a permutation of variables.
     /// Will be desugared
-    #[allow(unused)]
+    #[allow(unused, clippy::empty_enum_variants_with_brackets)]
     Alias {
         // permutation: TVec<ColumnId, ColumnId>,
         // other: RelationId,
@@ -848,7 +843,7 @@ impl SymbolicRule {
     }
 
     /// Replace (ALL * ALL * ALL) with (NEW * ALL * ALL) + (OLD * NEW * ALL) + (OLD * OLD * NEW)
-    fn as_semi_naive(self, relations: &TVec<RelationId, Relation>) -> impl Iterator<Item = Self> {
+    fn into_semi_naive(self, relations: &TVec<RelationId, Relation>) -> impl Iterator<Item = Self> {
         let newable =
             |atom: &Atom| atom.is_premise == Premise && relations[atom.relation].has_new();
 
@@ -1428,7 +1423,7 @@ impl Theory {
     pub(crate) fn transform_into_seminaive(mut self) -> Self {
         self.symbolic_rules = mem::take(&mut self.symbolic_rules)
             .into_iter()
-            .flat_map(|rule| rule.as_semi_naive(&self.relations))
+            .flat_map(|rule| rule.into_semi_naive(&self.relations))
             .map(|rule| {
                 rule.optimize(&self.relations)
                     .duplicate_actions_with_invariant_permutations(&self.relations)
@@ -1482,8 +1477,7 @@ impl Theory {
                                         fixpoint = false;
                                     }
                                 }
-                                ImplicitRuleAction::Panic => (),
-                                ImplicitRuleAction::Union => (),
+                                ImplicitRuleAction::Panic | ImplicitRuleAction::Union => {}
                             }
                         }
                     }
@@ -1530,8 +1524,7 @@ impl Theory {
                     for im in &mut relation.implicit_rules {
                         for action in im.out.values_mut() {
                             match action {
-                                ImplicitRuleAction::Panic => (),
-                                ImplicitRuleAction::Union => (),
+                                ImplicitRuleAction::Panic | ImplicitRuleAction::Union => {}
                                 ImplicitRuleAction::Lattice { call } => {
                                     *call = remap_relations[*call].unwrap();
                                 }
@@ -1636,10 +1629,10 @@ mod debug_print {
                     .map(|(id, x)| (id, DbgStr([format!("{:?}", FmtCtx(*this, x))])))
                     .collect::<BTreeMap<_, _>>(),
             );
-            let _ = global_types;
-            let _ = global_to_relation;
-            let _ = interner;
-            let _ = initial;
+            let _: &TVec<GlobalId, TypeId> = global_types;
+            let _: &TVec<GlobalId, RelationId> = global_to_relation;
+            let _: &crate::runtime::StringIntern = interner;
+            let _: &Vec<lir::Initial> = initial;
 
             theory.finish()
         }

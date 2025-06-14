@@ -65,7 +65,7 @@ impl RelationElement for OrdF64 {
     const MAX_ID: Self = OrdF64(f64::MAX);
 }
 
-#[inline(always)]
+#[inline]
 pub fn retain_hashmap<Key: Hash + Copy, Val: Copy, Row: Copy>(
     map: &mut hashbrown_14::HashMap<Key, Val>,
     out: &mut Vec<Row>,
@@ -93,7 +93,7 @@ pub struct IndexedSortedList<Key, Value> {
     list: Vec<Value>,
 }
 impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
-    /// SAFETY:
+    /// # Safety
     /// * `all_rows` is sorted based on some total order on `extract_key(row)`
     /// * meaning we don't care about the blocks of rows that are equal based on `extract_key`.
     pub unsafe fn reconstruct<Row: Copy>(
@@ -141,6 +141,10 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
                 }
                 debug_assert!(!self.map.contains_key(&key_i));
                 // self.map.insert(key_i, (i as u32, j as u32));
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "we OOM before exhausting u32 ids"
+                )]
                 self.map
                     .insert_unique_unchecked(key_i, (i as u32, j as u32));
                 i = j;
@@ -153,6 +157,8 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
             debug_assert!((start as usize) < self.list.len());
             debug_assert!((end as usize) <= self.list.len());
             // self.list[start as usize..end as usize]
+            // SAFETY:
+            // * the map indexes are in-bounds.
             unsafe { self.list.get_unchecked(start as usize..end as usize) }
                 .iter()
                 .copied()
@@ -169,17 +175,24 @@ impl<Key: Copy + Ord + Hash, Value: Copy + Ord> IndexedSortedList<Key, Value> {
                 debug_assert!((start as usize) < self.list.len());
                 debug_assert!((end as usize) <= self.list.len());
                 // self.list[start as usize..end as usize].iter().copied()
+                // SAFETY:
+                // * the map indexes are in-bounds.
                 unsafe { self.list.get_unchecked(start as usize..end as usize) }
                     .iter()
                     .copied()
             })
     }
+    #[must_use]
     pub fn contains_key(&self, key: &Key) -> bool {
         self.map.contains_key(key)
     }
     #[must_use]
     pub fn len(&self) -> usize {
         self.list.len()
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() != 0
     }
 }
 
@@ -260,6 +273,7 @@ pub trait EclassMapExtract<Enode, ExtractExpr>: Sized {
     fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr>;
 }
 
+#[allow(clippy::iter_over_hash_type, reason = "fix later")]
 /// Perform DAG extraction
 pub fn extract<
     Enode: EnodeInputs<Eclass> + Copy + Clone + Hash + Eq + Debug + Ord,

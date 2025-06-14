@@ -757,9 +757,9 @@ impl Parser {
 
         Ok(())
     }
-    fn add_global(&mut self, ty: TypeId, compute: ComputeMethod) -> MResult<GlobalId> {
+    fn add_global(&mut self, ty: TypeId, compute: ComputeMethod) -> GlobalId {
         let new_id = GlobalId(self.compute_to_global.len());
-        let global_id = *self
+        *self
             .compute_to_global
             .entry(compute.clone())
             .or_insert_with(|| {
@@ -794,9 +794,7 @@ impl Parser {
                 });
 
                 new_id
-            });
-
-        Ok(global_id)
+            })
     }
 
     fn add_function(&mut self, kind: FunctionKind) -> MResult<()> {
@@ -1026,7 +1024,7 @@ impl Parser {
             Expr::Literal(spanned) => {
                 let literal = **spanned;
                 let ty = self.literal_type(literal);
-                let global_id = self.add_global(ty, ComputeMethod::Literal(literal))?;
+                let global_id = self.add_global(ty, ComputeMethod::Literal(literal));
                 variables.push((ty, Some(global_id)))
             }
             Expr::Var(spanned) => match **spanned {
@@ -1134,7 +1132,7 @@ impl Parser {
                     let compute = ComputeMethod::Literal(*x);
                     let ty = parser.literal_type(*x);
 
-                    (parser.add_global(ty, compute)?, ty)
+                    (parser.add_global(ty, compute), ty)
                 }
                 Expr::Var(x) => {
                     let id = parser.global_variable_names.lookup(x, "global variable")?;
@@ -1168,7 +1166,7 @@ impl Parser {
                                 args,
                             };
                             let ty = parser.lang_relations[id].output;
-                            (parser.add_global(ty, compute)?, ty)
+                            (parser.add_global(ty, compute), ty)
                         }
                         [] => {
                             let mut err = bare_!(
@@ -1321,8 +1319,7 @@ mod compile_rule {
                 Expr::Literal(x) => {
                     let global_id = self
                         .parser
-                        .add_global(self.parser.literal_type(**x), ComputeMethod::Literal(**x))
-                        .unwrap();
+                        .add_global(self.parser.literal_type(**x), ComputeMethod::Literal(**x));
                     let global = &self.parser.global_variables[&global_id];
                     let relation_id = global.relation_id;
                     let ty = global.ty;

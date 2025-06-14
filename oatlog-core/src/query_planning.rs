@@ -24,13 +24,8 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
         let (mut variables, trie) =
             tir::schedule_rules(theory.symbolic_rules.clone(), &theory.relations);
 
-        let (lir_tries, variables) = tir::lowering(
-            &trie,
-            &mut variables,
-            &theory.relations,
-            &mut table_uses,
-            &theory.types,
-        );
+        let (lir_tries, variables) =
+            tir::lowering(&trie, &mut variables, &theory.relations, &mut table_uses);
 
         lir_variables = variables;
         tries = lir_tries;
@@ -77,7 +72,7 @@ pub(crate) fn emit_lir_theory(theory: hir::Theory) -> (hir::Theory, tir::Trie, l
 
                 // If we lack any FD, we require a key on all columns to construct `new` in `update_finalize`.
                 if relation.implicit_rules.len() == 0 {
-                    let _ =
+                    let _: IndexId =
                         uses.insert(relation.columns.enumerate().collect::<BTreeSet<ColumnId>>());
                 }
 

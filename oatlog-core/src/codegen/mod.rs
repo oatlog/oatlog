@@ -123,11 +123,10 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
             .filter_map(|rel| {
                 let rel = rel.as_ref()?;
                 match &rel.kind {
-                    RelationKind::Global { .. } => None,
                     RelationKind::Table { .. } => {
                         Some((ident::rel_var(rel), ident::delta_row(rel)))
                     }
-                    RelationKind::Primitive { .. } => None,
+                    RelationKind::Primitive { .. } | RelationKind::Global { .. } => None,
                 }
             })
             .collect_vecs();
@@ -198,11 +197,12 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
         .iter()
         .filter_map(|rel| {
             let rel = rel.as_ref()?;
-            Some(match &rel.kind {
-                RelationKind::Table { .. } => (ident::rel_var(rel), ident::rel_ty(rel), rel.name),
-                RelationKind::Global { .. } => return None,
-                RelationKind::Primitive { .. } => return None,
-            })
+            match &rel.kind {
+                RelationKind::Table { .. } => {
+                    Some((ident::rel_var(rel), ident::rel_ty(rel), rel.name))
+                }
+                RelationKind::Global { .. } | RelationKind::Primitive { .. } => None,
+            }
         })
         .collect_vecs();
 
@@ -629,43 +629,40 @@ fn codegen_globals_and_initial(
     let mut theory_initial: Vec<TokenStream> = theory
         .initial
         .iter()
-        .filter_map(|initial| {
-            Some(match initial {
-                Initial::Run { steps } => {
-                    let steps = steps.get();
-                    let canonicalize = canonicalization(&mut uncanonicalized_globals);
+        .map(|initial| match initial {
+            Initial::Run { steps } => {
+                let steps = steps.get();
+                let canonicalize = canonicalization(&mut uncanonicalized_globals);
+                quote! {
+                    #canonicalize
+                    for _ in 0..#steps { theory.step(); }
+                }
+            }
+            Initial::ComputeGlobal { global_id, compute } => {
+                let ty = theory.global_variable_types[global_id];
+                let ty_data = &theory.types[ty];
+
+                let expr = global_compute_to_expr(theory, *global_id, compute, &assigned_indices);
+                let idx = {
+                    let entry = map.entry(ty).or_default();
+                    let idx = *entry;
+                    *entry += 1;
+                    idx
+                };
+
+                uncanonicalized_globals = true;
+                assigned_indices.push_expected(*global_id, idx);
+                if ty_data.is_zero_sized() {
                     quote! {
-                        #canonicalize
-                        for _ in 0..#steps { theory.step(); }
+                        let _ = #expr;
+                    }
+                } else {
+                    let field = ident::type_global(ty_data);
+                    quote! {
+                        theory.#field.define(#idx, #expr);
                     }
                 }
-                Initial::ComputeGlobal { global_id, compute } => {
-                    let ty = theory.global_variable_types[global_id];
-                    let ty_data = &theory.types[ty];
-
-                    let expr =
-                        global_compute_to_expr(theory, *global_id, compute, &assigned_indices);
-                    let idx = {
-                        let entry = map.entry(ty).or_default();
-                        let idx = *entry;
-                        *entry += 1;
-                        idx
-                    };
-
-                    uncanonicalized_globals = true;
-                    assigned_indices.push_expected(*global_id, idx);
-                    if ty_data.is_zero_sized() {
-                        quote! {
-                            let _ = #expr;
-                        }
-                    } else {
-                        let field = ident::type_global(ty_data);
-                        quote! {
-                            theory.#field.define(#idx, #expr);
-                        }
-                    }
-                }
-            })
+            }
         })
         .collect();
     theory_initial.push(canonicalization(&mut uncanonicalized_globals));
