@@ -976,4 +976,7 @@ https://dl.acm.org/doi/pdf/10.1145/3695838
 Faster joins without fast matrix multiplication.
 
 
+= Adopting Worst-Case Optimal Joins in Relational Database Systems
+https://db.in.tum.de/~freitag/papers/p1891-freitag.pdf
 
+Specialized trie index.

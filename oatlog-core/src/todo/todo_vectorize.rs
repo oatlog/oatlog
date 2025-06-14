@@ -1,3 +1,10 @@
+// https://dl.acm.org/doi/pdf/10.14778/3275366.3284966?casa_token=SL57x-WGwZUAAAAA:Iavl-ocWNTM-hpr3a-ZHkQLECUyz_BvITSuK7LcqZFZK7-E9EY3jIsB-ZZHiuLH1_beWuk57fSH2hA
+// Everything You Always Wanted to Know About Compiled and Vectorized Queries But Were Afraid to Ask
+//
+// with vectorized execution we can emulate having more cache, but we kind of execute more
+// instructions.
+//
+
 mod conceptual_idea {
     // Writing a vectorized query plan is non-trivial because we always want to run everything in
     // batches and the batches must not be too big or too small.
@@ -478,9 +485,156 @@ mod demo_relation {
     }
 }
 
-// https://dl.acm.org/doi/pdf/10.14778/3275366.3284966?casa_token=SL57x-WGwZUAAAAA:Iavl-ocWNTM-hpr3a-ZHkQLECUyz_BvITSuK7LcqZFZK7-E9EY3jIsB-ZZHiuLH1_beWuk57fSH2hA
-// Everything You Always Wanted to Know About Compiled and Vectorized Queries But Were Afraid to Ask
-//
-// with vectorized execution we can emulate having more cache, but we kind of execute more
-// instructions.
-//
+mod trie_join {
+    use std::cell::UnsafeCell;
+
+    // non-lazy variant
+    #[derive(Default)]
+    struct Trie {
+        map: Vec<(i32, TriePtr)>,
+    }
+    union TriePtr {
+        trie: Trie,
+        rownum: usize,
+    }
+    impl Trie {
+        fn new() -> Self {
+            Self::default()
+        }
+        fn iter(&self /*, column: &[i32]*/) -> &[(i32, &Trie)] {
+            todo!()
+        }
+        fn get(&self, val: i32 /*, column: &[i32]*/) -> Option<&Trie> {
+            todo!()
+        }
+    }
+
+    // https://harp-lab.com/2025/04/12/wcoj.html
+
+    // order: [x, y, c, a, b, z]
+
+    // (Add x y z) = A(x, y, z)
+    // (Mul a c x) = B(x, a, c)
+    // (Mul b c y) = C(y, b, c)
+
+    fn join_impl() {
+        let a_trie_x_y_z = Trie::new();
+        let b_trie_x_c_a = Trie::new();
+        let c_trie_y_c_b = Trie::new();
+
+        // let a_trie_col_x = vec![];
+        // let a_trie_col_y = vec![];
+        // let a_trie_col_z = vec![];
+
+        // let b_trie_col_x = vec![];
+        // let b_trie_col_c = vec![];
+        // let b_trie_col_y = vec![];
+
+        // let c_trie_col_x = vec![];
+        // let c_trie_col_c = vec![];
+        // let c_trie_col_y = vec![];
+
+        // ====== module alpha
+        for (x, a_trie_y_z) in a_trie_x_y_z.iter() {
+            let Some(b_trie_c_a) = b_trie_x_c_a.get(*x) else {
+                continue;
+            };
+
+            // ====== module beta
+            for (y, a_trie_z) in a_trie_y_z.iter() {
+                let Some(c_trie_c_b) = c_trie_y_c_b.get(*y) else {
+                    continue;
+                };
+
+                // ====== module gamma
+                for (c, b_trie_a) in b_trie_c_a.iter() {
+                    let Some(c_trie_b) = c_trie_c_b.get(*c) else {
+                        continue;
+                    };
+
+                    // ====== module delta
+                    for (z, a_rownum) in a_trie_z.iter() {
+                        // ====== module epsilon
+                        for (a, b_rownum) in b_trie_a.iter() {
+                            // ====== module zeta
+                            for (b, c_rownum) in c_trie_b.iter() {
+                                println!("{x} {y} {z} {a} {b} {c}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // lengths of inputs and outputs are always equal.
+
+        // kind of want a generator here.
+
+        fn alpha(
+            in_a_trie_x_y_z: &Trie,
+            in_b_trie_x_c_a: &Trie,
+            out_a_trie_y_z: &mut Vec<&Trie>,
+            out_b_trie_c_a: &mut Vec<&Trie>,
+            /* has no state yet: out_c_trie_y_c_b: &mut Vec<&Trie>*/
+        ) {
+            for (x, a_trie_y_z) in in_a_trie_x_y_z.iter() {
+                let Some(b_trie_c_a) = in_b_trie_x_c_a.get(x) else {
+                    continue;
+                };
+                out_a_trie_y_z.push(a_trie_y_z);
+                out_b_trie_c_a.push(b_trie_c_a);
+
+                // => we can break if we reach *exactly* 1000 if alpha is a state machine.
+
+                // if out_a_trie_y_z.len() > 1000 {
+                //     beta();
+                // }
+            }
+        }
+
+        fn beta(
+            in_c_trie_y_c_b: &Trie,
+            in_a_trie_y_z: &[&Trie],
+            in_b_trie_c_a: &[&Trie],
+            out_a_trie_z: &mut Vec<&Trie>,
+            out_b_trie_c_a: &mut Vec<&Trie>,
+            out_c_trie_c_b: &mut Vec<&Trie>,
+        ) {
+            let n = in_a_trie_y_z.len();
+
+            for i in 0..n {
+                let a_trie_y_z = in_b_trie_c_a[i];
+                let b_trie_c_a = in_b_trie_c_a[i];
+                for (y, a_trie_z) in a_trie_y_z.iter() {
+                    let Some(c_trie_c_b) = in_c_trie_y_c_b.get(y) else {
+                        continue;
+                    };
+                    out_a_trie_z.push(a_trie_z);
+                    out_b_trie_c_a.push(b_trie_c_a);
+                    out_c_trie_c_b.push(c_trie_c_b);
+                }
+            }
+
+        }
+
+        fn gamma(
+            in_a_trie_z: &Vec<&Trie>,
+            in_b_trie_c_a: &Vec<&Trie>,
+            in_c_trie_c_b: &Vec<&Trie>,
+            out_a_trie_z: &mut Vec<&Trie>,
+            out_b_trie_a: &mut Vec<&Trie>,
+            out_c_trie_b: &mut Vec<&Trie>,
+        ) {
+
+            let n = in_a_trie_y_z.len();
+
+            for i in 0..n {
+                for (c, b_trie_a) in b_trie_c_a.iter() {
+                    let Some(c_trie_b) = c_trie_c_b.get(c) else {
+                        continue;
+                    };
+                }
+            }
+        }
+    }
+}
