@@ -1410,9 +1410,12 @@ It is implemented literally in @generic_join_triangle, for a query $"Foo"(a,b) j
 "Baz"(c,a)$. However, it is clearly undesirable from a constant factor point of view to require
 $("variables" - 1)$ joins rather than the $("relations"- 1)$ joins previously required in
 @trijoin_slow and @trijoin_fast, especially when the query has many variables that are only used
-once. This is addressed by the Free join algorithm @freejoin1 @freejoin2, which binds all variables
-whenever a relation is iterated, as in @trijoin_fast. It is clearly worst-case optimal since it can
-be seen as a constant-factor improvement of the Generic join binding variables in the same order.
+once.
+
+This is addressed by the Free join framework @freejoin1 @freejoin2, which unifies Generic join and
+binary join plans. Within the Free join framework, we can bind all variables as soon as a relation
+is iterated. If we introduce semi-joins as in @trijoin_fast this is worst-case optimal, since it be
+seen as a constant-factor improvement of the Generic join binding variables in the same order.
 
 While the theory of WCOJs is quite complicated, our understanding of it is that we can select an
 arbitrary order to join our relations -- implicitly determining a variable ordering -- and we remain
@@ -1644,7 +1647,7 @@ redundant rules, which are detected and removed.
 
 After HIR optimization and semi-naive expansion, the rewrite rules of the theory are jointly query
 planned while converting to TIR -- trie intermediate representation. The query planning follows a
-greedy heuristic within the confines of a worst-case optimal generic join. TIR is motivated by the
+greedy heuristic within the confines of a worst-case optimal Generic join. TIR is motivated by the
 insight that many rules have overlapping premises, as illustrated by @fig_trie_ir, which can be
 exploited by matching rewrite rules jointly in a trie. This is one of Oatlog's novel contributions.
 The trie is a tree where the root matches everything, edges add additional premise constraints and
@@ -1901,7 +1904,7 @@ Query planning in databases is the general problem of deciding an order in which
 Specifically for relational e-matching and Datalog, it refers to determining an order in which to
 join the atoms in a premise.
 
-Oatlog query plans only generic joins as described in @section_background_wcoj. Generic join is
+Oatlog query plans only Generic joins as described in @section_background_wcoj. Generic join is
 worst-case optimal given identically sized relations, but for relations of different sizes one
 should prefer to join smaller relations first. Oatlog statically query-plans at compile-time since
 that requires less engineering effort and provides greater freedom in terms of memory representation
@@ -1915,7 +1918,7 @@ Generic join is usually formulated as selecting an order in which to determine v
 Oatlog's query planning implicitly selects such an order by repeatedy selecting an atom to join in
 from a set of premise atoms. Joins can be primary joins, which iterate all relation tuples matching
 some columns, or semi-joins which verify that there are at least one relation tuple that matches the
-known columns. Semi-joins, as dictated by the generic join algorithm take precedence over primary
+known columns. Semi-joins, as dictated by the Generic join algorithm take precedence over primary
 joins, aside from the optimization that single-element primary joins are preferred. Oatlog encodes
 this as selecting the option with the maximum associated `RelationScore`, an enum which is shown
 with cases in ascending order of priority in @fig_impl_relation_score.
@@ -2146,7 +2149,7 @@ functional dependencies within every relation to a fixed point.
 === Relational e-matching codegen <section_implementation_codegen_ematching>
 
 @section_implementation_tir_details has already discussed query planning as a worst-case-optimal
-generic join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
+Generic join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
 lowered to a tree of nested loops in the generated code, each performing a semi-join or a primary
 join. @fig_impl_codegen_ematching shows generated code for `apply_rules`, including the
 index-accessing functions on the `AddRelation`. No-FD indexes iterate their outputs while FD indexes
