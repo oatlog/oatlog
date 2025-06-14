@@ -356,15 +356,6 @@ fn test_edgecase3() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((), (x0, _timestamp))) in
-                        self.fd_index_.iter().map(|(k, v)| ((*k), (*v))).enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "t_nil", "type_list", x0).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "t_nil").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -402,8 +393,8 @@ fn test_edgecase3() {
                         }
                         let offset = insertions.len();
                         self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (x0, _timestamp)| {
-                            if uf.type_list_.is_root(x0) {
+                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                            if uf.type_list_.is_root_mut(&mut x0) {
                                 true
                             } else {
                                 insertions.push((x0,));
@@ -541,19 +532,6 @@ fn test_edgecase3() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "type_list_length", "type_list", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "type_list_length", "i64", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "type_list_length").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -590,14 +568,15 @@ fn test_edgecase3() {
                         }
                         let offset = insertions.len();
                         self.type_list_num_uprooted_at_latest_retain = uf.type_list_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.type_list_.is_root(x0) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.type_list_.is_root_mut(&mut x0) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -826,14 +805,6 @@ fn test_edgecase3() {
                         self.delta.insert_type_list_length((qv0, qv1));
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.t_nil_.emit_graphviz(&mut buf);
-                    self.type_list_length_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -868,6 +839,11 @@ fn test_edgecase3() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -1253,19 +1229,6 @@ fn test_primitive_in_premise() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -1303,14 +1266,15 @@ fn test_primitive_in_premise() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -1600,13 +1564,6 @@ fn test_primitive_in_premise() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.const_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -1632,6 +1589,11 @@ fn test_primitive_in_premise() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -2661,20 +2623,6 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -2716,8 +2664,11 @@ fn regression_tir2() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -2876,20 +2827,6 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "pow").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -2931,8 +2868,11 @@ fn regression_tir2() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -3122,19 +3062,6 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -3172,14 +3099,15 @@ fn regression_tir2() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -3470,15 +3398,6 @@ fn regression_tir2() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.pow_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -3512,6 +3431,11 @@ fn regression_tir2() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -3756,20 +3680,6 @@ fn regression_tir1() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -3811,8 +3721,11 @@ fn regression_tir1() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -3971,19 +3884,6 @@ fn regression_tir1() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -4021,14 +3921,15 @@ fn regression_tir1() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -4266,14 +4167,6 @@ fn regression_tir1() {
                         self.uf.math_.union(qg, qv5);
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.sub_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -4302,6 +4195,11 @@ fn regression_tir1() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -5393,20 +5291,6 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5448,8 +5332,11 @@ fn codegen_constant_propagation() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -5671,20 +5558,6 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5726,8 +5599,11 @@ fn codegen_constant_propagation() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -5949,19 +5825,6 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5999,14 +5862,15 @@ fn codegen_constant_propagation() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -6322,15 +6186,6 @@ fn codegen_constant_propagation() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.add_.emit_graphviz(&mut buf);
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -6364,6 +6219,11 @@ fn codegen_constant_propagation() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -6526,20 +6386,6 @@ fn codegen_commutative() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -6581,8 +6427,11 @@ fn codegen_commutative() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -6814,13 +6663,6 @@ fn codegen_commutative() {
                         self.delta.insert_add((qb, qa, qe));
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.add_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -6846,6 +6688,11 @@ fn codegen_commutative() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -7033,20 +6880,6 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -7088,8 +6921,11 @@ fn regression_entry2() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -7248,19 +7084,6 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -7298,14 +7121,15 @@ fn regression_entry2() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -7537,14 +7361,6 @@ fn regression_entry2() {
                         self.delta.insert_const((qv3, qv2));
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.sub_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -7573,6 +7389,11 @@ fn regression_entry2() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -7763,20 +7584,6 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -7818,8 +7625,11 @@ fn regression_entry() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -7977,20 +7787,6 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -8032,8 +7828,11 @@ fn regression_entry() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -8281,14 +8080,6 @@ fn regression_entry() {
                         self.delta.insert_add((qv3, qg, qv2));
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.integral_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -8317,6 +8108,11 @@ fn regression_entry() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -8499,20 +8295,6 @@ fn test_bind_variable_multiple_times() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "same", "foo", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "same").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -8554,8 +8336,11 @@ fn test_bind_variable_multiple_times() {
                         let offset = insertions.len();
                         self.foo_num_uprooted_at_latest_retain = uf.foo_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.foo_.is_root(x0) & uf.foo_.is_root(x1) & uf.foo_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.foo_.is_root_mut(&mut x0)
+                                    & uf.foo_.is_root_mut(&mut x1)
+                                    & uf.foo_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -8783,13 +8568,6 @@ fn test_bind_variable_multiple_times() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.same_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -8815,6 +8593,11 @@ fn test_bind_variable_multiple_times() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -9065,20 +8848,6 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9120,8 +8889,11 @@ fn codegen_variable_reuse_bug() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -9309,15 +9081,6 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((), (x0, _timestamp))) in
-                        self.fd_index_.iter().map(|(k, v)| ((*k), (*v))).enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "zero", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "zero").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9355,8 +9118,8 @@ fn codegen_variable_reuse_bug() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (x0, _timestamp)| {
-                            if uf.math_.is_root(x0) {
+                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                            if uf.math_.is_root_mut(&mut x0) {
                                 true
                             } else {
                                 insertions.push((x0,));
@@ -9597,14 +9360,6 @@ fn codegen_variable_reuse_bug() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.add_.emit_graphviz(&mut buf);
-                    self.zero_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -9633,6 +9388,11 @@ fn codegen_variable_reuse_bug() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -9784,20 +9544,6 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9839,8 +9585,11 @@ fn initial_exprs() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -9998,20 +9747,6 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -10053,8 +9788,11 @@ fn initial_exprs() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -10213,19 +9951,6 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -10263,14 +9988,15 @@ fn initial_exprs() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -10415,19 +10141,6 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -10465,14 +10178,15 @@ fn initial_exprs() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -10764,16 +10478,6 @@ fn initial_exprs() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.add_.emit_graphviz(&mut buf);
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    self.var_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -10809,6 +10513,11 @@ fn initial_exprs() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -11208,12 +10917,6 @@ fn codegen_bug1() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -11235,6 +10938,11 @@ fn codegen_bug1() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -11366,12 +11074,6 @@ fn initial() {
                 }
                 #[inline(never)]
                 pub fn apply_rules(&mut self) {}
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -11393,6 +11095,11 @@ fn initial() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -11578,20 +11285,6 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -11633,8 +11326,11 @@ fn test_primitives_simple() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -11823,20 +11519,6 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -11878,8 +11560,11 @@ fn test_primitives_simple() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -12038,19 +11723,6 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12088,14 +11760,15 @@ fn test_primitives_simple() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -12245,19 +11918,6 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12295,14 +11955,15 @@ fn test_primitives_simple() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -12632,16 +12293,6 @@ fn test_primitives_simple() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    self.var_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -12677,6 +12328,11 @@ fn test_primitives_simple() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -13008,14 +12664,6 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.nofd_index_0.iter_key_value().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "foo", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "foo").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -13239,14 +12887,6 @@ fn triangle_join() {
                 }
                 fn len(&self) -> usize {
                     self.all.len()
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.nofd_index_0.iter_key_value().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "bar", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "bar").unwrap();
-                    }
                 }
                 fn update_begin(
                     &mut self,
@@ -13472,14 +13112,6 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self.nofd_index_0.iter_key_value().enumerate() {
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "baz", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "baz").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -13701,16 +13333,6 @@ fn triangle_join() {
                 }
                 fn len(&self) -> usize {
                     self.all.len()
-                }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1, x2), (_timestamp,))) in self.nofd_index_0_1_2.iter_key_value().enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "triangle", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "triangle").unwrap();
-                    }
                 }
                 fn update_begin(
                     &mut self,
@@ -14005,16 +13627,6 @@ fn triangle_join() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.foo_.emit_graphviz(&mut buf);
-                    self.bar_.emit_graphviz(&mut buf);
-                    self.baz_.emit_graphviz(&mut buf);
-                    self.triangle_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -14050,6 +13662,11 @@ fn triangle_join() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -14385,20 +14002,6 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -14440,8 +14043,11 @@ fn edgecase0() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -14693,20 +14299,6 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -14748,8 +14340,11 @@ fn edgecase0() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -15092,14 +14687,6 @@ fn edgecase0() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -15128,6 +14715,11 @@ fn edgecase0() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -15440,20 +15032,6 @@ fn edgecase0_no_egglog_compat() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -15495,8 +15073,11 @@ fn edgecase0_no_egglog_compat() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -15747,20 +15328,6 @@ fn edgecase0_no_egglog_compat() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -15802,8 +15369,11 @@ fn edgecase0_no_egglog_compat() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -16113,14 +15683,6 @@ fn edgecase0_no_egglog_compat() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -16149,6 +15711,11 @@ fn edgecase0_no_egglog_compat() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -16301,20 +15868,6 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -16356,8 +15909,11 @@ fn test_into_codegen() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -16547,20 +16103,6 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -16602,8 +16144,11 @@ fn test_into_codegen() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -16899,14 +16444,6 @@ fn test_into_codegen() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -16935,6 +16472,11 @@ fn test_into_codegen() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
@@ -19376,19 +18918,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "fuel", "fuel_unit", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "fuel").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19426,14 +18955,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.fuel_unit_.is_root(x0) & uf.fuel_unit_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.fuel_unit_.is_root_mut(&mut x0) & uf.fuel_unit_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -19607,15 +19137,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((), (x0, _timestamp))) in
-                        self.fd_index_.iter().map(|(k, v)| ((*k), (*v))).enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "zero_fuel", "fuel_unit", x0).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "zero_fuel").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19653,8 +19174,8 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
-                        self.fd_index_.retain(|&(), &mut (x0, _timestamp)| {
-                            if uf.fuel_unit_.is_root(x0) {
+                        self.fd_index_.retain(|&(), &mut (mut x0, _timestamp)| {
+                            if uf.fuel_unit_.is_root_mut(&mut x0) {
                                 true
                             } else {
                                 insertions.push((x0,));
@@ -19792,20 +19313,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "diff", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "diff").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19847,8 +19354,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -20042,21 +19552,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1, x2), (x3, _timestamp))) in self
-                        .fd_index_0_1_2
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "fuel_unit", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "integral", "math", x3).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "integral").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20102,11 +19597,11 @@ fn lir_math() {
                         self.fuel_unit_num_uprooted_at_latest_retain = uf.fuel_unit_.num_uprooted();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1_2
-                            .retain(|&(x0, x1, x2), &mut (x3, _timestamp)| {
-                                if uf.fuel_unit_.is_root(x0)
-                                    & uf.math_.is_root(x1)
-                                    & uf.math_.is_root(x2)
-                                    & uf.math_.is_root(x3)
+                            .retain(|&(mut x0, mut x1, mut x2), &mut (mut x3, _timestamp)| {
+                                if uf.fuel_unit_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                    & uf.math_.is_root_mut(&mut x3)
                                 {
                                     true
                                 } else {
@@ -20432,20 +19927,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "add", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "add").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20487,8 +19968,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -20709,20 +20193,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sub", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sub").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20764,8 +20234,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -20957,20 +20430,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "mul", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "mul").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21012,8 +20471,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -21263,20 +20725,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "div", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "div").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21318,8 +20766,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -21481,20 +20932,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0, x1), (x2, _timestamp))) in self
-                        .fd_index_0_1
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "pow", "math", x2).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "pow").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21536,8 +20973,11 @@ fn lir_math() {
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
                         self.fd_index_0_1
-                            .retain(|&(x0, x1), &mut (x2, _timestamp)| {
-                                if uf.math_.is_root(x0) & uf.math_.is_root(x1) & uf.math_.is_root(x2) {
+                            .retain(|&(mut x0, mut x1), &mut (mut x2, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0)
+                                    & uf.math_.is_root_mut(&mut x1)
+                                    & uf.math_.is_root_mut(&mut x2)
+                                {
                                     true
                                 } else {
                                     insertions.push((x0, x1, x2));
@@ -21818,19 +21258,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "ln", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "ln").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21868,14 +21295,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -22022,19 +21450,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sqrt", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sqrt").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -22072,14 +21487,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -22226,19 +21642,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "sin", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "sin").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -22276,14 +21679,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -22435,19 +21839,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "cos", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "cos").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -22485,14 +21876,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x0) & uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x0) & uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -22645,19 +22037,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "i64", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "const", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "const").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -22695,14 +22074,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -22852,19 +22232,6 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
-                fn emit_graphviz(&self, buf: &mut String) {
-                    use std::fmt::Write;
-                    for (i, ((x0,), (x1, _timestamp))) in self
-                        .fd_index_0
-                        .iter()
-                        .map(|(k, v)| ((*k), (*v)))
-                        .enumerate()
-                    {
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "string", x0).unwrap();
-                        writeln!(buf, "{}_{i} -> {}_{};", "var", "math", x1).unwrap();
-                        writeln!(buf, "{}_{i} [shape = box];", "var").unwrap();
-                    }
-                }
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -22902,14 +22269,15 @@ fn lir_math() {
                         }
                         let offset = insertions.len();
                         self.math_num_uprooted_at_latest_retain = uf.math_.num_uprooted();
-                        self.fd_index_0.retain(|&(x0,), &mut (x1, _timestamp)| {
-                            if uf.math_.is_root(x1) {
-                                true
-                            } else {
-                                insertions.push((x0, x1));
-                                false
-                            }
-                        });
+                        self.fd_index_0
+                            .retain(|&(mut x0,), &mut (mut x1, _timestamp)| {
+                                if uf.math_.is_root_mut(&mut x1) {
+                                    true
+                                } else {
+                                    insertions.push((x0, x1));
+                                    false
+                                }
+                            });
                         self.update_begin(&insertions[offset..], uf, latest_timestamp);
                         true
                     })
@@ -24201,27 +23569,6 @@ fn lir_math() {
                         }
                     }
                 }
-                fn emit_graphviz(&self) -> String {
-                    let mut buf = String::new();
-                    buf.push_str("digraph G {\n");
-                    self.fuel_.emit_graphviz(&mut buf);
-                    self.zero_fuel_.emit_graphviz(&mut buf);
-                    self.diff_.emit_graphviz(&mut buf);
-                    self.integral_.emit_graphviz(&mut buf);
-                    self.add_.emit_graphviz(&mut buf);
-                    self.sub_.emit_graphviz(&mut buf);
-                    self.mul_.emit_graphviz(&mut buf);
-                    self.div_.emit_graphviz(&mut buf);
-                    self.pow_.emit_graphviz(&mut buf);
-                    self.ln_.emit_graphviz(&mut buf);
-                    self.sqrt_.emit_graphviz(&mut buf);
-                    self.sin_.emit_graphviz(&mut buf);
-                    self.cos_.emit_graphviz(&mut buf);
-                    self.const_.emit_graphviz(&mut buf);
-                    self.var_.emit_graphviz(&mut buf);
-                    buf.push_str("}\n");
-                    buf
-                }
                 pub fn get_total_relation_entry_count(&self) -> usize {
                     self.get_relation_entry_count().values().sum()
                 }
@@ -24285,6 +23632,11 @@ fn lir_math() {
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
+                }
+                pub fn emit_graphviz(&self) -> String {
+                    let mut serialized_egraph = Vec::new();
+                    self.serialize(&mut serialized_egraph);
+                    runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
