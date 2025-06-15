@@ -667,14 +667,14 @@ impl SymbolicRule {
         self
     }
 
-    // TODO erik for loke: are the following properties of `dominates` always true?
-    // - dominates(x, y) and dominates(y, z) => dominates(x, z)
-    // - dominates(x, x) = true
-    //
     /// `self` dominates `other` if `other` is unnecessary when executing `self`,
     /// or concretely if
     /// - `self.premises` matches everything matched by `other.premises`
     /// - `self.actions` is a superset of `other.actions`
+    ///
+    /// It satisfies that
+    // - dominates(x, y) and dominates(y, z) => dominates(x, z)
+    // - dominates(x, x) = true
     fn dominates(&self, other: &Self, relations: &TVec<RelationId, Relation>) -> bool {
         {
             let common_atoms: BTreeSet<Atom> =
@@ -880,28 +880,23 @@ impl SymbolicRule {
             )
         );
 
-        // TODO erik for loke: fix whatever bug was here.
-
-        // TODO erik for loke: I think this might not generate the minimum set in some edge cases,
-        // what if the very last element in `rules` dominates all previous rules? In that case,
-        // nothing will be removed from ret?
+        // Compute the dominating subset of `rules`
         //
-        // Let `ret` be a minimal dominating subset of `rules`. Concretely, this unifies
-        //
+        // Concretely, this unifies
         // `MulOld(AddNew(a,b),AddAll(a,c))` and
         // `MulOld(AddOld(a,b),AddNew(a,c))` in the distributive law
-        //
         // using that `Mul` is commutative and `Old` more specific than `All`.
-        let mut ret = Vec::new();
-        'outer: for rule in rules {
-            for existing in &mut ret {
-                if rule.dominates(&*existing, relations) {
-                    *existing = rule;
-                    continue 'outer;
-                } else if existing.dominates(&rule, relations) {
-                    continue 'outer;
-                }
+        let mut ret: Vec<SymbolicRule> = Vec::new();
+        for rule in rules {
+            // Skip `rule` if it is dominated
+            if ret
+                .iter()
+                .any(|existing| existing.dominates(&rule, relations))
+            {
+                continue;
             }
+            // Remove any existing rules that are now dominated
+            ret.retain(|existing| !rule.dominates(existing, relations));
             ret.push(rule);
         }
 
