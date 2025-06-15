@@ -734,6 +734,7 @@ fn update_with_category(
 
     quote! {
         // Called once at beginning of canonicalization.
+        #[allow(unreachable_code)]
         fn update_begin(&mut self, insertions: &[Self::Row], uf: &mut Unification, latest_timestamp: TimeStamp) {
             // everything in "insertions" is considered new.
             #update_begin_impl

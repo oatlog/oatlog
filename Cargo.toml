@@ -104,6 +104,7 @@ similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
 unused_unit = "allow"
+needless_raw_string_hashes = "allow"
 
 never_loop = "warn"
 reversed_empty_ranges = "warn"

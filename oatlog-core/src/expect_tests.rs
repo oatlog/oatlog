@@ -358,6 +358,7 @@ fn test_edgecase3() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -526,6 +527,7 @@ fn test_edgecase3() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -697,11 +699,13 @@ fn test_edgecase3() {
                     self.type_list_length_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 TNil(),
                 TypeListLength(Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 TypeList(TypeList),
@@ -711,6 +715,7 @@ fn test_edgecase3() {
                     Eclass::TypeList(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 TNil(),
@@ -725,6 +730,7 @@ fn test_edgecase3() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::TNil() => ExtractExpr::TNil(),
@@ -758,6 +764,8 @@ fn test_edgecase3() {
                 pub type_list_length_: TypeListLengthRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, 0i64);
@@ -801,13 +809,18 @@ fn test_edgecase3() {
                     .into_iter()
                     .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.t_nil_.serialize(out);
                     self.type_list_length_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -817,6 +830,8 @@ fn test_edgecase3() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -1185,6 +1200,7 @@ fn test_primitive_in_premise() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -1380,10 +1396,12 @@ fn test_primitive_in_premise() {
                     self.const_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Const(std::primitive::i64),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -1393,6 +1411,7 @@ fn test_primitive_in_premise() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Const(std::primitive::i64),
@@ -1405,6 +1424,7 @@ fn test_primitive_in_premise() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Const(x0) => ExtractExpr::Const(x0),
@@ -1433,6 +1453,8 @@ fn test_primitive_in_premise() {
                 pub const_: ConstRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -1510,12 +1532,17 @@ fn test_primitive_in_premise() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.const_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -1525,6 +1552,8 @@ fn test_primitive_in_premise() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -2537,6 +2566,7 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -2735,6 +2765,7 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -2960,6 +2991,7 @@ fn regression_tir2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -3144,12 +3176,14 @@ fn regression_tir2() {
                     self.const_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Mul(Eclass, Eclass),
                 Pow(Eclass, Eclass),
                 Const(std::primitive::i64),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -3159,6 +3193,7 @@ fn regression_tir2() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Mul(Box<Self>, Box<Self>),
@@ -3175,6 +3210,7 @@ fn regression_tir2() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Mul(x0, x1) => ExtractExpr::Mul(
@@ -3215,6 +3251,8 @@ fn regression_tir2() {
                 pub const_: ConstRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, 2i64);
@@ -3296,6 +3334,8 @@ fn regression_tir2() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.mul_.serialize(out);
                     self.pow_.serialize(out);
@@ -3303,7 +3343,10 @@ fn regression_tir2() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -3313,6 +3356,8 @@ fn regression_tir2() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -3534,6 +3579,7 @@ fn regression_tir1() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -3732,6 +3778,7 @@ fn regression_tir1() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -3906,11 +3953,13 @@ fn regression_tir1() {
                     self.const_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Sub(Eclass, Eclass),
                 Const(std::primitive::i64),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -3920,6 +3969,7 @@ fn regression_tir1() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Sub(Box<Self>, Box<Self>),
@@ -3934,6 +3984,7 @@ fn regression_tir1() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Sub(x0, x1) => ExtractExpr::Sub(
@@ -3968,6 +4019,8 @@ fn regression_tir1() {
                 pub const_: ConstRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, 0i64);
@@ -4011,13 +4064,18 @@ fn regression_tir1() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.sub_.serialize(out);
                     self.const_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -4027,6 +4085,8 @@ fn regression_tir1() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -5098,6 +5158,7 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5351,6 +5412,7 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5604,6 +5666,7 @@ fn codegen_constant_propagation() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -5806,12 +5869,14 @@ fn codegen_constant_propagation() {
                     self.const_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Add(Eclass, Eclass),
                 Mul(Eclass, Eclass),
                 Const(std::primitive::i64),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -5821,6 +5886,7 @@ fn codegen_constant_propagation() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Add(Box<Self>, Box<Self>),
@@ -5837,6 +5903,7 @@ fn codegen_constant_propagation() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Add(x0, x1) => ExtractExpr::Add(
@@ -5875,6 +5942,8 @@ fn codegen_constant_propagation() {
                 pub const_: ConstRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -5961,6 +6030,8 @@ fn codegen_constant_propagation() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.add_.serialize(out);
                     self.mul_.serialize(out);
@@ -5968,7 +6039,10 @@ fn codegen_constant_propagation() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -5978,6 +6052,8 @@ fn codegen_constant_propagation() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -6117,6 +6193,7 @@ fn codegen_commutative() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -6302,10 +6379,12 @@ fn codegen_commutative() {
                     self.add_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Add(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -6315,6 +6394,7 @@ fn codegen_commutative() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Add(Box<Self>, Box<Self>),
@@ -6327,6 +6407,7 @@ fn codegen_commutative() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Add(x0, x1) => ExtractExpr::Add(
@@ -6358,6 +6439,8 @@ fn codegen_commutative() {
                 pub add_: AddRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -6390,12 +6473,17 @@ fn codegen_commutative() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.add_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -6405,6 +6493,8 @@ fn codegen_commutative() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -6580,6 +6670,7 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -6778,6 +6869,7 @@ fn regression_entry2() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -6952,11 +7044,13 @@ fn regression_entry2() {
                     self.const_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Sub(Eclass, Eclass),
                 Const(std::primitive::i64),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -6966,6 +7060,7 @@ fn regression_entry2() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Sub(Box<Self>, Box<Self>),
@@ -6980,6 +7075,7 @@ fn regression_entry2() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Sub(x0, x1) => ExtractExpr::Sub(
@@ -7014,6 +7110,8 @@ fn regression_entry2() {
                 pub const_: ConstRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, -1i64);
@@ -7051,13 +7149,18 @@ fn regression_entry2() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.sub_.serialize(out);
                     self.const_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -7067,6 +7170,8 @@ fn regression_entry2() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -7237,6 +7342,7 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -7434,6 +7540,7 @@ fn regression_entry() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -7624,11 +7731,13 @@ fn regression_entry() {
                     self.add_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Integral(Eclass, Eclass),
                 Add(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -7638,6 +7747,7 @@ fn regression_entry() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Integral(Box<Self>, Box<Self>),
@@ -7652,6 +7762,7 @@ fn regression_entry() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Integral(x0, x1) => ExtractExpr::Integral(
@@ -7688,6 +7799,8 @@ fn regression_entry() {
                 pub add_: AddRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -7725,13 +7838,18 @@ fn regression_entry() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.integral_.serialize(out);
                     self.add_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -7741,6 +7859,8 @@ fn regression_entry() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -7911,6 +8031,7 @@ fn test_bind_variable_multiple_times() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -8090,10 +8211,12 @@ fn test_bind_variable_multiple_times() {
                     self.same_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Same(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Foo(Foo),
@@ -8103,6 +8226,7 @@ fn test_bind_variable_multiple_times() {
                     Eclass::Foo(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Same(Box<Self>, Box<Self>),
@@ -8115,6 +8239,7 @@ fn test_bind_variable_multiple_times() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Same(x0, x1) => ExtractExpr::Same(
@@ -8146,6 +8271,8 @@ fn test_bind_variable_multiple_times() {
                 pub same_: SameRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -8180,12 +8307,17 @@ fn test_bind_variable_multiple_times() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.same_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -8195,6 +8327,8 @@ fn test_bind_variable_multiple_times() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -8431,6 +8565,7 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -8654,6 +8789,7 @@ fn codegen_variable_reuse_bug() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -8814,11 +8950,13 @@ fn codegen_variable_reuse_bug() {
                     self.zero_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Add(Eclass, Eclass),
                 Zero(),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -8828,6 +8966,7 @@ fn codegen_variable_reuse_bug() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Add(Box<Self>, Box<Self>),
@@ -8842,6 +8981,7 @@ fn codegen_variable_reuse_bug() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Add(x0, x1) => ExtractExpr::Add(
@@ -8876,6 +9016,8 @@ fn codegen_variable_reuse_bug() {
                 pub zero_: ZeroRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_math.define(0usize, {
@@ -8929,13 +9071,18 @@ fn codegen_variable_reuse_bug() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.add_.serialize(out);
                     self.zero_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -8945,6 +9092,8 @@ fn codegen_variable_reuse_bug() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -9079,6 +9228,7 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9276,6 +9426,7 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9474,6 +9625,7 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9656,6 +9808,7 @@ fn initial_exprs() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -9840,6 +9993,7 @@ fn initial_exprs() {
                     self.var_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Add(Eclass, Eclass),
@@ -9847,6 +10001,7 @@ fn initial_exprs() {
                 Const(std::primitive::i64),
                 Var(runtime::IString),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -9856,6 +10011,7 @@ fn initial_exprs() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Add(Box<Self>, Box<Self>),
@@ -9874,6 +10030,7 @@ fn initial_exprs() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Add(x0, x1) => ExtractExpr::Add(
@@ -9917,6 +10074,8 @@ fn initial_exprs() {
                 pub var_: VarRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, 2i64);
@@ -9994,6 +10153,8 @@ fn initial_exprs() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.add_.serialize(out);
                     self.mul_.serialize(out);
@@ -10002,7 +10163,10 @@ fn initial_exprs() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -10012,6 +10176,8 @@ fn initial_exprs() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -10328,10 +10494,13 @@ fn codegen_bug1() {
                     has_new_inserts
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {}
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {}
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {}
             impl EnodeInputs<Eclass> for Enode {
@@ -10340,6 +10509,7 @@ fn codegen_bug1() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {})
                 }
@@ -10360,6 +10530,8 @@ fn codegen_bug1() {
                 pub uf: Unification,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -10385,10 +10557,15 @@ fn codegen_bug1() {
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
                     [].into_iter().collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {}
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -10398,6 +10575,8 @@ fn codegen_bug1() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -10461,10 +10640,13 @@ fn initial() {
                     has_new_inserts
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {}
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {}
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {}
             impl EnodeInputs<Eclass> for Enode {
@@ -10473,6 +10655,7 @@ fn initial() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {})
                 }
@@ -10493,6 +10676,8 @@ fn initial() {
                 pub uf: Unification,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     for _ in 0..42u64 {
@@ -10521,10 +10706,15 @@ fn initial() {
                 pub fn get_uf_count(&self) -> std::collections::BTreeMap<&'static str, (usize, usize)> {
                     [].into_iter().collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {}
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -10534,6 +10724,8 @@ fn initial() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -10711,6 +10903,7 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -10935,6 +11128,7 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -11133,6 +11327,7 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -11320,6 +11515,7 @@ fn test_primitives_simple() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -11504,6 +11700,7 @@ fn test_primitives_simple() {
                     self.var_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Mul(Eclass, Eclass),
@@ -11511,6 +11708,7 @@ fn test_primitives_simple() {
                 Const(std::primitive::i64),
                 Var(runtime::IString),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -11520,6 +11718,7 @@ fn test_primitives_simple() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Mul(Box<Self>, Box<Self>),
@@ -11538,6 +11737,7 @@ fn test_primitives_simple() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Mul(x0, x1) => ExtractExpr::Mul(
@@ -11581,6 +11781,8 @@ fn test_primitives_simple() {
                 pub var_: VarRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, 2i64);
@@ -11696,6 +11898,8 @@ fn test_primitives_simple() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.mul_.serialize(out);
                     self.add_.serialize(out);
@@ -11704,7 +11908,10 @@ fn test_primitives_simple() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -11714,6 +11921,8 @@ fn test_primitives_simple() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -12019,6 +12228,7 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12226,6 +12436,7 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12433,6 +12644,7 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12638,6 +12850,7 @@ fn triangle_join() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -12814,8 +13027,10 @@ fn triangle_join() {
                     self.triangle_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {}
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -12825,6 +13040,7 @@ fn triangle_join() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {}
             impl EnodeInputs<Eclass> for Enode {
@@ -12833,6 +13049,7 @@ fn triangle_join() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {})
                 }
@@ -12862,6 +13079,8 @@ fn triangle_join() {
                 pub triangle_: TriangleRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -12927,6 +13146,8 @@ fn triangle_join() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.foo_.serialize(out);
                     self.bar_.serialize(out);
@@ -12935,7 +13156,10 @@ fn triangle_join() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -12945,6 +13169,8 @@ fn triangle_join() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -13262,6 +13488,7 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -13541,6 +13768,7 @@ fn edgecase0() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -13785,11 +14013,13 @@ fn edgecase0() {
                     self.add_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Mul(Eclass, Eclass),
                 Add(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -13799,6 +14029,7 @@ fn edgecase0() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Mul(Box<Self>, Box<Self>),
@@ -13813,6 +14044,7 @@ fn edgecase0() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Mul(x0, x1) => ExtractExpr::Mul(
@@ -13849,6 +14081,8 @@ fn edgecase0() {
                 pub add_: AddRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -13919,13 +14153,18 @@ fn edgecase0() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.mul_.serialize(out);
                     self.add_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -13935,6 +14174,8 @@ fn edgecase0() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -14232,6 +14473,7 @@ fn edgecase0_no_egglog_compat() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -14510,6 +14752,7 @@ fn edgecase0_no_egglog_compat() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -14727,11 +14970,13 @@ fn edgecase0_no_egglog_compat() {
                     self.add_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Mul(Eclass, Eclass),
                 Add(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -14741,6 +14986,7 @@ fn edgecase0_no_egglog_compat() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Mul(Box<Self>, Box<Self>),
@@ -14755,6 +15001,7 @@ fn edgecase0_no_egglog_compat() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Mul(x0, x1) => ExtractExpr::Mul(
@@ -14791,6 +15038,8 @@ fn edgecase0_no_egglog_compat() {
                 pub add_: AddRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -14859,13 +15108,18 @@ fn edgecase0_no_egglog_compat() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.mul_.serialize(out);
                     self.add_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -14875,6 +15129,8 @@ fn edgecase0_no_egglog_compat() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -15012,6 +15268,7 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -15237,6 +15494,7 @@ fn test_into_codegen() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -15454,11 +15712,13 @@ fn test_into_codegen() {
                     self.add_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Mul(Eclass, Eclass),
                 Add(Eclass, Eclass),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 Math(Math),
@@ -15468,6 +15728,7 @@ fn test_into_codegen() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Mul(Box<Self>, Box<Self>),
@@ -15482,6 +15743,7 @@ fn test_into_codegen() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Mul(x0, x1) => ExtractExpr::Mul(
@@ -15518,6 +15780,8 @@ fn test_into_codegen() {
                 pub add_: AddRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory
@@ -15572,13 +15836,18 @@ fn test_into_codegen() {
                         .into_iter()
                         .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.mul_.serialize(out);
                     self.add_.serialize(out);
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -15588,6 +15857,8 @@ fn test_into_codegen() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;
@@ -18014,6 +18285,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -18221,6 +18493,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -18389,6 +18662,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -18618,6 +18892,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -18969,6 +19244,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19221,6 +19497,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19448,6 +19725,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19725,6 +20003,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -19926,6 +20205,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20230,6 +20510,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20414,6 +20695,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20598,6 +20880,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20787,6 +21070,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -20977,6 +21261,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21164,6 +21449,7 @@ fn lir_math() {
                 fn len(&self) -> usize {
                     self.all.len()
                 }
+                #[allow(unreachable_code)]
                 fn update_begin(
                     &mut self,
                     insertions: &[Self::Row],
@@ -21403,6 +21689,7 @@ fn lir_math() {
                     self.var_.push(x);
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Enode {
                 Fuel(Eclass),
@@ -21421,6 +21708,7 @@ fn lir_math() {
                 Const(std::primitive::i64),
                 Var(runtime::IString),
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum Eclass {
                 FuelUnit(FuelUnit),
@@ -21436,6 +21724,7 @@ fn lir_math() {
                     Eclass::Math(self)
                 }
             }
+            #[allow(clippy::empty_enum_variants_with_brackets)]
             #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
             pub enum ExtractExpr {
                 Fuel(Box<Self>),
@@ -21476,6 +21765,7 @@ fn lir_math() {
                 }
             }
             impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+                #[allow(unreachable_code)]
                 fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                     Some(match extract(self)? {
                         Enode::Fuel(x0) => ExtractExpr::Fuel(Box::new(x0.map_extract(extract)?)),
@@ -21561,6 +21851,8 @@ fn lir_math() {
                 pub var_: VarRelation,
             }
             impl Theory {
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_mut)]
                 pub fn new() -> Self {
                     let mut theory = Self::default();
                     theory.global_i64.define(0usize, -1i64);
@@ -22519,6 +22811,8 @@ fn lir_math() {
                     .into_iter()
                     .collect()
                 }
+                #[allow(clippy::let_and_return)]
+                #[allow(unused_variables)]
                 pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                     self.fuel_.serialize(out);
                     self.zero_fuel_.serialize(out);
@@ -22538,7 +22832,10 @@ fn lir_math() {
                 }
                 #[doc = r" Perform DAG extraction"]
                 pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                    #[allow(unreachable_code)]
+                    #[allow(unused_variables)]
                     let target: Eclass = target.into();
+                    #[allow(unreachable_code)]
                     let mut serialized_egraph = Vec::new();
                     self.serialize(&mut serialized_egraph);
                     runtime::extract(serialized_egraph.into_iter(), target)
@@ -22548,6 +22845,8 @@ fn lir_math() {
                     self.serialize(&mut serialized_egraph);
                     runtime::emit_graphviz(serialized_egraph.into_iter())
                 }
+                #[allow(unused_mut)]
+                #[inline(never)]
                 #[inline(never)]
                 pub fn canonicalize(&mut self) {
                     self.latest_timestamp.0 += 1;

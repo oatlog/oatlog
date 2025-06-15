@@ -151,6 +151,8 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
             .collect_vec();
 
         quote! {
+            #[allow(unused_mut)]
+            #[inline(never)]
             #[inline(never)]
             pub fn canonicalize(&mut self) {
                 self.latest_timestamp.0 += 1;
@@ -239,6 +241,8 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
             #(pub #stored_relations: #stored_relation_types,)*
         }
         impl #theory_ty {
+            #[allow(clippy::let_and_return)]
+            #[allow(unused_mut)]
             pub fn new() -> Self {
                 let mut theory = Self::default();
                 #(#theory_initial)*
@@ -277,12 +281,17 @@ pub(crate) fn codegen(theory: &Theory) -> TokenStream {
                     )*
                 ].into_iter().collect()
             }
+            #[allow(clippy::let_and_return)]
+            #[allow(unused_variables)]
             pub fn serialize(&self, out: &mut Vec<(Enode, Eclass)>) {
                 #(self.#stored_relations.serialize(out);)*
             }
             /// Perform DAG extraction
             pub fn extract(&self, target: impl Into<Eclass>) -> Option<ExtractExpr> {
+                #[allow(unreachable_code)]
+                #[allow(unused_variables)]
                 let target: Eclass = target.into();
+                #[allow(unreachable_code)]
                 let mut serialized_egraph = Vec::new();
                 self.serialize(&mut serialized_egraph);
                 runtime::extract(serialized_egraph.into_iter(), target)
@@ -465,15 +474,21 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
     }
 
     quote! {
+        #[allow(clippy::empty_enum_variants_with_brackets)]
         #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
         pub enum Enode {
             #enode_ty
         }
+
+        #[allow(clippy::empty_enum_variants_with_brackets)]
         #[derive(Copy, Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
         pub enum Eclass {
             #eclass_ty
         }
+
         #eclass_into
+
+        #[allow(clippy::empty_enum_variants_with_brackets)]
         #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd)]
         pub enum ExtractExpr {
             #extract_expr_ty
@@ -488,6 +503,7 @@ fn codegen_extract(theory: &Theory) -> TokenStream {
         }
 
         impl EclassMapExtract<Enode, ExtractExpr> for Eclass {
+            #[allow(unreachable_code)]
             fn map_extract(self, extract: impl Fn(Self) -> Option<Enode> + Copy) -> Option<ExtractExpr> {
                 Some(match extract(self)? {
                     #map_extract
