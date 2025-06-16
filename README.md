@@ -23,8 +23,8 @@ Some language features of egglog are missing, notably:
 * The egglog language is somewhat documented in `oatlog-core/src/frontend/egglog_ast.rs`
 * For example generated code, see `oatlog-core/src/expect_tests.rs`
 * Benchmark Oatlog against egglog using `cargo run --release -p oatlog-bench`. This may require 64GB
-  or more of memory, so you may want to reduce the size of the largest test instance in
-  `oatlog-bench/src/lib.rs`
+  or more of memory, so you may want to reduce the size of the largest test instances in
+  `oatlog-bench/src/lib.rs` from 12 to 11.
 
 # Semantics
 
