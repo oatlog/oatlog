@@ -1,1 +1,3 @@
 Cargo.nix linguist-generated
+oatlog-bench/src/precompiled_eggcc.rs linguist-generated
+oatlog-core/src/expect_tests.rs linguist-generated
