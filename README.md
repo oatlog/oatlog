@@ -7,7 +7,7 @@ You can learn more about Oatlog through
 * the master's thesis presentation (TODO)
 * egraphs workshop video (TODO)
 
-# Limitations
+## Limitations
 
 Oatlog requires that the schema and rewrite rules are known at compile time.
 A typical usecase might be an optimizing compiler.
@@ -17,7 +17,7 @@ Some language features of egglog are missing, notably:
 * containers
 * interpreter-oriented features such as csv input and push/pop
 
-# Usage
+## Usage
 
 * For usage examples, see `examples/`
 * The egglog language is somewhat documented in `oatlog-core/src/frontend/egglog_ast.rs`
@@ -26,7 +26,7 @@ Some language features of egglog are missing, notably:
   or more of memory, so you may want to reduce the size of the largest test instances in
   `oatlog-bench/src/lib.rs` from 12 to 11.
 
-# Semantics
+## Semantics
 
 The semantics of Oatlog when using `oatlog::compile_egraph_strict` are similar to but slightly
 weaker than egglog's nondeterministic mode.
