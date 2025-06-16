@@ -45,7 +45,7 @@
   title-font: "New Computer Modern Sans",
   extra-faithful: true,
 
-  title: [Oatlog: A high-performance #box[e-graph] engine],
+  title: text(hyphenate: false)[Oatlog: A high-performance #box[e-graph] engine],
   subtitle: [],
   authors: ("Loke Gustafsson", "Erik Magnusson"),
   department: department,
