@@ -67,13 +67,11 @@
           '';
         };
 
-        checks.default =
-          cargoNix.workspaceMembers.egraph.build.override { runTests = true; };
-
         packages = rec {
-          default = egraph;
-          egraph = cargoNix.workspaceMembers.egraph.build;
-          math = cargoNix.workspaceMembers.math.build;
+          default = oatlog;
+          oatlog = cargoNix.workspaceMembers.oatlog.build;
+          extract-demo = cargoNix.workspaceMembers.extract-demo.build;
+          quadratic-formula = cargoNix.workspaceMembers.quadratic-formula.build;
         };
         apps = builtins.mapAttrs (k: v: {
           type = "app";
@@ -89,11 +87,6 @@
               lib.getExe pkgs.typst
             } compile ./doc/report/main.typ --root . report.pdf \
               --font-path ${pkgs.newcomputermodern}
-          '';
-          cargo = ''
-            set -v -e
-            PATH="${rust-stable}/bin:$PATH"
-            cargo "$@"
           '';
         };
       });
