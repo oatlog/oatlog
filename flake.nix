@@ -88,6 +88,11 @@
             } compile ./doc/report/main.typ --root . report.pdf \
               --font-path ${pkgs.newcomputermodern}
           '';
+          ci-cargo = ''
+            set -v -e
+            PATH="${rust-stable}/bin:$PATH"
+            cargo "$@"
+          '';
         };
       });
 }
