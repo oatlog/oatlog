@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::{
     fs::{self, File},
     io::{self, Read as _},
+    iter,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -33,6 +34,10 @@ enum Commands {
         /// shrink needs an output file (../`shrink_scratch/src/main.rs`)
         output: PathBuf,
     },
+    Fuzz {
+        /// fuzz needs an output file (../`shrink_scratch/src/main.rs`)
+        output: PathBuf,
+    },
 }
 
 fn main() {
@@ -40,6 +45,14 @@ fn main() {
     init_logging();
 
     let cli = Cli::parse();
+
+    match &cli.command {
+        Commands::Fuzz { output } => {
+            fuzz(output.clone());
+            return;
+        }
+        _ => (),
+    }
 
     let mut ret = String::new();
     let input = if let Some(path) = cli.input {
@@ -118,6 +131,9 @@ fn main() {
             println!("{ret}");
             shrink(input, output, expected);
         }
+        Commands::Fuzz { .. } => {
+            panic!()
+        }
     }
 }
 
@@ -142,13 +158,52 @@ fn init_logging() {
             .with_default(tracing::Level::TRACE)
             .with_subscriber(
                 tracing_subscriber::FmtSubscriber::builder()
-                    .with_max_level(tracing::Level::TRACE)
+                    .with_max_level(tracing::Level::INFO)
                     .with_timer(UptimeMilliseconds(Instant::now()))
                     .with_writer(std::io::stderr)
                     .finish(),
             ),
     )
     .expect("enable global logger");
+}
+
+fn fuzz(output: PathBuf) {
+    static FILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let file_lock = FILE_LOCK.try_lock().unwrap();
+
+    let output = output.canonicalize().unwrap();
+    let wd = output.parent().unwrap();
+
+    tracing::info!(?wd);
+
+    tracing::info!("starting fuzz testing...");
+
+    let mut file = open_source_file_checked(&output);
+    set_file_contents(&mut file, &empty_contents());
+
+    let mut iterations = 0;
+    let (failing_program, failing_verdict) = loop {
+        let program = oatlog_core::generate();
+        tracing::info!("testing program {program}");
+
+        tracing::info!("iteration {iterations}");
+        iterations += 1;
+
+        let verdict = get_verdict(program.clone(), &mut file, &wd);
+
+        tracing::info!("got verdict {verdict:?}");
+
+        match verdict {
+            AllCorrect | GenErr => {}
+            Mismatched | NoCompile => break (program, verdict),
+        }
+    };
+
+    set_file_contents(&mut file, &empty_contents());
+    drop(file_lock);
+
+    tracing::info!("FOUND FAILIURE ({failing_verdict:?}), RUNNING SHRINK");
+    shrink(failing_program, output.clone(), failing_verdict);
 }
 
 fn shrink(program: String, output: PathBuf, wanted_verdict: Verdict) {
@@ -214,7 +269,8 @@ use Verdict::{AllCorrect, GenErr, Mismatched, NoCompile};
 
 fn get_verdict(program: String, file: &mut File, wd: &Path) -> Verdict {
     // println!("testing program:\n{program}\n");
-    if oatlog_core::try_compile(&program).is_err() {
+    if let Err(err) = oatlog_core::try_compile(&program) {
+        tracing::error!("{err}");
         return GenErr;
     }
     let contents = test_contents(&program);
@@ -343,7 +399,7 @@ fn check_ok(egglog: &mut egglog::EGraph, theory: &Theory) {{
 
     let oatlog_counts = theory.get_relation_entry_count();
 
-    dbg!(&theory);
+    // dbg!(&theory);
     for (&relation, &oatlog_count) in oatlog_counts.iter() {{
         assert_eq!(egglog_counts[relation], oatlog_count, \"mismatch in {{relation}}\");
     }}

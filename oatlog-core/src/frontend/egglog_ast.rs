@@ -13,6 +13,8 @@ use itertools::Itertools as _;
 pub(crate) use ast::*;
 pub(crate) use shrink::Shrink;
 
+pub(crate) use arbitrary::generate;
+
 pub(crate) fn parse_program(x: Vec<SexpSpan>) -> MResult<Vec<Spanned<Statement>>> {
     x.into_iter().map(parse_statement).collect()
 }
@@ -1259,12 +1261,14 @@ mod shrink {
         fn shuffle(self) -> impl Iterator<Item = T> {
             let mut elems: Vec<_> = self.collect();
             // Shuffle
-            RNG.with_borrow_mut(|rng| {
-                let n = elems.len() as u64;
-                for i in 0..(n - 1) {
-                    elems.swap(i as usize, rng.rand_range(i..n) as usize);
-                }
-            });
+            if !elems.is_empty() {
+                RNG.with_borrow_mut(|rng| {
+                    let n = elems.len() as u64;
+                    for i in 0..(n - 1) {
+                        elems.swap(i as usize, rng.rand_range(i..n) as usize);
+                    }
+                });
+            }
             elems.into_iter()
         }
     }
@@ -1537,4 +1541,353 @@ mod shrink {
     }
     macro_rules! no_op_shrink { ($($ident:ident)*) => { $( impl Shrink for $ident { fn impl_shrink(&self) -> It<Self> { Box::new(None.into_iter()) } })* } }
     no_op_shrink!(Variant Schedule);
+}
+
+// TODO: Metamorphic testing of Datalog engines https://dl.acm.org/doi/abs/10.1145/3468264.3468573
+mod arbitrary {
+    use super::*;
+
+    fn gen_range<T>(range: std::ops::Range<T>) -> T
+    where
+        T: TryFrom<u64> + TryInto<u64>,
+        <T as TryInto<u64>>::Error: std::fmt::Debug,
+        <T as TryFrom<u64>>::Error: std::fmt::Debug,
+    {
+        RNG.with_borrow_mut(|rng| {
+            rng.rand_range(range.start.try_into().unwrap()..range.end.try_into().unwrap())
+                .try_into()
+                .unwrap()
+        })
+    }
+
+    fn select_1_slice<T>(x: &[T]) -> &T {
+        &x[gen_range(0..x.len())]
+    }
+
+    fn select_n_slice<T: Clone>(mut x: Vec<T>, n: usize) -> Vec<T> {
+        let mut out = vec![];
+
+        while out.len() < n && x.len() > 0 {
+            out.push(x.swap_remove(gen_range(0..x.len())));
+        }
+        out
+    }
+
+    use std::collections::BTreeMap;
+
+    /// generate arbitrary programs of the *core* language.
+    pub(crate) fn generate() -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+
+        macro_rules! wln {
+            ($($arg:tt)*) => {
+                writeln!(&mut out, $($arg)*).unwrap()
+            };
+        }
+
+        let sort_names = vec!["Math", "Mem", "Token"];
+        for &sort in &sort_names {
+            wln!("(sort {sort})");
+        }
+        wln!();
+        let primitive_types = vec!["i64"];
+        let all_types: Vec<_> = sort_names
+            .iter()
+            .copied()
+            .chain(primitive_types.iter().copied())
+            .collect();
+
+        let constructors: Vec<_> = ["Add", "Mul", "And", "Or", "Abs", "Pointer", "Fma"]
+            .iter()
+            .copied()
+            .map(|name| {
+                let args: Vec<_> = (0..gen_range(1..5))
+                    .map(|_| *select_1_slice(&all_types))
+                    .collect();
+                (name, args, Some(*select_1_slice(&sort_names)))
+            })
+            .chain(
+                [
+                    ("ConstMath", vec!["i64"], Some("Math")),
+                    ("ConstMem", vec!["i64"], Some("Mem")),
+                    ("ConstToken", vec!["i64"], Some("Token")),
+                ]
+                .into_iter(),
+            )
+            .collect();
+
+        let relations: Vec<_> = ["edge", "path", "points-to", "known-bits"]
+            .iter()
+            .copied()
+            .map(|name| {
+                let args: Vec<_> = (0..gen_range(1..5))
+                    .map(|_| *select_1_slice(&all_types))
+                    .collect();
+                (name, args, Some(*select_1_slice(&sort_names)))
+            })
+            .collect();
+
+        for (name, args, out) in constructors.iter().chain(relations.iter()) {
+            let args = args.iter().copied().join(" ");
+            match out {
+                Some(ty) => wln!("(constructor {name} ({args}) {ty})"),
+                None => wln!("(relation {name} ({args}))"),
+            }
+        }
+        wln!();
+
+        let variable_names = vec!["a", "b", "c", "x", "y", "z"];
+
+        #[derive(Debug, Clone)]
+        enum Expr {
+            Var(&'static str),
+            Literal(i64),
+            Call(&'static str, Vec<Expr>),
+        }
+        impl Expr {
+            fn size(&self) -> usize {
+                match self {
+                    Expr::Var(_) => 1,
+                    Expr::Literal(_) => 1,
+                    Expr::Call(_, x) => 1 + x.iter().map(|x| x.size()).sum::<usize>(),
+                }
+            }
+            fn extract_vars(
+                &self,
+                premise_ty: &BTreeMap<&'static str, &'static str>,
+                action_ty: &mut Vec<(&'static str, &'static str)>,
+            ) {
+                match self {
+                    Expr::Var(x) => {
+                        action_ty.push((x, premise_ty[x]));
+                    }
+                    Expr::Literal(_) => (),
+                    Expr::Call(_, x) => {
+                        for x in x {
+                            x.extract_vars(premise_ty, action_ty);
+                        }
+                    }
+                }
+            }
+            fn serialize(&self, out: &mut String) {
+                match self {
+                    Expr::Var(x) => write!(out, "{x}").unwrap(),
+                    Expr::Literal(x) => write!(out, "{x}").unwrap(),
+                    Expr::Call(name, x) => {
+                        write!(out, "({name}").unwrap();
+                        for x in x {
+                            write!(out, " ").unwrap();
+                            x.serialize(out);
+                        }
+                        write!(out, ")").unwrap();
+                    }
+                }
+            }
+        }
+
+        let budget = 20;
+
+        let mut toplevel_expressions: BTreeMap<Option<&'static str>, Vec<Expr>> = BTreeMap::new();
+
+        for _ in 0..20 {
+            toplevel_expressions
+                .entry(Some("i64"))
+                .or_default()
+                .push(Expr::Literal(gen_range(0..100)));
+        }
+
+        let toplevel_callable: Vec<_> = constructors
+            .iter()
+            .cloned()
+            .chain(relations.iter().cloned())
+            .collect();
+
+        for _ in 0..200 {
+            let (name, args, rty) = select_1_slice(&toplevel_callable);
+
+            if args
+                .iter()
+                .copied()
+                .map(Some)
+                .any(|x| toplevel_expressions.get(&x).is_none_or(|x| x.is_empty()))
+            {
+                continue;
+            }
+
+            let args: Vec<_> = args
+                .iter()
+                .copied()
+                .map(Some)
+                .map(|x| select_1_slice(&*toplevel_expressions[&x]).clone())
+                .collect();
+
+            let expr = Expr::Call(*name, args);
+
+            if expr.size() > budget {
+                continue;
+            }
+
+            toplevel_expressions.entry(*rty).or_default().push(expr);
+        }
+
+        let mut action_callable = toplevel_callable.clone();
+        action_callable.push(("union", vec!["Math", "Math"], None));
+        action_callable.push(("union", vec!["Mem", "Mem"], None));
+        action_callable.push(("union", vec!["Token", "Token"], None));
+
+        let mut premise_callable = toplevel_callable.clone();
+        // potentially unsound
+        // premise_callable.push(("=", vec!["i64", "i64"], None));
+        premise_callable.push(("=", vec!["Math", "Math"], None));
+        premise_callable.push(("=", vec!["Mem", "Mem"], None));
+        premise_callable.push(("=", vec!["Token", "Token"], None));
+
+        for _ in 0..20 {
+            let mut action_expressions: BTreeMap<Option<&'static str>, Vec<Expr>> = BTreeMap::new();
+            let mut premise_expressions: BTreeMap<Option<&'static str>, Vec<Expr>> =
+                BTreeMap::new();
+
+            for _ in 0..20 {
+                premise_expressions
+                    .entry(Some("i64"))
+                    .or_default()
+                    .push(Expr::Literal(gen_range(0..100)));
+                action_expressions
+                    .entry(Some("i64"))
+                    .or_default()
+                    .push(Expr::Literal(gen_range(0..100)));
+            }
+
+            let mut premise_var_ty = BTreeMap::new();
+            for v in variable_names.iter().copied() {
+                let ty = *select_1_slice(&all_types);
+                premise_expressions
+                    .entry(Some(ty))
+                    .or_default()
+                    .push(Expr::Var(v));
+                premise_var_ty.insert(v, ty);
+            }
+
+            for _ in 0..20 {
+                let (name, args, rty) = select_1_slice(&premise_callable);
+
+                if args
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .any(|x| premise_expressions.get(&x).is_none_or(|x| x.is_empty()))
+                {
+                    continue;
+                }
+
+                let args: Vec<_> = args
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .map(|x| select_1_slice(&*premise_expressions[&x]).clone())
+                    .collect();
+
+                let expr = Expr::Call(*name, args);
+
+                if expr.size() > budget {
+                    continue;
+                }
+
+                premise_expressions.entry(*rty).or_default().push(expr);
+            }
+
+            let premise_expressions: Vec<_> = premise_expressions
+                .into_iter()
+                .flat_map(|(_, x)| x)
+                .filter(|x| match x {
+                    Expr::Var(..) => false,
+                    Expr::Literal(..) => false,
+                    Expr::Call("=", exprs) => match exprs.as_slice() {
+                        [Expr::Var(_), Expr::Var(_)] => false,
+                        [..] => true,
+                    },
+                    Expr::Call(..) => true,
+                })
+                .collect();
+
+            let premise_expressions = select_n_slice(premise_expressions, gen_range(1..3));
+
+            let mut action_var_ty = vec![];
+
+            for x in &premise_expressions {
+                x.extract_vars(&premise_var_ty, &mut action_var_ty);
+            }
+
+            for (v, ty) in action_var_ty {
+                action_expressions
+                    .entry(Some(ty))
+                    .or_default()
+                    .push(Expr::Var(v));
+            }
+
+            for _ in 0..20 {
+                let (name, args, rty) = select_1_slice(&action_callable);
+
+                if args
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .any(|x| action_expressions.get(&x).is_none_or(|x| x.is_empty()))
+                {
+                    continue;
+                }
+
+                let args: Vec<_> = args
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .map(|x| select_1_slice(&*action_expressions[&x]).clone())
+                    .collect();
+
+                let expr = Expr::Call(*name, args);
+
+                if expr.size() > budget {
+                    continue;
+                }
+
+                action_expressions.entry(*rty).or_default().push(expr);
+            }
+
+            let action_expressions: Vec<_> = action_expressions
+                .into_iter()
+                .flat_map(|(_, x)| x)
+                .filter(|x| !matches!(x, Expr::Var(_) | Expr::Literal(_)))
+                .collect();
+
+            let action_expressions = select_n_slice(action_expressions, gen_range(1..8));
+
+            wln!("(rule (");
+            for expr in &premise_expressions {
+                expr.serialize(&mut out);
+                wln!();
+            }
+            wln!(") (");
+            for expr in &action_expressions {
+                expr.serialize(&mut out);
+                wln!();
+            }
+            wln!("))");
+            wln!();
+        }
+
+        let toplevel_expressions: Vec<_> = toplevel_expressions
+            .into_iter()
+            .flat_map(|(_, x)| x)
+            .filter(|x| !matches!(x, Expr::Var(_) | Expr::Literal(_)))
+            .collect();
+
+        let n = gen_range(0..toplevel_expressions.len());
+        for expr in select_n_slice(toplevel_expressions, n) {
+            expr.serialize(&mut out);
+            wln!();
+        }
+
+        out
+    }
 }

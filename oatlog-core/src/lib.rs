@@ -22,34 +22,42 @@ use frontend::MResult;
 use itertools::Itertools as _;
 use std::{collections::BTreeMap, panic::UnwindSafe, time::Instant};
 
-fn to_egglog_ast(program: &str) -> frontend::egglog_ast::Program {
+fn to_egglog_ast(program: &str) -> MResult<frontend::egglog_ast::Program> {
     let program = program.to_string().leak();
-    frontend::egglog_ast::Program {
+    Ok(frontend::egglog_ast::Program {
         statements: frontend::egglog_ast::parse_program(
-            frontend::parse_str_to_sexps(program)
-                .unwrap()
+            frontend::parse_str_to_sexps(program)?
                 .into_iter()
                 .flat_map(frontend::ParseInput::unwrap)
                 .collect_vec(),
-        )
-        .unwrap(),
-    }
+        )?,
+    })
 }
 fn from_egglog_ast(ast: frontend::egglog_ast::Program) -> String {
     ast.to_string()
 }
 
+pub fn generate() -> String {
+    frontend::egglog_ast::generate()
+}
+
 #[must_use]
-pub fn shrink(program: String) -> Box<impl Iterator<Item = String>> {
+pub fn shrink(program: String) -> Box<dyn Iterator<Item = String>> {
     use frontend::egglog_ast::Shrink as _;
-    let ast = to_egglog_ast(&program);
+    let ast = match to_egglog_ast(&program) {
+        Ok(ast) => ast,
+        Err(e) => {
+            tracing::info!("{e:?}");
+            return Box::new([].into_iter());
+        }
+    };
 
     Box::new(ast.shrink().map(from_egglog_ast))
 }
 
 #[must_use]
 pub fn format_program(program: String) -> String {
-    from_egglog_ast(to_egglog_ast(&program))
+    from_egglog_ast(to_egglog_ast(&program).unwrap())
 }
 
 /// Try to compile egglog program into a string
