@@ -340,8 +340,7 @@ by eliding e-classes consisting of a single e-node.
     ),
   ),
   caption: [Illustration on how e-graphs deduplicate usages of equivalent computations. The left
-    side is an expression DAG while the right side is a pseudo-e-graph #footnote[Interestingly,
-    acyclic e-graphs actually do rely on `union` nodes @acyclic_egraphs.] with a `union` node to avoid
+    side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
     duplicating the addition @acyclic_egraphs.],
   placement: auto,
 ) <fig_intro_baby_egraph>
@@ -1395,7 +1394,7 @@ optimal.
           print(f"{a} * {c} + {b} dot {c}")
   ```,
   caption: [A triangle join using a semi-join, making it faster than without the semi-join as in
-  @trijoin_slow.],
+    @trijoin_slow.],
 ) <trijoin_fast>
 
 The first known worst-case optimal join algorithm is the Generic join @optimaljoin. It can be
