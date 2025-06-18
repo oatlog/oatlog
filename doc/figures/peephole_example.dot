@@ -24,7 +24,7 @@ digraph G {
     m3 -> ma;
     q -> ma;
     ma -> ret;
-    a -> ma [style="dashed"];
+    a -> ma [style="dotted"];
     five -> ret;
     ret -> return;
 }

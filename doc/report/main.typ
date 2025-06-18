@@ -94,7 +94,7 @@
     Karppa, and especially our advisor Alejandro Luque Cerpa for their feedback
     and guidance on our work.
 
-    We would also like to thank our opponent group Edvin Nilsson and Enayatullah Norozi for their feedback.
+    We would also like to thank Edvin Nilsson and Enayatullah Norozi for their feedback.
   ],
 )
 
@@ -202,9 +202,9 @@ configurations are in practice hundreds of entries long with many passes being r
 Pass configurations are effectively compiler hyperparameters and managing them is a challenge.
 
 A reasonable idea, if one wants to apply as many beneficial optimizations as possible, is to apply
-optimization passes to the program in a loop until having reached a fixed point. But this is not
-done in practice for the simple reason that doing so would result in excessively long compile times
--- each pass processes the entire program in at least linear time and there are hundreds of passes.
+optimization passes to the program in a loop until reaching a fixed point. But this is not done in
+practice for the simple reason that doing so would result in excessively long compile times -- each
+pass processes the entire program in at least linear time and there are hundreds of passes.
 
 Optimization to a fixed point is made possible by peephole optimization @son, which takes the
 optimization pass architecture and makes it incremental. Rather than passes (re)processing the
@@ -243,13 +243,13 @@ watch for substructures `<lhs> + <rhs>` where `<lhs>` and `<rhs>` themselves are
 input declaration interface takes the form of a syntactic pattern over terms in the IR, which the
 peephole engine is able to incrementally resolve into a set of candidate locations. Once a pattern
 match is found, some rewrite rules may need to run arbitrary logic to figure out whether their
-optimizations are applicable and how to modify the program, but other rewrite rules may directly
+optimizations are applicable and how to modify the program, but simpler rewrite rules may directly
 specify a syntactic rewrite performing the optimization. In this latter case we have a purely
 syntactic rewrite rule, such as `Add(Const(a), Const(b)) => Const(a+b)` or
 `Add(Mul(a,b), Mul(a,c)) => Mul(a, Add(b,c))`, which not only are easy to state but also easier
 to reason about than ad-hoc passes, expressed in possibly very many lines of code. Many but not all
 optimizations can be implemented as single syntactic rewrites. More complicated optimizations may be
-implemented through multiple rewrites, especially with the aid of e-class analyses @egg @egglog.
+implemented through multiple rewrites, especially with the aid of lattice-based analyses @egg @egglog.
 
 In summary, peephole optimization has fundamental advantages over an optimization pass architecture
 while still serving as an approach to modularize the compiler implementation. Peephole rewriting
@@ -284,33 +284,35 @@ by eliding e-classes consisting of a single e-node.
   grid(
     columns: (1fr, 1fr),
     fletcher.diagram(
-      spacing: 2.2em,
+      spacing: 0em,
+      cell-size: 3.8em,
       node-stroke: 1pt,
       node-shape: circle,
       {
         let (A0, A1, A2) = ((1, 0), (0, 0), (2, 0))
         let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
         let (C0, C1) = ((0, 2), (1, 2))
-        node(A0, $a$)
-        node(A1, $2$)
-        node(A2, $1$)
-        node(B2, $b$)
+        node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+        node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
+        node(A2, "" + [#place(dx: -3pt, dy: -8.5pt, [$1$])])
+        node(B2, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
         edge(A0, B0, "->")
         edge(A1, B0, "->")
         edge(A0, B1, "->")
         edge(A2, B1, "->")
-        node(B0, $*$)
-        node(B1, $<<$)
+        node(B0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+        node(B1, "" + [#place(dx: -6pt, dy: -8.5pt, [$<<$])])
         edge(B0, C0, "->")
         edge(B1, C1, "->")
         edge(B2, C0, "->")
         edge(B2, C1, "->")
-        node(C0, $+$)
-        node(C1, $+$)
+        node(C0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+        node(C1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
       },
     ),
     fletcher.diagram(
-      spacing: 2.2em,
+      spacing: 0em,
+      cell-size: 3.8em,
       node-stroke: 1pt,
       node-shape: circle,
       {
@@ -318,37 +320,37 @@ by eliding e-classes consisting of a single e-node.
         let (B0, B1) = ((0, 1), (1, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         let (D0) = (0, 3)
-        node(A0, $a$)
-        node(A1, $2$)
-        node(A2, $1$)
+        node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+        node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
+        node(A2, "" + [#place(dx: -3pt, dy: -8.5pt, [$1$])])
         edge(A0, B0, "->")
         edge(A1, B0, "->")
         edge(A0, B1, "->")
         edge(A2, B1, "->")
-        node(B0, $*$)
-        node(B1, $<<$)
+        node(B0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+        node(B1, "" + [#place(dx: -6pt, dy: -8.5pt, [$<<$])])
         edge(B0, C0, "->")
         edge(B1, C0, "->")
-        node(C0, text(size: 8pt, `union`))
-        node(C1, $b$)
+        node(C0, radius: 1.25em, "" + [#place(dx: -2.5pt, dy: -7pt, text(size: 9.5pt, `union`))])
+        node(C1, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
         edge(C0, D0, "->")
         edge(C0, D0, "->")
         edge(C1, D0, "->")
         edge(C1, D0, "->")
-        node(D0, $+$)
+        node(D0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
       },
     ),
   ),
-  caption: [Illustration on how e-graphs deduplicate usages of equivalent computations. The left
-    side is an expression DAG while the right side is a pseudo-e-graph with a `union` node to avoid
-    duplicating the addition @acyclic_egraphs.],
+  caption: [Illustration on how e-graphs deduplicate usages of the equivalent subcomputation in $2a+1$
+    and $(a<<1)+1$. The left side is an expression DAG while the right side is a pseudo-e-graph with a
+    `union` node to avoid duplicating the addition.],
   placement: auto,
 ) <fig_intro_baby_egraph>
 
 E-graphs were originally developed for automated theorem proving @oldegraph @egraphwithexplain, in
 which they interact with a larger system. The e-graph is fed assumptions, possibly producing
 contradictions, which are then revoked and replaced with other assumptions. This means e-graphs for
-use in automated theorem proving require support for backtracking, restricting how they can be
+use in automated theorem proving require support for undoing, restricting how they can be
 implemented.
 
 In contrast, the equality saturation (EqSat) @equalitysaturation workflow involves an e-graph
@@ -434,8 +436,8 @@ databases and how this can be leveraged for a significantly more efficient imple
 @chapter_implementation[Chapter] concretely describes the application of these techniques in Oatlog
 and the implementation decisions we have made, in addition to showing how Oatlog is used and its
 capabilities. @chapter_evaluation[Chapter] follows by evaluating Oatlog through its test suite and
-benchmarks. @chapter_conclusion[Chapter] discusses future work, both algorithmic and constant factor
-performance improvements.
+benchmarks. @chapter_conclusion[Chapter] concludes with a discussion on future work, both
+algorithmic and constant factor performance improvements.
 
 = Background <chapter_background>
 
@@ -448,8 +450,7 @@ explains the basics of the egglog language -- the frontend language used in Oatl
 
 == E-graphs <section_group_egraphs>
 
-This section introduces e-graphs as mathematical objects before going on to explain how e-graphs can
-be implemented in relatively simple code.
+This section introduces e-graphs as immutable mathematical objects.
 
 === Expression trees and DAGs <section_background_dags>
 
@@ -461,16 +462,16 @@ tree, in this case $((a+b) dot 2) dot ((a+b)+2)$.
 This representation spells out $a+b$ twice, which may be acceptable for small expressions but
 quickly becomes cumbersome for larger expressions such as in the quadratic formula. We can avoid
 this using variable substitutions: let $t=a+b$ in $t dot 2 dot (t+2)$. The equivalent of this for
-the tree representation is allow re-use of syntactically identical expressions, which turns the tree
-into a DAG#footnote[While technically all directed trees are also DAGs, that is pedantry.] (Directed
-Acyclic Graph). @fig_background_expression_tree_and_dag shows the tree and DAG representations side
-by side. This transform is often called common subexpression elimination.
+the tree representation is to allow re-use of syntactically identical expressions, which turns the
+tree into a DAG#footnote[While technically all directed trees are also DAGs, that is pedantry.]
+(Directed Acyclic Graph). @fig_background_expression_tree_and_dag shows the tree and DAG
+representations side by side. This transform is often called common subexpression elimination.
 
 #figure(
   grid(
     columns: (1fr, 1fr),
     fletcher.diagram(
-      spacing: 2.2em,
+      spacing: (4em, 3em),
       node-stroke: 1pt,
       node-shape: circle,
       {
@@ -478,31 +479,31 @@ by side. This transform is often called common subexpression elimination.
         let (B0, B1, B2, B3) = ((0, 1), (1, 1), (2, 1), (3, 1))
         let (C0, C1) = ((0.5, 2), (2.5, 2))
         let D = (1.5, 3)
-        node(A0, $a$)
-        node(A1, $b$)
-        node(A2, $a$)
-        node(A3, $b$)
+        node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+        node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
+        node(A2, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+        node(A3, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
         edge(A0, B0, "->")
         edge(A1, B0, "->")
         edge(A2, B2, "->")
         edge(A3, B2, "->")
-        node(B0, $+$)
-        node(B1, $2$)
-        node(B2, $+$)
-        node(B3, $2$)
+        node(B0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+        node(B1, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
+        node(B2, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+        node(B3, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
         edge(B0, C0, "->")
         edge(B1, C0, "->")
         edge(B2, C1, "->")
         edge(B3, C1, "->")
-        node(C0, $*$)
-        node(C1, $+$)
+        node(C0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+        node(C1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
         edge(C0, D, "->")
         edge(C1, D, "->")
-        node(D, $*$)
+        node(D, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
       },
     ),
     fletcher.diagram(
-      spacing: 2.2em,
+      spacing: (4em, 3em),
       node-stroke: 1pt,
       node-shape: circle,
       {
@@ -510,21 +511,21 @@ by side. This transform is often called common subexpression elimination.
         let (B0, B1) = ((0, 1), (1, 1))
         let (C0, C1) = ((0, 2), (1, 2))
         let D = (0.5, 3)
-        node(A0, $a$)
-        node(A1, $b$)
+        node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+        node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
         edge(A0, B0, "->")
         edge(A1, B0, "->")
-        node(B0, $+$)
-        node(B1, $2$)
+        node(B0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+        node(B1, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
         edge(B0, C0, "->")
         edge(B1, C0, "->")
         edge(B0, C1, "->")
         edge(B1, C1, "->")
-        node(C0, $*$)
-        node(C1, $+$)
+        node(C0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+        node(C1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
         edge(C0, D, "->")
         edge(C1, D, "->")
-        node(D, $*$)
+        node(D, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
       },
     ),
   ),
@@ -538,11 +539,11 @@ syntactically different subexpressions are processed identically. If one can rep
 the expressions $(2+(a xor b)) dot (2 dot (a xor b))$ and $(2+(a+b)) dot (2 dot (a+b))$, with $xor$
 denoting bitwise xor, could be compactly represented as $f(a xor b)$ and $f(a + b)$ with $f(x) =
 (2+x) dot (2 dot x)$. But this is not possible in expression DAGs, and they must instead duplicate
-the identical usage code downstream of the $xor$ and $+$ as shown in @fig_background_dag_duplicated.
+the identical usage code downstream of the $xor$ and $+$, as shown in @fig_background_dag_duplicated.
 
 #figure(
   fletcher.diagram(
-    spacing: 2.2em,
+    spacing: (4em, 3em),
     node-stroke: 1pt,
     node-shape: circle,
     {
@@ -550,15 +551,15 @@ the identical usage code downstream of the $xor$ and $+$ as shown in @fig_backgr
       let (B0, B1, B2) = ((0, 1), (2, 1), (3, 1))
       let (C0, C1, C2, C3) = ((0, 2), (1, 2), (2, 2), (3, 2))
       let (D0, D1) = ((0.5, 3), (2.5, 3))
-      node(A0, $a$)
-      node(A1, $b$)
+      node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+      node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
       edge(A0, B0, "->")
       edge(A1, B0, "->")
       edge(A0, B1, "->")
       edge(A1, B1, "->")
-      node(B0, $xor$)
-      node(B1, $+$)
-      node(B2, $2$)
+      node(B0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$xor$])])
+      node(B1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+      node(B2, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
       edge(B0, C0, "->")
       edge(B0, C1, "->")
       edge(B1, C2, "->")
@@ -567,16 +568,16 @@ the identical usage code downstream of the $xor$ and $+$ as shown in @fig_backgr
       edge(B2, C1, "->")
       edge(B2, C2, "->")
       edge(B2, C3, "->")
-      node(C0, $*$)
-      node(C1, $+$)
-      node(C2, $*$)
-      node(C3, $+$)
+      node(C0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+      node(C1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+      node(C2, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+      node(C3, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
       edge(C0, D0, "->")
       edge(C1, D0, "->")
       edge(C2, D1, "->")
       edge(C3, D1, "->")
-      node(D0, $*$)
-      node(D1, $*$)
+      node(D0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+      node(D1, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
     },
   ),
   caption: [An expression DAG representing both
@@ -612,30 +613,30 @@ duplicated.
       let (B0, B1, B2) = ((0, 1), (1, 1), (2, 1))
       let (C0, C1) = ((0.75, 2), (1.75, 2))
       let D = (1.25, 3)
-      node(A0, $a$)
+      node(A0, radius: 1em, $a$)
       node(enclose: (A0,), shape: square)
-      node(A1, $b$)
+      node(A1, radius: 1em, $b$)
       node(enclose: (A1,), shape: square)
       edge(A0, <xor>, "->")
       edge(A1, <xor>, "->")
       edge(A0, <plus>, "->")
       edge(A1, <plus>, "->")
-      node(B0, $xor$, name: <xor>)
-      node(B1, $+$, name: <plus>)
+      node(B0, radius: 1em, $xor$, name: <xor>)
+      node(B1, radius: 1em, $+$, name: <plus>)
       node(enclose: (B0, B1), shape: square, name: <either>)
-      node(B2, $2$, name: <two>)
+      node(B2, radius: 1em, $2$, name: <two>)
       node(enclose: (B2,), shape: square)
       edge(<either>, <mul>, "->")
       edge(<either>, <add>, "->")
       edge(B2, <mul>, "->")
       edge(B2, <add>, "->")
-      node(C0, $*$, name: <mul>)
+      node(C0, radius: 1em, $*$, name: <mul>)
       node(enclose: (C0,), shape: square)
-      node(C1, $+$, name: <add>)
+      node(C1, radius: 1em, $+$, name: <add>)
       node(enclose: (C1,), shape: square)
       edge(C0, <top>, "->")
       edge(C1, <top>, "->")
-      node(D, $*$, name: <top>)
+      node(D, radius: 1em, $*$, name: <top>)
       node(enclose: (D,), shape: square)
     },
   ),
@@ -667,10 +668,10 @@ example is synthetic but in general e-graphs achieve compression exponential in 
 rewrites.
 
 E-graphs can be represented as graphs in multiple ways. We have already seen how e-nodes can be
-nodes and e-classes equivalence classes of nodes. This is representation that motivates the e-class
-and e-node terminology. In another formulation, e-graphs are bipartite graphs with e-classes and
-e-nodes being the two types of nodes. Edges run from e-node to e-class denoting membership in that
-equivalence class, and from e-class to e-node denoting being used as input in that e-node's
+nodes and e-classes equivalence classes of nodes. This is the representation that motivates the
+e-class and e-node terminology. In another formulation, e-graphs are bipartite graphs with e-classes
+and e-nodes being the two types of nodes. Edges run from e-node to e-class denoting membership in
+that equivalence class, and from e-class to e-node denoting being used as input in that e-node's
 operation. As in the other representations, operation input edges are ordered from the point of view
 of the operation since not all operations are commutative. Finally, every e-node is a member of
 exactly one e-class and typically no e-class is empty. @fig_background_bipartite_egraph shows this
@@ -678,7 +679,7 @@ representation.
 
 #figure(
   fletcher.diagram(
-    spacing: 3em,
+    spacing: (4em, 3em),
     node-stroke: 1pt,
     node-shape: circle,
     {
@@ -691,8 +692,8 @@ representation.
       let G = (6, 1)
       let H = (7, 1)
 
-      node(A0, $a$)
-      node(A1, $b$)
+      node(A0, "" + [#place(dx: -3pt, dy: -8.5pt, [$a$])])
+      node(A1, "" + [#place(dx: -3pt, dy: -8.5pt, [$b$])])
       edge(A0, B0, "->")
       edge(A1, B1, "->")
       node(B0, " ", shape: rect)
@@ -703,9 +704,9 @@ representation.
       edge(B1, C0, "->")
       edge(B1, C1, "->")
 
-      node(C0, $xor$)
-      node(C1, $+$)
-      node(C2, $2$)
+      node(C0, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$xor$])])
+      node(C1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
+      node(C2, "" + [#place(dx: -3pt, dy: -8.5pt, [$2$])])
       edge(C0, D0, "->")
       edge(C1, D0, "->")
       edge(C2, D1, "->")
@@ -717,8 +718,8 @@ representation.
       edge(D1, E0, "->")
       edge(D1, E1, "->")
 
-      node(E0, $*$)
-      node(E1, $+$)
+      node(E0, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
+      node(E1, "" + [#place(dx: -4.5pt, dy: -8.5pt, [$+$])])
       edge(E0, F0, "->")
       edge(E1, F1, "->")
       node(F0, " ", shape: rect)
@@ -727,7 +728,7 @@ representation.
       edge(F0, G, "->")
       edge(F1, G, "->")
 
-      node(G, $*$)
+      node(G, "" + [#place(dx: -3pt, dy: -8.5pt, [$*$])])
       edge(G, H, "->")
       node(H, " ", shape: rect)
     },
@@ -798,14 +799,14 @@ optimization involves modifying which root is merged into the other in `union()`
 smaller-to-larger, guaranteeing logarithmic tree depth. Each of these optimizations individually
 guarantee an amortized $O(log n)$ time per `find()` and `union()`, with an amortized exceedingly
 slowly growing $O(alpha(n))$ time #footnote[$alpha(n)$ is roughly the inverse of the Ackermann
-function and significantly slower than even nested logarithms.] per operation if both are applied
-@fastunionfind @unionfindvariantbounds.
+function and grows significantly slower than even nested logarithms.] per operation if both are
+applied @fastunionfind @unionfindvariantbounds.
 
-For equality saturation the cost of different path compression and merging order choices affect not
+For equality saturation, the cost of different path compression and merging order choices affect not
 just the time spent within `find()` but also the time spent within the larger e-graph computation.
 In particular, the cost of a merge is dominated not by pointer chasing within `find()` but by having
 to remove uprooted e-classes from the broader e-graph. This motivates merging smaller-to-larger not
-in terms of union-find tree size but the number of e-nodes referring to the e-class. This can either
+in terms of union-find tree size but the number of e-nodes referring to that e-class. This can either
 be tracked explicitly, which has bookkeeping overhead, or by the heuristic that older e-classes are
 more referred to, motivating younger-to-older merging. However, the minimal implementation presented
 in @fig_background_practice_uf merges in arbitrary order.
@@ -907,7 +908,7 @@ uses its e-class if present, only otherwise falling back to `make()`.
     let b = raw(read("egraph.rs").split("\n").slice(start - 1, end).join("\n"), lang: "rust", block: true)
     text(size: 8pt, setup + b + reset)
   },
-  caption: [Hard-coded implementation of rewrite rules for commutativity and distributivity on an
+  caption: [A hard-coded implementation of rewrite rules for commutativity and distributivity on an
     e-graph.],
 ) <fig_background_practice_apply_rules>
 
@@ -1373,7 +1374,7 @@ reasonable implementation shown in @trijoin_slow.
       for (b) in Mul(_, c, y):
         print(f"{a} * {c} + {b} dot {c}")
   ```,
-  caption: [Triangle join with only joins.],
+  caption: [A triangle join with only joins.],
 ) <trijoin_slow>
 
 However, it is not asymptotically optimal. The problem arises in situations where any `x` or `y`
@@ -1397,7 +1398,7 @@ optimal.
     @trijoin_slow.],
 ) <trijoin_fast>
 
-The first known worst-case optimal join algorithm is the Generic join @optimaljoin. It can be
+The first known worst-case optimal join algorithm is the Generic Join @optimaljoin. It can be
 formulated as the following:
 + First choose an arbitrary total variable ordering. We determine variables one by one in this
   order.
@@ -1411,10 +1412,10 @@ $("variables" - 1)$ joins rather than the $("relations"- 1)$ joins previously re
 @trijoin_slow and @trijoin_fast, especially when the query has many variables that are only used
 once.
 
-This is addressed by the Free join framework @freejoin1 @freejoin2, which unifies Generic join and
+This is addressed by the Free join framework @freejoin1 @freejoin2, which unifies Generic Join and
 binary join plans. Within the Free join framework, we can bind all variables as soon as a relation
 is iterated. If we introduce semi-joins as in @trijoin_fast this is worst-case optimal, since it be
-seen as a constant-factor improvement of the Generic join binding variables in the same order.
+seen as a constant-factor improvement of the Generic Join binding variables in the same order.
 
 While the theory of WCOJs is quite complicated, our understanding of it is that we can select an
 arbitrary order to join our relations -- implicitly determining a variable ordering -- and we remain
@@ -1454,9 +1455,7 @@ bound.
   def join_abc(a, b, c):
     print(a, b, c)
   ```,
-  caption: [
-    Generic join algorithm for a triangle join.
-  ],
+  caption: [Generic Join algorithm for a triangle join.],
 ) <generic_join_triangle>
 
 === Design constraints for Datalog engines vs SQL databases. <section_background_datalog_vs_sql>
@@ -1646,7 +1645,7 @@ redundant rules, which are detected and removed.
 
 After HIR optimization and semi-naive expansion, the rewrite rules of the theory are jointly query
 planned while converting to TIR -- trie intermediate representation. The query planning follows a
-greedy heuristic within the confines of a worst-case optimal Generic join. TIR is motivated by the
+greedy heuristic within the confines of a worst-case optimal Generic Join. TIR is motivated by the
 insight that many rules have overlapping premises, as illustrated by @fig_trie_ir, which can be
 exploited by matching rewrite rules jointly in a trie. This is one of Oatlog's novel contributions.
 The trie is a tree where the root matches everything, edges add additional premise constraints and
@@ -1691,9 +1690,9 @@ nodes contain actions. @fig_impl_tir shows TIR's trie structure.
       ```,
     ),
   ),
-  caption: [
-    Merging similar rules to avoid repeated joins and actions where A,B,C,D are premises and X,Y,Z are actions (inserts and unifications).
-  ],
+
+  caption: [Merging similar rules to avoid repeated joins and actions where `A`, `B`, `C`, `D` are
+    premises and `X`, `Y`, `Z` are actions (inserts and unifications).],
 ) <fig_trie_ir>
 
 #figure(
@@ -1903,7 +1902,7 @@ Query planning in databases is the general problem of deciding an order in which
 Specifically for relational e-matching and Datalog, it refers to determining an order in which to
 join the atoms in a premise.
 
-Oatlog query plans only Generic joins as described in @section_background_wcoj. Generic join is
+Oatlog query plans only Generic Joins as described in @section_background_wcoj. Generic Join is
 worst-case optimal given identically sized relations, but for relations of different sizes one
 should prefer to join smaller relations first. Oatlog statically query-plans at compile-time since
 that requires less engineering effort and provides greater freedom in terms of memory representation
@@ -1913,11 +1912,11 @@ size information is known when query planning. Oatlog makes the following assump
 - Functional dependencies may cause some joins to produce at most a single element.
 - Relations corresponding to global variables contain exactly one element.
 
-Generic join is usually formulated as selecting an order in which to determine variables, but
+Generic Join is usually formulated as selecting an order in which to determine variables, but
 Oatlog's query planning implicitly selects such an order by repeatedy selecting an atom to join in
 from a set of premise atoms. Joins can be primary joins, which iterate all relation tuples matching
 some columns, or semi-joins which verify that there are at least one relation tuple that matches the
-known columns. Semi-joins, as dictated by the Generic join algorithm take precedence over primary
+known columns. Semi-joins, as dictated by the Generic Join algorithm take precedence over primary
 joins, aside from the optimization that single-element primary joins are preferred. Oatlog encodes
 this as selecting the option with the maximum associated `RelationScore`, an enum which is shown
 with cases in ascending order of priority in @fig_impl_relation_score.
@@ -2088,10 +2087,10 @@ In the absence of a functional dependency, lookups on a subset of all columns ma
 values. A non-FD index should behave like a `HashMap<Keys, Vec<Values>>`, but directly using that
 representation results in many individually allocated vectors. This is expensive due to a 24-byte
 overhead per `Vec<T>` as as well as minimum allocation sizes. This can partly be addressed with a
-custom allocator and/or a short string optimization, but a more fundamental fix involves storing all
-`Values` in a single permuted list with the `HashMap` pointing into it. Oatlog therefore implements
-non-FD indexes as in @fig_impl_non_fd_index, with `Value`s being sorted by their corresponding
-`Key`.
+custom allocator and/or a short string optimization, but a more fundamental solution involves
+storing all `Values` in a single permuted list with the `HashMap` pointing into it. Oatlog therefore
+implements non-FD indexes as in @fig_impl_non_fd_index, with `Value`s being sorted by their
+corresponding `Key`.
 
 #figure(
   placement: auto,
@@ -2148,7 +2147,7 @@ functional dependencies within every relation to a fixed point.
 === Relational e-matching codegen <section_implementation_codegen_ematching>
 
 @section_implementation_tir_details has already discussed query planning as a worst-case-optimal
-Generic join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
+Generic Join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
 lowered to a tree of nested loops in the generated code, each performing a semi-join or a primary
 join. @fig_impl_codegen_ematching shows generated code for `apply_rules`, including the
 index-accessing functions on the `AddRelation`. No-FD indexes iterate their outputs while FD indexes
@@ -2426,7 +2425,7 @@ performing very similarly to egglog over $10^7$ e-nodes.
 #figure(
   placement: auto,
   image("benchmarks.svg"),
-  caption: [Oatlog's speedup over egglog as a function of the number of e-nodes. Oatlog has a
+  caption: [Oatlog's speedup over egglog as a function of the number of e-nodes in the e-graph. Oatlog has a
     double-digit speedup for scenarios less than a thousand e-nodes, which gradually shrinks to closely
     approach egglog's performance for e-graphs of tens of millions of e-nodes.],
 ) <fig_eval_benchmarks_plot>
