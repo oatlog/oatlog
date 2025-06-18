@@ -840,24 +840,24 @@ alongside the e-node pointing towards the e-class or vice versa. Note that every
 exactly one outgoing edge and some fixed number of ingoing edges, depending on the operation arity.
 On the other hand, e-classes may have an arbitrary number of ingoing and outgoing edges. A natural
 representation of the graph is therefore to store all edges as going from e-node to e-class, or in
-more concrete terms to let e-classes be numerical ids and e-nodes be tuples of their input and
-output e-class ids. The statement $x_1 + x_2 = x_3$ can be represented with an e-node tuple $(+, 1,
+more concrete terms to let e-classes be numerical IDs and e-nodes be tuples of their input and
+output e-class IDs. The statement $x_1 + x_2 = x_3$ can be represented with an e-node tuple $(+, 1,
 2, 3)$.
 
-Representing e-classes with e-class ids additionally means that e-class `union()` can be tracked
-with a union-find data structure as previously described in @section_background_practice_union_find.
+Representing e-classes with e-class IDs also means that e-class `union()` can be tracked with a
+union-find data structure as previously described in @section_background_practice_union_find.
 E-classes that are uprooted after a `union()` will still be referred to in various e-nodes, so there
 must be a canonicalization step in which all such e-nodes are updated.
 
 Finally, addition satisfies that for any given input there is exactly one valid output. This is
-called functional dependency and holds for any total function, and for partial functions there is at
-most one valid output. This functional dependency means that for any e-nodes $(op, a, b, c)$ and
+called a functional dependency and holds for any total function, and for partial functions there is
+at most one valid output. This functional dependency means that for any e-nodes $(op, a, b, c)$ and
 $(op, a, b, d)$ we are guaranteed that $c=d$, motivating storing e-nodes in a map from operator and
 inputs to output.
 
 @fig_background_practice_canonicalization combines these insights to represent an e-graph as a pair
 of `uf: UnionFind` and `enodes: HashMap<(Op, EClass, EClass), EClass>`. It also shows how e-class
-ids can be canonicalized after a batch of `union()` operations, requiring looping until a fixed
+IDs can be canonicalized after a batch of `union()` operations, requiring looping until a fixed
 point is reached due to functional dependencies possibly triggering a cascade of `union()`
 operations.
 
@@ -885,7 +885,7 @@ unlike a generic e-graph engine, which must be able to handle arbitrary rules by
 compiling them.
 
 Each of the three rules are phrased as conditional insertions, adding new e-classes and e-nodes when
-matching specific patterns in the existing structure. If this was the only effect of the rules then
+matching specific patterns in the existing structure. If this was the only effect of the rules, then
 `canonicalize()` would never need to be run since `self.enodes` would never contain any uprooted
 e-class. However, e-node insertions on already existing e-node inputs result in `union()`
 operations. These break the invariant that `self.enodes` contain only root e-classes, requiring a
@@ -914,10 +914,10 @@ uses its e-class if present, only otherwise falling back to `make()`.
 
 === A full implementation
 
-@fig_background_practice_full displays the full program from which we have seen snippets of in
-previous sections, showcasing the entire EqSat workflow in a single example. It is a condensed
-example, having only a handful of rewrite rules and few operators in addition to being an
-unsophisticated implementation, but is conceptually similar to real e-graph engines.
+@fig_background_practice_full displays the full program which we have seen snippets of in previous
+sections, showcasing the entire EqSat workflow in a single example. It is a condensed example,
+having only a handful of rewrite rules and few operators in addition to being an unsophisticated
+implementation, but is conceptually similar to real e-graph engines.
 
 An expression language, i.e. a set of operators, together with a set of rewrite rules, is called a
 theory. In the EqSat workflow, a user creates an initial e-graph by declaring variables and
@@ -985,7 +985,7 @@ considered standard due to egg's ubiquity.
 
 The name recursive e-matching is derived from how it recursively matches the left hand side of a
 rewrite rule. A pattern $(a dot b) + (a dot c) = d$ can be seen as a tree of three nodes, a root
-addition with two child multiplication, and it can be matched with the four functions shown in
+addition with two child multiplications, and it can be matched with the four functions shown in
 @fig_background_recursive_ematching_example.
 
 #figure(
@@ -1019,18 +1019,18 @@ addition with two child multiplication, and it can be matched with the four func
 ) <fig_background_recursive_ematching_example>
 
 The name recursive e-matching derives from how e-nodes are bound to the pattern in a pre-order
-traversal of the pattern tree, and in addition to the `enodes: HashMap<ENode, EClass>`, which is
+traversal of the pattern tree. In addition to the `enodes: HashMap<ENode, EClass>`, which is
 familiar from @fig_background_practice_apply_rules and necessary for insertions, recursive
-e-matching also relies on a reversed `enodes_by_eclass: HashMap<EClass, ENode>`.
+e-matching also relies on the inverse `enodes_by_eclass: HashMap<EClass, ENode>`.
 
-Overall, recursive e-matching by only iterating all e-nodes in the outermost layer is significantly
-more efficient than what we presented previously, but there are still problems that arise.
-Roughly, these are:
+Overall, recursive e-matching's use of `enodes_by_eclass` is significantly more efficient than what
+we presented previously, but there are still problems that arise. Roughly, these are:
 + Iterating through e-nodes that will be rejected on the bases of operator or variable agreement is
   unnecessary and wasteful.
 + Calls to `apply_rules()` will output all matches, even those discovered in previous calls to
   `apply_rules()`.
-Later on, we will see that relational e-matching addresses these issues.
+Later on, we will see how relational e-matching and semi-naive evaluation respectively address
+these issues.
 
 == Relational Databases <section_background_relational_databases>
 
@@ -1038,8 +1038,8 @@ This section connects relational databases with e-graphs.
 
 === Database joins <section_background_db_join>
 
-This section is an interlude from e-graphs and equality saturation to present the relational
-database concepts necessary that we later will apply to e-graphs.
+This section is an interlude from e-graphs and equality saturation, presenting the relational
+database concepts that we later will apply to e-graphs.
 
 #let c2 = table.cell(fill: red.lighten(20%))[c2]
 #let c5 = table.cell(fill: blue.lighten(20%))[c5]
@@ -1103,24 +1103,23 @@ database concepts necessary that we later will apply to e-graphs.
 Relational databases store tables, also known as relations, such as the order and customer tables in
 the example of @fig_background_database_join_concept. Tables are lists of rows, but they can often
 be seen as sets of rows due to not containing duplicates and their order being irrelevant. A row is
-a key-value record, with every row in a table satisfying the same schema.
+a key-value record, with every row in a table having identical keys.
 
 An algorithm that reads both the order and customer tables can be expressed in terms of reading and
-mutating them individually, but it is often useful to be able to access the two
-simultaneously, which is why the join ($join$) operation exists. A join, or more precisely an inner
-join, compares all pairs of rows in the two tables and keeps those where the attribute that we join
-on, in the figure `Cust`, matches. The output of a join is semantically another table as shown in
-@fig_background_database_join_concept. Storing the order and customer data separately means changing
-a customer name requires touching less memory and is more compact overall. Additionally, doing joins
-dynamically supports not just queries accessing $"Orders" join "Customers"$ but also more
-complicated joins involving more relations.
+mutating them individually, but it is often useful to be able to access the two simultaneously,
+motivating the join ($join$) operation. A join, or more precisely an inner join, compares all pairs
+of rows in the two tables and keeps those where the attribute that we join on, `Cust` in
+@fig_background_database_join_concept, matches. The output of a join is semantically another table.
+Storing the order and customer data separately means changing a customer name requires touching less
+memory and is more compact overall. Additionally, doing joins dynamically supports not just queries
+accessing $"Orders" join "Customers"$ but also more complicated joins involving more relations.
 
 A join can be implemented with a Cartesian product and a filter, but this is inefficient if the
-overwhelming majority of the $O(n^2)$ intermediate rows are filtered out and constructing them
-turned out to be unnecessary. Joins are therefore usually implemented using search trees such as
-B-trees or hash maps, for which the time complexity scales linearitmically or linearly with the size
-of the smaller relation and the number of output rows. Both of these join implementations are
-illustrated in @fig_background_database_join_impl
+overwhelming majority of the $O(n^2)$ intermediate rows are filtered out and constructing them would
+be unnecessary. Joins are therefore usually implemented using search trees such as B-trees or hash
+maps, for which the time complexity scales linearitmically or linearly with the size of the smaller
+relation and the number of output rows. Both of these join implementations are illustrated in
+@fig_background_database_join_impl
 
 #figure(
   text(
@@ -1160,8 +1159,8 @@ illustrated in @fig_background_database_join_impl
 === E-graphs as relational databases <section_background_relational>
 
 In @section_background_recursive_ematching we determined that we can improve upon recursive
-e-matching either if we can avoid rediscovering matches from earlier iterations, or if we can do
-lookups with less filtering by incorporating more known constraints up-front.
+e-matching by either avoiding rediscovering matches from earlier iterations, or if we can do lookups
+with less filtering by incorporating more known constraints up-front.
 
 The least constrained lookup in recursive e-matching is binding the root e-node, which involves
 iterating all e-nodes of a given operator. All lookups in recursive calls are for a known operator,
@@ -1171,10 +1170,8 @@ of arity differences this even has the benefit of a more uniform memory layout.
 
 After storing the e-nodes of each operator separately, each operator stores a set of e-class tuples
 and lookups are in form of one of
-+ Hashcons#footnote[A hashmap from e-node to output e-class, to ensure that any e-node belongs to
-  exactly one e-class. This is analogous to the general concept of hash consing where structurally
-  equal values are only stored once.] for insertion, with all inputs known.
-+ Recursive e-matching case, with the output known.
++ Insertion, with all inputs known.
++ Recursive e-matching, with the output known.
 + Recursive e-matching alternative case, with the output and some inputs known.
 
 This is very reminiscent of various indexed lookups on a table. The table columns are the inputs and
@@ -1201,7 +1198,7 @@ then adjoining tables for its subpatterns. The pattern can also be written in co
 
 $"Add"("ab", "ac", "d") join "Add"("a", "b", "ab") join "Add"("a", "c", "ac")$
 
-Where $join$ denotes a natural join, here on the columns $"ab"$, $"ac"$ and $"a"$ after renaming the
+where $join$ denotes a natural join, here on the columns $"ab"$, $"ac"$ and $"a"$ after renaming the
 columns according to the labels within parenthesis. This is a conjunctive query, a (multi)set of
 tables that have their columns renamed and then naturally joined. In general, all patterns expressed
 as syntactic trees can be turned into conjunctive queries by adding temporary variables for function
@@ -1244,8 +1241,8 @@ provides a way to only compute those query matches that have not been matched in
 iterations, hence solving the second problem that we identified with recursive e-matching in
 @section_background_recursive_ematching.
 
-Let us say that we want to join relations A, B and C, where $join$ is a join, $union$ is the union
-of relations and $Delta$ is the change to a relation. Then
+Let us say that we want to join relations $A$, $B$ and $C$, where $join$ is a join, $union$ is the
+union of relations and $Delta$ is the change to a relation. Then
 
 $
   "all information" = (A union Delta A) join (B union Delta B) join (C union Delta C).
@@ -1398,9 +1395,9 @@ optimal.
     @trijoin_slow.],
 ) <trijoin_fast>
 
-The first known worst-case optimal join algorithm is the Generic Join @optimaljoin. It can be
-formulated as the following:
-+ First choose an arbitrary total variable ordering. We determine variables one by one in this
+The first worst-case optimal join algorithm to be formulated is the Generic Join @optimaljoin. To
+employ it, we do the following:
++ First choose an arbitrary permutation of all variables. We determine variables one by one in this
   order.
 + Iterate an arbitrary relation for values to bind to the first variable.
 + Perform semi-joins, checking that this value is valid according to all other relations.
@@ -1477,9 +1474,9 @@ language-level functions.
 
 Egglog's predecessor egg @egg had its rewrite rules declared in an ad-hoc manner through a
 combination of a Rust procedural macro and S-expression strings, but egglog defined a complete
-language for equality saturation designed to be usable in a REPL or otherwise standalone from a Rust
-program. While Oatlog is designed to be used to embed e-graphs within programs, it implements the
-egglog language for compatibility and because it is an effective language for describing EqSat
+language for equality saturation designed to be usable in a REPL or otherwise outside the context of
+a Rust program. While Oatlog is designed to be used to embed e-graphs within programs, it implements
+the egglog language for compatibility and because it is an effective language for describing EqSat
 theories.
 
 @informal-theory-example shows an example theory specified in the egglog domain-specific language
@@ -1554,7 +1551,7 @@ intermediate representations: HIR, TIR and LIR.
 
 == Oatlog from a user's perspective <section_implementation_api_interface>
 
-Oatlog is a, or technically a pair of, Rust procedural macros. The macros
+Oatlog is a, or technically a pair of, Rust procedural macros. The two macros
 `oatlog::compile_egraph_strict!()` and `oatlog::compile_egraph_relaxed!()` both take as input an
 egglog theory and emits a struct `Theory` as well as opaque types representing e-classes within each
 of the egglog code datatypes. A generated theory containing
@@ -1610,7 +1607,7 @@ egglog code into minimal misbehaving examples when debugging.
 === HIR, high-level IR
 
 The AST is transformed into HIR -- high-level intermediate representation -- while desugaring and
-performing type inference. HIR represents rewrite rules as shown in @fig_impl_hir, as a set of
+performing type inference. HIR represents rewrite rules, as shown in @fig_impl_hir, as a set of
 premises, actions and unifications.
 
 #figure(
@@ -1638,14 +1635,14 @@ premises, actions and unifications.
 The HIR allows rewrite rules to be simplified, both individually and as a group. Rules first
 experience individual optimization, merging identical variables, deduplicating premises, etc. The
 rewrite rules are then expanded for semi-naive evaluation, in which every rewrite rule is replaced
-with multiple other rules with differently tagged premise atoms. Semi-naive expansion can cause
+with multiple other rules with differently tagged premise atoms. Semi-naive expansion can lead to
 redundant rules, which are detected and removed.
 
 === TIR, trie IR
 
 After HIR optimization and semi-naive expansion, the rewrite rules of the theory are jointly query
 planned while converting to TIR -- trie intermediate representation. The query planning follows a
-greedy heuristic within the confines of a worst-case optimal Generic Join. TIR is motivated by the
+greedy heuristic within the confines of a worst-case optimal Free Join. TIR is motivated by the
 insight that many rules have overlapping premises, as illustrated by @fig_trie_ir, which can be
 exploited by matching rewrite rules jointly in a trie. This is one of Oatlog's novel contributions.
 The trie is a tree where the root matches everything, edges add additional premise constraints and
@@ -1725,7 +1722,7 @@ nodes contain actions. @fig_impl_tir shows TIR's trie structure.
 
 === LIR, low-level IR
 
-The LIR -- low-level intermediate representation -- also represent rules as a trie but with
+The LIR -- low-level intermediate representation -- also represents rules as a trie but with
 additional annotations in order to allow for straightforward code generation. This particularly
 includes a description what indexes are required on every relation and precisely how joins and
 actions should be performed. The structure of the LIR's `RuleTrie` is shown in @fig_impl_lir.
@@ -1828,7 +1825,7 @@ unify = [{b, c}]
 Oatlog performs the following optimizations until reaching a fixed point
 - Merging variables due to functional dependency.
 - Deduplicating identical premise atoms and identical action atoms.
-- Removing all action atoms that are also present in premise.
+- Removing all action atoms that are also present among the premises.
 - Attempt to merge variables that are later unified, so the unify can be avoided.
   - This is not possible if and only if both variables in the unify are already defined in the
     premise, in which case merging them would restrict the matches.
@@ -1886,15 +1883,15 @@ former in fact matches a superset of the latter.
 After the semi-naive transform, Oatlog eliminates all rules that match subsets of some other rule.
 We call this subset-like relation domination, where a rule A dominates a rule B if the matches of A
 are a superset of the matches of B. Equivalently, A dominates B if a variable substitution can be
-found such that the premise of A is a subset of the premise of B and the actions of A is a subset of
-the actions of B. This is an instance of the subgraph isomorphism problem between graphs
+found such that the premise of A is a subset of the premise of B and the actions of A is a superset
+of the actions of B. This is an instance of the subgraph isomorphism problem between graphs
 representing the two rules, which is NP-complete. Luckily the number of atoms in realistic rules is
 relatively small, so Oatlog is efficiently able to determine domination using recursive
 backtracking, significantly reducing the search space by exploiting the fact that atoms of a given
 relation can only be paired with atoms of the same relation.
 
 While invariant permutations directly eliminate indexes and hence providing a speedup, domination
-extends this to a further speedup by elimination duplicated e-matching work.
+extends this to a further speedup by eliminating duplicated e-matching work.
 
 == TIR and query planning <section_implementation_tir_details>
 
@@ -1902,24 +1899,24 @@ Query planning in databases is the general problem of deciding an order in which
 Specifically for relational e-matching and Datalog, it refers to determining an order in which to
 join the atoms in a premise.
 
-Oatlog query plans only Generic Joins as described in @section_background_wcoj. Generic Join is
+Oatlog query plans only Free Joins as described in @section_background_wcoj. Free Joins are
 worst-case optimal given identically sized relations, but for relations of different sizes one
 should prefer to join smaller relations first. Oatlog statically query-plans at compile-time since
 that requires less engineering effort and provides greater freedom in terms of memory representation
 compared to run-time dynamic query planning. We are therefore very limited in terms of what relation
-size information is known when query planning. Oatlog makes the following assumptions
-- `new` is smaller than `old` and `old` is smaller than `all`.
+size information is known when query planning. Oatlog estimates sizes through the following:
+- Assuming that `new` is smaller than `old` and `old` is smaller than `all`.
 - Functional dependencies may cause some joins to produce at most a single element.
 - Relations corresponding to global variables contain exactly one element.
 
-Generic Join is usually formulated as selecting an order in which to determine variables, but
-Oatlog's query planning implicitly selects such an order by repeatedy selecting an atom to join in
-from a set of premise atoms. Joins can be primary joins, which iterate all relation tuples matching
-some columns, or semi-joins which verify that there are at least one relation tuple that matches the
-known columns. Semi-joins, as dictated by the Generic Join algorithm take precedence over primary
-joins, aside from the optimization that single-element primary joins are preferred. Oatlog encodes
-this as selecting the option with the maximum associated `RelationScore`, an enum which is shown
-with cases in ascending order of priority in @fig_impl_relation_score.
+Rather than selecting an order in which to determine variables ahead-of-time, Oatlog's query
+planning implicitly selects such an order by repeatedy selecting an atom to join in from a set of
+premise atoms. Joins can be primary joins, which iterate all relation tuples matching some columns,
+or semi-joins which verify that there is at least one relation tuple that matches the known columns.
+Semi-joins, as dictated by Free Join, take precedence over primary joins, aside from the
+optimization that single-element primary joins are preferred. Oatlog encodes this as selecting the
+option with the maximum associated `RelationScore`, an enum which is shown with cases in ascending
+order of priority in @fig_impl_relation_score.
 
 #figure(
   ```rust
@@ -1962,10 +1959,10 @@ builds a trie from the rules with atoms as the alphabet. In order to actually ac
 among rules, this is done allowing for variable renaming. Effectively, Oatlog finds, for every rule,
 the set of joins that score the highest on the scale shown in @fig_impl_relation_score, then groups
 rules based on compatibility modulo renaming. Note that this compatibility is not transitive if
-there are multiple joins at the maximum `RelationScore`.
+a rule has multiple possible joins at the maximum `RelationScore`.
 
 In general we want to select the fewest atoms such that all rules are covered, which is the set-cover problem.
-Oatlog solves it greedily by repeatedly selecting the atom which covers the most new rules.
+Oatlog solves this greedily by repeatedly selecting the atom which covers the most new rules.
 
 == LIR, code generation and the runtime <section_implementation_lir_details>
 
@@ -1980,7 +1977,7 @@ affect.
 === E-class bitwidth
 
 Using 32-bit e-class IDs is preferable to 64-bit IDs since that roughly halves the size of indexes
-and union-finds. While it is entirely possibly to run out of the $2^32$ e-class IDs, it would
+and union-finds. While it is entirely possible to run out of the $2^32$ e-class IDs, it would
 require a larger e-graph than Oatlog can reasonably be expected to accomodate by default. The memory
 usage of an e-graph can be estimated as
 
@@ -1993,7 +1990,7 @@ $
 $
 
 which reasonably would be at least $8 dot 3 dot 4 dot 1 dot 2^32 =
-384 "GiB"$ of memory for the smallest e-graph that runs out of e-class IDs.
+384 "GiB"$ of memory for the smallest e-graph that runs out of 32-bit e-class IDs.
 
 === Sorting
 
@@ -2036,18 +2033,18 @@ union-finds are therefore implemented as in @fig_impl_oatlogs_uf.
           }
       }
   }
-  // with newer-to-older
+  // with younger-to-older merging
   fn union(a: u32, b: u32, repr: &mut [u32]) {
       let a = find(a, repr);
       let b = find(b, repr);
       if a == b {
           return;
       }
-      let (newer, older) = (u32::max(a, b), u32::min(a, b));
-      repr[newer] = older;
+      let (younger, older) = (u32::max(a, b), u32::min(a, b));
+      repr[younger] = older;
   }
   ```,
-  caption: [Union-find without path compression and with newer-to-older.],
+  caption: [Union-find without path compression and with younger-to-older merging using the e-class ID.],
 ) <fig_impl_oatlogs_uf>
 
 === Index implementation
@@ -2062,17 +2059,17 @@ tables, with rows larger than $12$ bytes, in which case indirect indexes are sen
 Indexes can be stored in multiple conceptually different ways. Egglog @egglog uses trie indexes that
 for a relation with columns $(A, B, C)$ behave like `HashMap<A, HashMap<B, C>>`. In order to reduce
 indirection, but also somewhat arbitrarily, Oatlog instead uses single `HashMap`s for all indexes.
-In this model, indexes come in the two types: functional dependency (FD) indexes, which store at
+In this model, indexes come in the two types of functional dependency (FD) indexes, which store at
 most one row per key, and non-FD indexes which may store any number of rows per key. An example of
 the former is `HashMap<(A, B), C>` and for the latter `HashMap<A, Vec<(B, C)>>`.
 
 Oatlog's FD indexes are indeed represented as `hashbrown::HashMap<Keys, Values>`, for some key and
-value columns where the value columns are uniquely determined through a functional dependency. In
-practice function dependencies are only derived from actual egglog-language-level functions, so
-there is always a single value column which also is the last column in a relation.
+value columns where the value columns are uniquely determined through the functional dependency. In
+practice functional dependencies are only derived from actual egglog-language-level functions, so
+there is always a single value column which also is the last column in the relation.
 
 The hashbrown @hashbrown/SwissTable @swisstable hashmap uses open addressing, storing both an array
-of 8-bit integers and an array of key value pairs. The 8-bit integer has 1 bit indicating whether
+of 8-bit integers and an array of key-value pairs. The 8-bit integer has 1 bit indicating whether
 the slot is empty or a tombstone, while the remaining 7 bits come from the hash of the key in the
 corresponding slot. Lookups use 128-bit SIMD against the array of 8-bit integers to do filtered
 linear probing in the key-value array with a $1/2^7 = 1/128$ false positive rate.
@@ -2118,12 +2115,13 @@ indexes and some vectors of e-nodes pending insertion.
 
 The function `Theory::new()` initializes the theory, including initializing global variables and
 executing various egglog commands hard-coded in the theory definition, but neither of these are
-present in @fig_impl_codegen_theory. The theory will be interacted with by interleaving calls to
-`step` with insertions and queries whose helper functions are not depicted in the listing.
+present in egglog program in @fig_impl_codegen_theory. The theory will be interacted with by
+interleaving calls to `step` with insertions and queries whose helper functions are not depicted in
+the listing.
 
 Equality saturation involves repeatedly calling `step`. When doing this, `apply_rules` performs
 relational e-matching by reading from the various `new`/`fd_index_`/`nofd_index_` indexes, with
-rewrite rule actions creating e-classes in the union-find, merging e-classes and push pending
+rewrite rule actions creating e-classes in the union-find, merging e-classes and pushing pending
 insertions to `delta`. The function `canonicalize` applies the pending insertions, then resolves
 functional dependencies within every relation to a fixed point.
 
@@ -2147,7 +2145,7 @@ functional dependencies within every relation to a fixed point.
 === Relational e-matching codegen <section_implementation_codegen_ematching>
 
 @section_implementation_tir_details has already discussed query planning as a worst-case-optimal
-Generic Join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
+Free Join with heuristics, performed jointly to create a rewrite rule trie. Such a trie is
 lowered to a tree of nested loops in the generated code, each performing a semi-join or a primary
 join. @fig_impl_codegen_ematching shows generated code for `apply_rules`, including the
 index-accessing functions on the `AddRelation`. No-FD indexes iterate their outputs while FD indexes
@@ -2159,8 +2157,8 @@ number of semi-naive variants of the distributive law from 3 to 2, as well as ca
 insertions to uphold the invariant that an index that contains `(a,b,c)` must also contain
 `(b,a,c)`.
 
-Finally, note that the indexes store timestamps, which are integers incremented with every call to
-`canonicalize` that serve as a way to distinguish `old` from `all` tuples within calls such as
+Finally, note that the indexes store timestamps, which are integers, incremented with every call to
+`canonicalize`, that serve as a way to distinguish `old` from `all` tuples within calls such as
 `self.mul_.iter_old_2_to_0_1`.
 
 #figure(
@@ -2192,7 +2190,7 @@ relation.
 Canonicalization can be implemented in amortized $O(n log n)$ time, with $n$ being the number of
 individual insertions, by using both FD and inverted indexes. The inverted indexes would for a given
 e-class list all e-nodes containing it, which can then all be removed from all indexes and replaced
-with canonicalized versions of the e-node. By merging e-class smaller-to-larger by e-node count in
+with canonicalized versions of the e-node. By merging e-classes smaller-to-larger by e-node count in
 the union-find, a given e-class would only be uprooted a logarithmic number of times and a round of
 canonicalization would take only $O("insertions" dot log("e-nodes"))$ time.
 
@@ -2269,8 +2267,8 @@ to a vector of pending insertions. These insertions are then applied using `upda
 process repeated until all relations contain only up-to-date e-nodes in their FD indexes.
 
 The `update` fixed point loop makes Oatlog's implementation of `canonicalize` quadratic in the worst
-case , if for example an e-graph of $n$ e-nodes has `update` called $n$ times with `update_begin` in
-every iteration performing exactly one union. This does however not occur in practice, with the
+case, if for example an e-graph of $n$ e-nodes has `update` called $n$ times with `update_begin` in
+every iteration performing exactly one union. This, however, does not occur in practice, with the
 `update` fixed point loop typically having a low single digit number of iterations.
 
 #figure(
@@ -2348,11 +2346,8 @@ We developed Oatlog alongside a few different kinds of tests. These are
 - Compatibility tests, where Oatlog and egglog run the same egglog program and their outputs are
   compared.
 
-// #TODO[knapsack is now allcorrect]
-// #TODO[looking up..good is zrocorrect]
-
-The compatibility tests are those most relevant to egglog compatibility and therefore those we focus
-on here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility
+The compatibility tests are those most relevant to egglog compatibility and we therefore focus on
+them here. In addition to the benchmark programs used in @section_eval_benchmarks, the compatibility
 tests run egglog's test suite. Of its 93 tests,
 - 14 are successful, while outputting an e-graph with a nonzero number of e-nodes,
 - 6 are successful, but output an empty e-graph,
@@ -2373,11 +2368,11 @@ verdicts.
 
 The second caveat, assuming that the $11$ tests together with the benchmarks thoroughly exercise the
 engine, is e-class numbering. Since egglog and Oatlog match rules and perform canonicalization in
-different orders, the union-find will be issued `make()` and `union()` operations in different order
-and thus nominal e-class ids will be different. In fact, since both egglog in its nondeterministic
-mode and Oatlog iterate hashmaps, e-class numbering is not even reproducible between two runs of the
-same engine due to randomized hash functions. However, if the e-classes are only used as opaque
-identifiers then their e-graphs are indistinguishable.
+different orders, the union-find will be issued `make()` and `union()` operations in different
+orders and thus nominal e-class IDs will be different. In fact, since both egglog in its
+nondeterministic mode and Oatlog iterate hashmaps, e-class numbering is not even reproducible
+between two runs of the same engine due to randomized hash functions. However, if the e-classes are
+only used as opaque identifiers then their e-graphs are indistinguishable.
 
 The missing features that prevent Oatlog from running 74 of the tests are primarily, in descending
 order,
@@ -2392,16 +2387,15 @@ not reasonable implementation-wise or usability-wise in a non-interpreter archit
 features could be surfaced in a different run-time API.
 
 Finally, although it is only exercised in a few tests, Oatlog does not support `query-extract` or
-even extraction in general. This, as well as the previously mentioned unsupported features are
-unsupported mostly because they are not necessary to demonstrate the speedups that can be achieved
+even extraction in general. This, as well as the previously mentioned unsupported features, is
+unsupported mostly because it is not necessary to demonstrate the speedups that can be achieved
 compared to egglog, and focusing in implementing them would distract from our ability to optimize
 Oatlog for performance within the limited scope of a master's thesis.
 
 == Benchmarks <section_eval_benchmarks>
 
-Oatlog's development has been guided by its performance on the three microbenchmarks --
-`fuelN_math`, `math`, and `boolean_adder` -- all of whose egglog code is available in
-@appendix_benchmarks.
+Oatlog's development has been guided by its performance on three microbenchmarks -- `fuelN_math`,
+`math`, and `boolean_adder` -- all of whose egglog code is available in @appendix_benchmarks.
 
 - The `boolean_adder` benchmark rewrites according to the laws of boolean algebra and is initialized
   with a 10-bit ripple carry adder.
@@ -2413,12 +2407,12 @@ Oatlog's development has been guided by its performance on the three microbenchm
   where the nesting count of integration by parts is limited to a $N$ between $1$ and $3$.
 
 The `fuelN_math` benchmark is run to a fixed point while the others are run with a specific step
-count. Although designing benchmarks is difficult and we cannot be sure that these benchmarks
-accurately capture the real-world performance of Oatlog,
+count. The `fuelN_math` benchmark therefore is compiled using Oatlog's relaxed mode while the others
+use Oatlog's strict mode.
 
 The complete benchmark results are shown in @fig_eval_benchmarks_table. The same data is also
 plotted in @fig_eval_benchmarks_plot, showing that Oatlog achieves very different speedups over
-egglog for different e-graph sizes. Oatlog is most competitive across the entire range, with 10-100x
+egglog for different e-graph sizes. Oatlog is competitive across the entire range, with 10-100x
 speedups below $10^3$ e-nodes, maintaining a large speedup down to about $2$x at $10^6$ e-nodes and
 performing very similarly to egglog over $10^7$ e-nodes.
 
@@ -2426,7 +2420,7 @@ performing very similarly to egglog over $10^7$ e-nodes.
   placement: auto,
   image("benchmarks.svg"),
   caption: [Oatlog's speedup over egglog as a function of the number of e-nodes in the e-graph. Oatlog has a
-    double-digit speedup for scenarios less than a thousand e-nodes, which gradually shrinks to closely
+    double-digit speedup for scenarios of less than a thousand e-nodes, which gradually shrinks to closely
     approach egglog's performance for e-graphs of tens of millions of e-nodes.],
 ) <fig_eval_benchmarks_plot>
 
@@ -2497,8 +2491,6 @@ but there are also differences, such as Oatlog
 - using flat indexes (effectively `HashMap<A, &[(B, C)]>` and `HashMap<(A, B), C>`) over trie
   indexes (effectively a single `HashMap<A, HashMap<B, C>>`),
 - exploiting invariant permutations for saturation benchmarks
-
-/*#TODO[Ablation? Although it would possibly be annoying to implement] OUT OF SCOPE */
 
 #figure(
   text(
@@ -2665,12 +2657,12 @@ for every e-node insertion created by `apply_rules` as well as every time the ca
 e-node is changed due to a functional-dependency-triggered union. Speeding up Oatlog is therefore
 not a matter of removing an accidental bottleneck but rather about addressing the fundamental issue
 of expensive random access by doing one of
-- fewer indexes,
-- fewer `update()` iterations to functional dependency fixed point,
-- more compact hashtable memory, increasing cache hit rates,
-- increased instruction-level parallelism for `update_begin()`,
-- a conceptual algorithmic change, avoiding random access for canonicalization, or
-- a conceptual change to the e-graph, storing fewer e-nodes for the same computation.
+- maintaining fewer indexes,
+- requiring fewer `update()` iterations to functional dependency fixed point,
+- having more compact hashtable memory, increasing cache hit rates,
+- increasing instruction-level parallelism for `update_begin()`,
+- avoiding random access for canonicalization through a conceptual algorithmic change, or
+- storing fewer e-nodes for the same computation, through a conceptual change to the e-graph.
 
 = Conclusion <chapter_conclusion>
 
@@ -2724,8 +2716,6 @@ large e-graphs. This is possibly the most interesting implementation detail, fro
 perspective, to study further.
 
 == Future work
-
-/*#TODO[Compare performance with Datalog engines, borrow more tricks from there] OUT OF SCOPE */
 
 Aside from studying how implementation details drive performance differences in Oatlog and egglog,
 possible future work on Oatlog includes adding features to improve egglog compatibility, smaller
