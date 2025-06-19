@@ -81,6 +81,7 @@
     exploits commutative relations to optimize queries and reduce memory usage. The second, trie
     query planning, amortizes index lookups across rewrite rules during e-matching.
 
+    Oatlog is accessible at https://github.com/oatlog/oatlog.
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite systems"),
   acknowledgements: [
