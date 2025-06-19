@@ -80,8 +80,6 @@
     engineering, but it also benefits from two novel techniques. The first, invariant permutations,
     exploits commutative relations to optimize queries and reduce memory usage. The second, trie
     query planning, amortizes index lookups across rewrite rules during e-matching.
-
-    Oatlog is accessible at https://github.com/oatlog/oatlog.
   ],
   keywords: ("e-graphs", "equality saturation", "datalog", "program optimization", "rewrite systems"),
   acknowledgements: [
@@ -1546,9 +1544,10 @@ depending on the situation.
 
 = Implementation <chapter_implementation>
 
-This section describes Oatlog -- focusing first on its external interface, then on its overall
-architecture, before finally going into detail on the compilation stages and their respective
-intermediate representations: HIR, TIR and LIR.
+This section describes Oatlog#footnote[Oatlog is accessible at https://github.com/oatlog/oatlog.] --
+focusing first on its external interface, then on its overall architecture, before finally going
+into detail on the compilation stages and their respective intermediate representations: HIR, TIR
+and LIR.
 
 == Oatlog from a user's perspective <section_implementation_api_interface>
 
