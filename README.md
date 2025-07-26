@@ -3,9 +3,9 @@
 Oatlog is an e-graph engine that is implements the egglog language while being faster than [egglog](https://github.com/egraphs-good/egglog).
 
 You can learn more about Oatlog through
-* the master's thesis, draft available at https://github.com/oatlog/oatlog/releases/tag/latest-report-draft
+* the master's thesis (https://github.com/oatlog/oatlog/releases/download/masters-thesis/oatlog_thesis.pdf)
 * the master's thesis presentation (TODO)
-* egraphs workshop video (TODO)
+* egraphs workshop video (https://www.youtube.com/watch?v=Me-sxQcfnQQ)
 
 ## Limitations
 
